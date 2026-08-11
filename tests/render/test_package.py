@@ -149,7 +149,13 @@ def test_une_relation_interne_nest_pas_marquee():
 
 
 def test_libreoffice_ouvre_le_fichier(docx_deux_pages, tmp_path):
-    """Le test de contrat : un docx corrompu fait échouer la conversion LibreOffice."""
+    """Vérifie qu'un lecteur réel consomme le package, sans plus.
+
+    LibreOffice n'est PAS un validateur : il convertit même du texte brut renommé en
+    .docx sans erreur (mesuré dans tests/visual/test_harness.py). La conformité
+    structurelle est couverte par les tests de parties obligatoires et de bonne formation
+    XML ci-dessus ; celui-ci ajoute seulement qu'un vrai lecteur ne s'étrangle pas.
+    """
     resultat = subprocess.run(
         [
             "soffice",
