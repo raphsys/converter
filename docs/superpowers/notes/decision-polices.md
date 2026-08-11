@@ -1,71 +1,81 @@
-# Décision : embarquement des polices
+# Décision : reconnaissance des polices
 
-**Verdict : `EMBARQUEMENT_RETENU = False`.**
+**Approche retenue : reconnaître la police exacte nommée par le PDF, dans une
+bibliothèque locale indexée.** Le `.docx` la référence par son nom ; `--embed-fonts`
+l'embarquera.
 
-La conversion utilise les polices système, avec correction de largeur par espacement.
-C'est le mode de repli prévu par la spec §8, et il devient le comportement unique.
+Une première version de cette note concluait « pas d'embarquement, substitution vers
+Arial ». Ce cadrage était faux et est abandonné : il traitait le sous-ensemble embarqué
+dans le PDF comme la seule source possible, alors que le PDF fournit surtout un *nom*.
 
-## Mesure
+## Le raisonnement
 
-Sonde `scripts/probe_pymupdf.py` exécutée sur trois PDF réels, publics et techniques —
-une licence, un article scientifique, une classification médicale. 19 polices relevées.
-Pour chacune : extraction via `doc.extract_font(xref)`, puis lecture du cmap par
-fontTools.
+Un PDF embarque des sous-ensembles de police : réduits aux glyphes employés, souvent
+privés de leur table `cmap`. Mesure sur 19 polices de trois PDF réels :
 
-| Type de police | Encodage | Exemple | Octets | cmap |
-|---|---|---|---|---|
-| TrueType | WinAnsiEncoding | `FAWIGL+Raleway-Medium` | 8352 | **407 entrées** |
-| TrueType | WinAnsiEncoding | `FAWIGL+Raleway-Bold` | 13496 | **407 entrées** |
-| TrueType | WinAnsiEncoding | `FAWIGL+Raleway-Thin` | 8198 | **409 entrées** |
-| TrueType | MacRomanEncoding | `AAAAAB+HelveticaNeue-Bold` | 9952 | **0 entrée** |
-| TrueType | MacRomanEncoding | `AAAAAC+HelveticaNeue` | 14156 | **0 entrée** |
-| Type0 (CID) | Identity-H | `FAWIGL+Raleway-Medium` | 10700 | **table absente** |
-| Type0 (CID) | Identity-H | `NVCIQX+Raleway-Bold` | 8568 | **table absente** |
-| Type1 (`pfa`) | — | `BZVLCX+NimbusSanL-Regu` | 9726 | **illisible par fontTools** |
-| Type1 (`pfa`) | — | `JCVQDE+URWPalladioL-Roma` | 26175 | **illisible par fontTools** |
-| base-14 | — | `Times-Roman` | 0 | non embarquée |
+| Type | Encodage | cmap |
+|---|---|---|
+| TrueType | WinAnsiEncoding | 407-409 entrées |
+| TrueType | MacRomanEncoding | 0 entrée |
+| Type0 (CID) | Identity-H | table absente |
+| Type1 (`pfa`) | — | illisible par fontTools |
 
-Un seul des quatre cas embarquables fonctionne directement : TrueType avec un encodage
-simple. Les trois autres échouent, chacun pour une raison distincte :
+Trois cas sur quatre sont inexploitables — dont Type0/Identity-H, dominant dans les PDF
+modernes. Conclusion correcte : **le sous-ensemble du PDF n'est pas une source de
+métriques**. Conclusion erronée qu'on en avait tirée : « donc on substitue à l'aveugle ».
 
-- **MacRomanEncoding** : la police est un sous-ensemble dont le cmap a été retiré. Le
-  mappage code → glyphe vit dans le dictionnaire de police du PDF, pas dans le fichier.
-- **Type0 / Identity-H** : par construction, ces polices CID n'ont pas de table cmap. Le
-  code du caractère *est* l'identifiant de glyphe, et la correspondance vers Unicode passe
-  par le `ToUnicode` du PDF. C'est le cas dominant des PDF modernes.
-- **Type1 / `pfa`** : format non-sfnt, que fontTools ne peut pas ouvrir sans conversion
-  préalable vers OTF.
+Le PDF donne aussi le nom PostScript de chaque police (`AAAAAB+HelveticaNeue-Bold`).
+Ce nom suffit à retrouver la police complète sur le disque — laquelle a un cmap valide et
+les bonnes chasses. C'est cette police qui fait autorité.
 
-## Pourquoi ça tranche
+Substituer à l'aveugle fausse les largeurs, donc oblige la correction d'espacement à
+rattraper un écart grossier. Reconnaître la police rend cette correction fine.
 
-La spec §8 annonçait le risque : « les polices embarquées dans un PDF sont presque
-toujours des sous-ensembles, dont la table cmap est absente ou arbitraire ». La mesure le
-confirme, et précise l'ampleur : ce n'est pas un cas limite, c'est le cas courant.
+## Mise en œuvre
 
-La mitigation prévue — reconstruire le cmap depuis le `ToUnicode` — reste techniquement
-possible, mais elle représente un chantier à elle seule : trois chemins de code distincts
-(sfnt sans cmap, CID, Type1), chacun avec ses pièges, pour un gain qui ne porte que sur la
-forme exacte des glyphes. La mise en page, elle, est déjà exacte sans embarquement grâce à
-la correction de largeur.
+`pdfexact/fontlib.py` construit un index et le résout en cascade :
 
-C'est un mauvais rapport risque/valeur en début de projet. Décision : on livre le mode
-police système, et l'embarquement redevient un chantier candidat une fois la chaîne
-complète mesurée.
+1. nom PostScript exact, préfixe de sous-ensemble retiré
+2. famille + style
+3. **équivalence métrique** via `pdfexact/data/alias_polices.json`
+4. famille seule, en Regular
+5. échec → substitution signalée dans le rapport
 
-## Ce qui reste en place
+Sources indexées, par priorité croissante : polices système via `fc-list` (qui expose
+déjà le nom PostScript, donc sans ouvrir les fichiers), puis les dossiers — `fonts/` du
+projet et tout `--font-dir`. Un dossier l'emporte toujours sur le système, ce qui rend une
+conversion reproductible d'un poste à l'autre.
 
-`pdfexact/render/fonts_embed.py` fournit `obfusquer_police()` et `nouveau_guid()`,
-testés (8 tests). C'est de l'infrastructure **non branchée** : rien ne l'appelle
-aujourd'hui. Elle est conservée parce qu'elle encode la partie non évidente du problème —
-l'obfuscation `.odttf` attendue par Word — et rend le chantier de suivi mécanique.
+## Mesure de reconnaissance
+
+Sur les mêmes trois PDF, 53 polices distinctes, avec 139 polices système indexées et un
+dossier `fonts/` vide :
+
+| Étape | Reconnues |
+|---|---|
+| Nom PostScript et famille seuls | 4 / 53 |
+| **+ table d'équivalences métriques** | **28 / 53** |
+
+Les 25 manques restants se répartissent en trois catégories, et une seule appelle une
+action :
+
+- **Polices absentes** (5 — Raleway et ses graisses) : à déposer dans `fonts/`. C'est le
+  cas nominal que la bibliothèque est faite pour traiter.
+- **Computer Modern en corps 6 à 9** (12) : seul le corps 10 est installé. Les rediriger
+  vers cmr10 fausserait les chasses — les tailles optiques de CM ne sont pas homothétiques.
+  Laissés en repli délibérément.
+- **Sous-ensembles anonymes** (8 — `TT2Bo00`, `TT79o00`) : le PDF ne dit pas de quelle
+  police il s'agit. Aucun dossier n'y changera rien ; seul le repli s'applique.
+
+## Embarquement
+
+Redevenu possible, et pour la bonne raison : on embarquerait la police **de la
+bibliothèque**, complète et pourvue d'un cmap, jamais le sous-ensemble cassé du PDF.
+
+`pdfexact/render/fonts_embed.py` fournit l'obfuscation `.odttf` attendue par Word,
+testée (8 tests). Non branché pour l'instant : le comportement par défaut est le
+référencement par nom, `--embed-fonts` viendra l'activer.
 
 **Non validé** : l'algorithme d'obfuscation n'a pas été confronté à un `.docx` produit par
-Word avec polices embarquées. Les tests prouvent l'involution et la dérivation de clé, pas
-la conformité à Word. Cette validation appartient au chantier d'embarquement, pas à
-maintenant.
-
-## Conséquence sur la spec
-
-`--no-embed-fonts` (spec §7) n'est pas implémentée : un drapeau qui ne commute rien serait
-pire que pas de drapeau. Elle apparaîtra avec l'embarquement. Voir la section « Écart
-assumé avec la spec » du plan d'implémentation.
+Word. Les tests prouvent l'involution et la dérivation de clé, pas la conformité. Cette
+validation appartient au chantier `--embed-fonts`.

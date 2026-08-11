@@ -5,3 +5,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Polices : fichiers non redistribuables, seul le mode d'emploi est suivi
+fonts/*
+!fonts/LISEZ-MOI.md

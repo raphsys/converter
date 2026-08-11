@@ -1,0 +1,80 @@
+{
+  "_lisez_moi": [
+    "Table d'équivalence entre les familles nommées par les PDF et les familles réellement",
+    "installables. Éditable : ajoutez vos propres correspondances sans toucher au code.",
+    "",
+    "Clé   : nom de famille du PDF, en minuscules, sans espace ni ponctuation, et sans les",
+    "        suffixes de fonderie MT / PS / PSMT (la normalisation s'en charge).",
+    "Valeur: nom de famille tel que fontconfig ou la police du dossier le déclare.",
+    "",
+    "Les familles listées à droite sont des clones métriquement compatibles : mêmes chasses",
+    "que l'originale, donc la mise en page tombe juste même si le dessin diffère un peu."
+  ],
+
+  "familles": {
+    "arial": "Liberation Sans",
+    "arialnarrow": "Liberation Sans Narrow",
+    "helvetica": "Nimbus Sans",
+    "helveticaneue": "Nimbus Sans",
+    "nimbussanl": "Nimbus Sans",
+    "nimbussanslt": "Nimbus Sans",
+
+    "times": "Liberation Serif",
+    "timesnewroman": "Liberation Serif",
+    "timesroman": "Nimbus Roman",
+    "nimbusromno9l": "Nimbus Roman",
+    "nimbusroman": "Nimbus Roman",
+
+    "couriernew": "Liberation Mono",
+    "courier": "Nimbus Mono PS",
+    "nimbusmonl": "Nimbus Mono PS",
+    "nimbusmonops": "Nimbus Mono PS",
+
+    "urwpalladiol": "P052",
+    "palatino": "P052",
+    "palatinolinotype": "P052",
+
+    "centuryschl": "C059",
+    "newcenturyschlbk": "C059",
+
+    "urwbookmanl": "URW Bookman",
+    "bookmanoldstyle": "URW Bookman",
+
+    "urwgothicl": "URW Gothic",
+    "avantgarde": "URW Gothic",
+
+    "urwchanceryl": "Z003",
+    "zapfchancery": "Z003",
+
+    "symbol": "Standard Symbols PS",
+    "zapfdingbats": "D050000L",
+    "dingbats": "D050000L",
+
+    "verdana": "DejaVu Sans",
+    "tahoma": "DejaVu Sans",
+    "segoeui": "DejaVu Sans",
+    "calibri": "Carlito",
+    "cambria": "Caladea",
+    "georgia": "Gelasio"
+  },
+
+  "styles": {
+    "regu": "regular",
+    "roma": "regular",
+    "rom": "regular",
+    "medi": "regular",
+    "bd": "bold",
+    "bol": "bold",
+    "ital": "italic",
+    "ita": "italic",
+    "obl": "italic",
+    "oblique": "italic",
+    "reguital": "italic",
+    "romaital": "italic",
+    "bdita": "bold italic",
+    "boldital": "bold italic",
+    "bolditalic": "bold italic",
+    "boldoblique": "bold italic",
+    "bdoblique": "bold italic"
+  }
+}
