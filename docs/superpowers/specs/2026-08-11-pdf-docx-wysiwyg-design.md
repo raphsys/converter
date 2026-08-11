@@ -259,38 +259,54 @@ L'API Python expose la même chose : `pdfexact.convert(src, dst, **options) -> R
 
 ## 8. Polices
 
-C'est le point techniquement le plus incertain du projet, et il est traité en premier dans
-l'implémentation.
+Le PDF n'embarque que des sous-ensembles de police, souvent privés de leur table `cmap` :
+inexploitables pour mesurer du texte. Mesure sur 19 polices de trois PDF réels — seul le
+cas TrueType + WinAnsiEncoding porte un cmap utilisable ; MacRomanEncoding, Type0/Identity-H
+et Type1 échouent, et Type0 domine les PDF modernes.
 
-Chaîne de traitement, à partir de `doc.extract_font(xref)` :
+En revanche le PDF **nomme** toujours ses polices. C'est ce nom qui sert.
 
-| Cas | Traitement |
-|---|---|
-| TrueType ou OpenType embarqué | injection directe |
-| CFF ou Type1 embarqué | conversion vers OTF via fontTools |
-| Non embarquée (base 14) | mappage : Helvetica → Arial, Times → Times New Roman, Courier → Courier New |
+### Bibliothèque de reconnaissance
 
-L'embarquement dans Word passe par `fontTable.xml`, avec une entrée
-`<w:embedRegular r:id="..." w:fontKey="{GUID}"/>` par police. Le fichier de police est
-obfusqué selon la convention Word : les 32 premiers octets sont combinés par XOR avec les
-octets du GUID. `settings.xml` doit porter `<w:embedTrueTypeFonts/>`.
+`pdfexact/fontlib.py` indexe les polices disponibles et résout un nom PostScript en
+cascade :
 
-### Risque identifié
+1. nom exact, préfixe de sous-ensemble retiré
+2. famille + style
+3. équivalence métrique via `pdfexact/data/alias_polices.json` — table de **données**,
+   éditable sans toucher au code
+4. famille seule, en Regular
+5. échec → substitution approchante, signalée dans le rapport
 
-Les polices embarquées dans un PDF sont presque toujours des sous-ensembles, dont la table
-cmap est absente ou arbitraire — les codes de glyphes n'ont aucune raison de correspondre
-à de l'Unicode. Embarquée telle quelle dans un docx, une telle police affiche du charabia.
+Sources, par priorité croissante : polices système (`fc-list`), bibliothèque embarquée
+dans le paquet, dossier `fonts/` du projet, puis chaque `--font-dir`. Le dernier gagne.
 
-Mitigation : reconstruire la table cmap à partir du `ToUnicode` du PDF, via fontTools,
-avant l'embarquement.
+`pdfexact/fonts/` embarque 444 polices à licence libre vérifiée, suivies par git : un
+clone du dépôt convertit à l'identique sur n'importe quelle machine. `scripts/auditer_licences.py`
+lit `OS/2.fsType` et les mentions de licence de chaque fichier et refuse tout ce qu'il ne
+reconnaît pas — une licence non identifiée n'est jamais présumée permissive.
 
-Repli si la mitigation échoue sur un document donné : police système la plus proche, plus
-la correction de largeur par espacement décrite en section 4. Les glyphes diffèrent
-légèrement, la mise en page reste exacte. `--no-embed-fonts` force ce mode.
+### Ce que la reconnaissance apporte, mesuré
 
-L'embarquement de polices est donc souhaitable mais non bloquant. Il est validé par un
-prototype avant l'écriture du writer complet ; s'il s'avère impraticable, le projet livre
-le mode repli et reste conforme aux critères de réussite.
+La police retrouvée fournit les métriques réelles, qui gouvernent le placement :
+ascendante pour le sommet de la zone de texte, avances de glyphes pour la correction de
+largeur.
+
+| Cas | dx | dy | largeur |
+|---|---|---|---|
+| Police exactement retrouvée | 0,000 pt | 0,000 pt | 0,000 % |
+| Police réelle (Raleway, document complexe) | +0,09 pt | −0,04 pt | −0,09 % |
+| Police substituée (HelveticaNeue → Nimbus Sans) | +0,12 pt | +0,62 pt | +1,7 % |
+
+L'écart entre la dernière ligne et les deux premières est exactement ce que la
+reconnaissance évite.
+
+### Embarquement dans le docx
+
+Le `.docx` référence la police par son nom. `--embed-fonts` l'embarquera : on embarquerait
+alors la police **de la bibliothèque**, complète et pourvue d'un cmap, jamais le
+sous-ensemble cassé du PDF. `pdfexact/render/fonts_embed.py` fournit déjà l'obfuscation
+`.odttf` attendue par Word, testée mais non branchée.
 
 ## 9. Gestion des erreurs
 

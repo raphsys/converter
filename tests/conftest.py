@@ -67,3 +67,37 @@ def pdf_liens(tmp_path):
     doc.save(chemin)
     doc.close()
     return chemin
+
+
+@pytest.fixture
+def police_embarquee():
+    """Chemin d'une police livrée avec le paquet, pour des mesures déterministes."""
+    from pdfexact.fontlib import DOSSIER_EMBARQUE
+
+    for nom in ("LiberationSans-Regular.ttf", "LiberationSans.ttf", "DejaVuSans.ttf"):
+        chemin = DOSSIER_EMBARQUE / nom
+        if chemin.exists():
+            return chemin
+    candidats = sorted(DOSSIER_EMBARQUE.glob("*.ttf"))
+    if not candidats:
+        pytest.skip("bibliothèque embarquée vide")
+    return candidats[0]
+
+
+@pytest.fixture
+def pdf_police_connue(tmp_path, police_embarquee):
+    """PDF composé avec une police que la bibliothèque retrouvera à l'identique.
+
+    C'est le cas nominal : aucune substitution, donc l'erreur de placement mesurée
+    n'exprime que la qualité de la chaîne, pas l'écart entre deux polices différentes.
+    """
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_font(fontname="F0", fontfile=str(police_embarquee))
+    page.insert_text((72, 120), "Hamburgefonstiv 12345", fontname="F0", fontsize=12)
+    page.insert_text((72, 240), "Deuxieme ligne temoin", fontname="F0", fontsize=18)
+    page.insert_text((300, 400), "Troisieme, plus a droite", fontname="F0", fontsize=9)
+    chemin = tmp_path / "police_connue.pdf"
+    doc.save(chemin)
+    doc.close()
+    return chemin

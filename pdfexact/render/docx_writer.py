@@ -5,7 +5,8 @@ sert uniquement de point d'ancrage. Tous les éléments sont des formes flottant
 positionnées par rapport à la page, donc hors du flux — rien ne peut refluer.
 """
 from pdfexact.geometry import emu_vers_pt, pt_vers_twips
-from pdfexact.ir import Document, Page
+from pdfexact.ir import Document, Page, TextBox
+from pdfexact.render.drawing import zone_texte_xml
 
 _ENTETE = (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -40,9 +41,17 @@ def _section_xml(page: Page) -> str:
 def _ancres_de_page(page: Page, compteur: list, relations, media: dict) -> str:
     """Rend tous les éléments de la page, dans l'ordre de superposition.
 
-    Vide pour l'instant : les types d'élément sont branchés par les tâches suivantes.
+    `relativeHeight` croît avec l'ordre du flux de contenu PDF, ce qui reproduit les
+    recouvrements de l'original.
     """
-    return ""
+    morceaux = []
+    for z, element in enumerate(page.elements, start=1):
+        if isinstance(element, TextBox):
+            for ligne in element.lignes:
+                compteur[0] += 1
+                morceaux.append(zone_texte_xml(ligne, compteur[0], z, relations))
+        # Images, formes et liens de zone sont branchés par les tâches 9 à 12.
+    return "".join(morceaux)
 
 
 def construire_document_xml(document: Document, relations) -> str:

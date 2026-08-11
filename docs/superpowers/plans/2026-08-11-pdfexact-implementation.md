@@ -1300,6 +1300,15 @@ git commit -m "test: add SSIM-based visual regression harness"
 
 ### Task 8 : extraction et rendu du texte — première mesure de fidélité
 
+> **Réalisée. Le code livré diverge de ce qui suit sur un point :** `extract/fonts.py` ne
+> substitue plus à l'aveugle, il interroge `pdfexact.fontlib` pour retrouver la police
+> exacte et en tirer les métriques. Voir la spec §8. Le reste de la tâche — une zone de
+> texte par ligne, placement sur la baseline, correction d'espacement — est conforme.
+>
+> Le critère de validation a été durci : au lieu du seul SSIM, `ecarts_de_placement()`
+> relit les baselines du PDF reconverti et les compare numériquement à la source.
+> Résultat sur police exactement retrouvée : 0,000 pt d'écart, SSIM 1,0000.
+
 **Files:**
 - Create: `pdfexact/extract/__init__.py`
 - Create: `pdfexact/extract/fonts.py`

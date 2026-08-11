@@ -115,3 +115,71 @@ def rapport_de_comparaison(scores, seuil: float = SEUIL_PAR_DEFAUT) -> str:
         marque = "ok " if score >= seuil else "ECHEC"
         lignes.append(f"  page {numero} : SSIM {score:.4f}  [{marque}]")
     return "\n".join(lignes)
+
+
+def origines_de_page(chemin_pdf, page: int = 0) -> list[tuple[str, float, float, float]]:
+    """Retourne (texte, x, baseline_y, largeur) de chaque span, en points."""
+    doc = pymupdf.open(chemin_pdf)
+    releve = []
+    try:
+        for bloc in doc[page].get_text("dict").get("blocks", []):
+            if bloc.get("type") != 0:
+                continue
+            for ligne in bloc["lines"]:
+                for span in ligne["spans"]:
+                    texte = span["text"].strip()
+                    if texte:
+                        releve.append(
+                            (
+                                texte,
+                                span["origin"][0],
+                                span["origin"][1],
+                                span["bbox"][2] - span["bbox"][0],
+                            )
+                        )
+    finally:
+        doc.close()
+    return releve
+
+
+def ecarts_de_placement(pdf_source, docx_produit, page_source: int = 0) -> dict:
+    """Compare les positions de texte entre le PDF source et le docx reconverti.
+
+    Bien plus sévère que le SSIM : on lit les coordonnées réelles des baselines au lieu
+    de comparer des images. Un décalage d'un dixième de point se voit ici, pas à l'œil.
+
+    Les spans sont appariés par texte identique, puis par abscisse la plus proche — un
+    même mot apparaissant plusieurs fois sur la page fausserait sinon la mesure.
+    """
+    dossier = Path(docx_produit).parent
+    pdf_produit = docx_vers_pdf(docx_produit, dossier)
+
+    source = origines_de_page(pdf_source, page_source)
+    produit = origines_de_page(pdf_produit, 0)
+
+    par_texte: dict[str, list] = {}
+    for texte, x, y, largeur in produit:
+        par_texte.setdefault(texte, []).append((x, y, largeur))
+
+    dx, dy, dlargeur = [], [], []
+    for texte, x, y, largeur in source:
+        candidats = par_texte.get(texte)
+        if not candidats:
+            continue
+        X, Y, L = min(candidats, key=lambda c: abs(c[0] - x))
+        dx.append(X - x)
+        dy.append(Y - y)
+        if largeur > 1:
+            dlargeur.append((L - largeur) / largeur * 100.0)
+
+    def _mediane(valeurs):
+        return float(np.median(valeurs)) if valeurs else float("nan")
+
+    return {
+        "apparies": len(dx),
+        "total_source": len(source),
+        "dx_median_pt": _mediane(dx),
+        "dy_median_pt": _mediane(dy),
+        "dlargeur_median_pct": _mediane(dlargeur),
+        "dy_max_pt": max((abs(v) for v in dy), default=float("nan")),
+    }

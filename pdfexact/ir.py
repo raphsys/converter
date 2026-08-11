@@ -5,10 +5,13 @@ connaît l'autre. Toutes les dimensions sont en EMU, à l'exception de Span.size
 points, parce que Word exprime les corps de police en demi-points.
 """
 from dataclasses import dataclass, field
+from pathlib import Path as CheminFichier
 from typing import Union
 
 from pdfexact.geometry import BBox
 
+# Attention : `Path` désigne ici un tracé vectoriel, pas un chemin de fichier — d'où
+# l'import de pathlib sous le nom CheminFichier.
 # Une commande de chemin : un opérateur et ses points, en EMU absolus.
 # Opérateurs : "move", "line", "cubic", "quad", "close".
 PathCommand = tuple[str, tuple[tuple[int, int], ...]]
@@ -28,6 +31,10 @@ class FontAsset:
     donnees: bytes | None
     extension: str
     embarquee: bool
+    # Fichier de police retrouvé par la bibliothèque. C'est lui qui fournit les métriques
+    # réelles ; sans lui, on ne peut que retomber sur une approximation.
+    chemin: CheminFichier | None = None
+    reconnue: bool = False
 
 
 @dataclass(frozen=True)
