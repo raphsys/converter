@@ -132,3 +132,34 @@ def test_une_bibliotheque_vide_resout_none():
     bibliotheque = Bibliotheque(par_nom={}, par_famille_style={})
 
     assert bibliotheque.resoudre("Arial") is None
+
+
+def test_la_bibliotheque_embarquee_est_livree_avec_le_paquet():
+    from pdfexact.fontlib import DOSSIER_EMBARQUE
+
+    assert DOSSIER_EMBARQUE.is_dir(), "pdfexact/fonts/ doit être livré avec le paquet"
+    assert any(DOSSIER_EMBARQUE.glob("*.ttf")) or any(DOSSIER_EMBARQUE.glob("*.otf"))
+
+
+def test_les_familles_courantes_sont_reconnues_sans_le_systeme():
+    """Le test qui garantit l'autonomie : aucune police système, tout vient du paquet.
+
+    Sur une machine nue, ces familles doivent se résoudre via la bibliothèque embarquée
+    et la table d'équivalences métriques.
+    """
+    from pdfexact.fontlib import DOSSIER_EMBARQUE
+
+    bibliotheque = construire(dossiers=[DOSSIER_EMBARQUE], inclure_systeme=False)
+
+    for nom in ("Arial", "ArialMT", "Helvetica", "TimesNewRomanPSMT", "Courier"):
+        assert bibliotheque.resoudre(nom) is not None, f"{nom} non reconnue hors système"
+
+
+def test_le_dossier_dextension_du_projet_est_charge_par_defaut(tmp_path, monkeypatch):
+    from pdfexact.fontlib import NOM_DOSSIER_LOCAL, dossiers_par_defaut
+
+    extension = tmp_path / NOM_DOSSIER_LOCAL
+    extension.mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    assert extension in dossiers_par_defaut()

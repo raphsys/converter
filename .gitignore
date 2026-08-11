@@ -6,6 +6,8 @@ __pycache__/
 build/
 dist/
 
-# Polices : fichiers non redistribuables, seul le mode d'emploi est suivi
-fonts/*
-!fonts/LISEZ-MOI.md
+# La bibliotheque embarquee (pdfexact/fonts/) EST suivie : c'est elle qui rend le
+# projet autonome. Seul le dossier d'extension de la racine est ignore, ainsi que
+# fonts/local/, ou l'audit de licences met en quarantaine le non redistribuable.
+/fonts/*
+!/fonts/LISEZ-MOI.md

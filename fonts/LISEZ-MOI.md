@@ -1,49 +1,65 @@
-# Bibliothèque de polices
+# Polices : bibliothèque embarquée et extensions
 
-Déposez ici les fichiers de police (`.ttf`, `.otf`, `.ttc`) que vos PDF utilisent.
-Le dossier est scanné récursivement, et **il a priorité sur les polices installées du
-système** : c'est ce qui rend une conversion reproductible d'une machine à l'autre.
+Le projet embarque sa propre bibliothèque de polices, dans `pdfexact/fonts/`. C'est ce qui
+le rend autonome : un clone du dépôt convertit à l'identique sur n'importe quelle machine,
+sans dépendre de ce qui y est installé.
 
-## Pourquoi c'est nécessaire
+## Les trois niveaux
 
-Un PDF n'embarque qu'un *sous-ensemble* de chaque police, réduit aux seuls glyphes
-utilisés, et souvent privé de sa table de correspondance caractère → glyphe. Ce
-sous-ensemble ne permet ni de mesurer du texte ni de le réafficher.
+Indexation du moins au plus prioritaire — le dernier inscrit gagne :
+
+| Emplacement | Contenu | Suivi par git |
+|---|---|---|
+| Polices du système | ce que `fc-list` déclare | — |
+| `pdfexact/fonts/` | **405 polices à licence libre**, livrées avec le projet | oui |
+| `fonts/` (ce dossier) | vos ajouts, propres à cette machine | non |
+| `--font-dir <chemin>` | dossiers supplémentaires, option répétable | — |
+
+Une police déposée ici l'emporte donc sur celle livrée, qui l'emporte sur celle du système.
+
+## Pourquoi une bibliothèque plutôt que les polices du PDF
+
+Un PDF n'embarque qu'un *sous-ensemble* de chaque police, réduit aux glyphes employés et
+souvent privé de sa table de correspondance caractère → glyphe. Ce sous-ensemble ne permet
+ni de mesurer du texte ni de le réafficher.
 
 En revanche, le PDF nomme toujours ses polices. Le convertisseur lit ce nom et cherche la
-vraie police correspondante : ici d'abord, puis parmi les polices du système.
+vraie police : ici, puis dans la bibliothèque embarquée, puis sur le système. Trouvée, ses
+métriques réelles positionnent le texte au bon endroit. Non trouvée, le convertisseur
+retombe sur une famille approchante et le signale dans son rapport.
 
-Quand la police est trouvée, ses métriques réelles servent à positionner le texte, et le
-`.docx` déclare son vrai nom. Quand elle ne l'est pas, le convertisseur retombe sur une
-famille approchante et le signale dans son rapport de conversion.
+## Ajouter des polices
 
-## Savoir quoi déposer
+Déposez les fichiers `.ttf`, `.otf` ou `.ttc` dans ce dossier — il est scanné
+récursivement. Le rapport de conversion liste les polices non reconnues : ce sont
+précisément celles à récupérer.
 
-Le rapport de conversion liste les polices non reconnues. Ce sont celles à récupérer.
+Trois cas parmi les manques, un seul appelle une action :
 
-Trois cas de figure parmi les manques :
+- **Police absente** (Raleway, Helvetica Neue, une police d'entreprise) : déposez-la ici.
+- **Police ayant un clone métrique** (Arial, Times New Roman, Courier) : inutile.
+  `pdfexact/data/alias_polices.json` la redirige vers Liberation, Nimbus ou Carlito, dont
+  les chasses sont identiques. Pour ajouter une équivalence, éditez ce fichier plutôt que
+  de dupliquer un fichier de police.
+- **Sous-ensemble anonyme** (`TT2Bo00`, `ABCDEF+F1`) : le PDF ne dit pas de quelle police
+  il s'agit. Aucun dossier n'y changera rien.
 
-- **Police commerciale ou absente du système** — Raleway, Helvetica Neue, une police
-  d'entreprise. C'est le cas nominal : déposez le fichier ici.
-- **Police ayant un clone métrique déjà installé** — Arial, Times New Roman, Courier.
-  Inutile de la déposer : `pdfexact/data/alias_polices.json` la redirige vers son clone
-  (Liberation, Nimbus…), dont les chasses sont identiques.
-- **Sous-ensemble anonyme** — noms du type `TT2Bo00`, `ABCDEF+F1`. Le PDF ne dit pas de
-  quelle police il s'agit ; aucun dossier n'y changera rien.
-
-## Ajouter une équivalence
-
-Si une famille devrait être redirigée vers une autre, éditez
-`pdfexact/data/alias_polices.json` plutôt que de dupliquer un fichier de police. Le
-format et les conventions de nommage sont documentés dans le fichier lui-même.
-
-## Autres dossiers
-
-L'option `--font-dir` accepte d'autres emplacements, et se répète :
+## Outils
 
 ```bash
-pdfexact convertir doc.pdf doc.docx --font-dir ~/polices-client --font-dir /opt/fonts
+# Moissonner les polices complètes déjà présentes sur la machine
+python scripts/importer_polices.py --destination fonts
+
+# Vérifier ce qui est redistribuable avant d'ajouter à la bibliothèque embarquée
+python scripts/auditer_licences.py --dossier pdfexact/fonts
 ```
 
-Le contenu de ce dossier n'est pas suivi par git, à l'exception de ce fichier : les
-polices ont leurs propres licences de redistribution.
+## Licences
+
+Seules les polices à licence libre vérifiée sont embarquées dans `pdfexact/fonts/` :
+OFL, Apache, MIT, Ubuntu Font License, domaine public. La vérification lit le champ
+`fsType` et les mentions de licence de chaque fichier ; une licence non identifiée est
+refusée, jamais présumée permissive.
+
+`fonts/local/` reçoit ce que l'audit écarte. Ce dossier n'est pas suivi par git : ces
+polices restent utilisables pour vos conversions, mais ne sont pas redistribuées.

@@ -22,6 +22,14 @@ EXTENSIONS_INDEXABLES = {".ttf", ".otf", ".ttc"}
 
 FICHIER_ALIAS = Path(__file__).parent / "data" / "alias_polices.json"
 
+# Bibliothèque livrée avec le paquet : c'est elle qui rend une conversion identique d'une
+# machine à l'autre, sans dépendre de ce qui est installé localement.
+DOSSIER_EMBARQUE = Path(__file__).parent / "fonts"
+
+# Dossier d'extension, à la racine du projet. Ce que l'utilisateur y dépose l'emporte sur
+# la bibliothèque embarquée.
+NOM_DOSSIER_LOCAL = "fonts"
+
 # Suffixes de fonderie accolés aux noms PostScript : ArialMT, TimesNewRomanPSMT.
 # Ils ne portent aucune information de style et empêchent la correspondance.
 _SUFFIXES_FONDERIE = ("psmt", "mt", "ps")
@@ -260,12 +268,22 @@ def _indexer_systeme():
         )
 
 
-def construire(dossiers=(), inclure_systeme: bool = True) -> Bibliotheque:
+def dossiers_par_defaut() -> list[Path]:
+    """Bibliothèque embarquée, puis dossier d'extension du projet s'il existe."""
+    candidats = [DOSSIER_EMBARQUE, Path.cwd() / NOM_DOSSIER_LOCAL]
+    return [dossier for dossier in candidats if dossier.is_dir()]
+
+
+def construire(dossiers=None, inclure_systeme: bool = True) -> Bibliotheque:
     """Construit l'index des polices disponibles.
 
-    Le système est indexé en premier et les dossiers ensuite, de sorte qu'une police
-    déposée dans un dossier l'emporte toujours sur celle installée sur la machine : c'est
-    ce qui rend une conversion reproductible d'un poste à l'autre.
+    Ordre d'indexation, du moins au plus prioritaire : polices installées sur la machine,
+    bibliothèque embarquée dans le paquet, puis dossiers d'extension. Le dernier inscrit
+    l'emporte, de sorte qu'une police déposée par l'utilisateur prime sur celle livrée,
+    qui prime elle-même sur celle du système.
+
+    `dossiers=None` utilise les emplacements par défaut ; passer une liste, même vide,
+    la remplace intégralement.
     """
     bibliotheque = Bibliotheque()
 
@@ -273,7 +291,7 @@ def construire(dossiers=(), inclure_systeme: bool = True) -> Bibliotheque:
         for police in _indexer_systeme():
             bibliotheque.ajouter(police, prioritaire=False)
 
-    for dossier in dossiers:
+    for dossier in dossiers_par_defaut() if dossiers is None else dossiers:
         for police in _indexer_dossier(Path(dossier)):
             bibliotheque.ajouter(police, prioritaire=True)
 

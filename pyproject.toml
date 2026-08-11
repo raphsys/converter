@@ -27,7 +27,7 @@ pdfexact = "pdfexact.cli:main"
 include = ["pdfexact*"]
 
 [tool.setuptools.package-data]
-pdfexact = ["data/*.json"]
+pdfexact = ["data/*.json", "fonts/*.ttf", "fonts/*.otf", "fonts/*.ttc"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
