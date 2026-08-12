@@ -1,10 +1,10 @@
 """Extraction des images, du vectoriel, des clusters et des liens."""
 import pymupdf
-import pytest
 
 from pdfexact.extract.images import extraire_images
+from pdfexact.extract.layout_map import PageLayoutMap, quantifier_bbox
 from pdfexact.extract.links import appliquer_liens
-from pdfexact.extract.ocr import _corriger_elements_ocr
+from pdfexact.extract.ocr import _corriger_elements_ocr, _dedoublonner_elements_ocr
 from pdfexact.extract.text import extraire_texte
 from pdfexact.extract.fonts import collecter_polices
 from pdfexact.extract.vector import (
@@ -263,3 +263,125 @@ def test_les_mots_ocr_adjacents_sont_corriges():
         ("TECHNOLOGY", 0.89, BBox(10, 10, 26, 20)),
         ("TRANSFIX", 0.96, BBox(30, 10, 50, 20)),
     ]
+
+
+def test_les_lignes_ocr_superposees_sont_dedoublonnees():
+    bbox = BBox(10, 10, 110, 30)
+
+    corriges = _dedoublonner_elements_ocr(
+        [
+            ("FEMA", 0.80, bbox),
+            ("FOR PUBLIC RELEASE", 0.92, bbox),
+        ]
+    )
+
+    assert corriges == [("FOR PUBLIC RELEASE", 0.92, bbox)]
+
+
+def test_les_lignes_ocr_incluses_sur_la_meme_ligne_sont_dedoublonnees():
+    grand = BBox(10, 100, 500, 120)
+    petit = BBox(40, 101, 260, 121)
+
+    corriges = _dedoublonner_elements_ocr(
+        [
+            ("a partial noisy duplicate", 0.80, petit),
+            ("This is the complete OCR line that should be kept", 0.90, grand),
+        ]
+    )
+
+    assert corriges == [("This is the complete OCR line that should be kept", 0.90, grand)]
+
+
+# --- carte géométrique ----------------------------------------------------
+
+
+def test_la_quantification_conserve_lenveloppe():
+    boite = BBox(1, 3599, 3601, 7201)
+
+    assert quantifier_bbox(boite) == BBox(0, 0, 7200, 10800)
+
+
+def test_la_carte_recale_locr_sur_la_ligne_native():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    natif = BBox(pt_vers_emu(72), pt_vers_emu(120), pt_vers_emu(450), pt_vers_emu(134))
+    ocr = BBox(pt_vers_emu(70), pt_vers_emu(119), pt_vers_emu(595), pt_vers_emu(136))
+    carte.ajouter(
+        "native-line",
+        natif,
+        "test",
+        text="Final Report Hurricane Katrina in Mississippi",
+        font_name="JoannaMT",
+        size_pt=18,
+    )
+
+    assert carte.recaler_ligne_ocr(ocr, "Final Report Hurricane Katrina in Mississippi") == natif
+
+
+def test_la_carte_ne_recale_pas_sur_un_texte_natif_incompatible():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    natif = BBox(pt_vers_emu(72), pt_vers_emu(120), pt_vers_emu(450), pt_vers_emu(134))
+    ocr = BBox(pt_vers_emu(70), pt_vers_emu(119), pt_vers_emu(595), pt_vers_emu(136))
+    carte.ajouter("native-line", natif, "test", text="remxsgifwvnrLambqcnktmrim")
+
+    recale = carte.recaler_ligne_ocr(
+        ocr,
+        "The accumulated knowledge has been technology transferred to actuation mechanisms.",
+    )
+
+    assert recale != natif
+
+
+def test_la_carte_recale_sur_une_ligne_native_fusionnee():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    carte.ajouter(
+        "native-visual-line",
+        BBox(pt_vers_emu(56), pt_vers_emu(225), pt_vers_emu(560), pt_vers_emu(241)),
+        "test",
+        text="bad native fragments but correct visual width",
+    )
+    ocr = BBox(pt_vers_emu(56), pt_vers_emu(225), pt_vers_emu(346), pt_vers_emu(241))
+
+    recale = carte.recaler_ligne_ocr(
+        ocr,
+        "the accumulated knowledge has been technology transferred to actuation mechanisms.",
+    )
+
+    assert recale.x1 == pt_vers_emu(560)
+
+
+def test_la_carte_contraint_une_ligne_ocr_longue_au_cadre_natif():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    carte.ajouter(
+        "native-line",
+        BBox(pt_vers_emu(80), pt_vers_emu(100), pt_vers_emu(500), pt_vers_emu(114)),
+        "test",
+        text="A native text frame establishes the right margin",
+    )
+    ocr = BBox(pt_vers_emu(80), pt_vers_emu(150), pt_vers_emu(598), pt_vers_emu(164))
+
+    contraint = carte.contraindre_bbox_texte(
+        ocr,
+        "This OCR line is long enough to be constrained by the native text frame",
+    )
+
+    assert contraint.x1 <= pt_vers_emu(508)
+
+
+def test_la_carte_detecte_une_ocr_courte_contradictoire():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    bbox = BBox(pt_vers_emu(452), pt_vers_emu(733), pt_vers_emu(580), pt_vers_emu(753))
+    carte.ajouter("native-line", bbox, "test", text="FOR PUBLIC RELEASE")
+
+    assert carte.contredit_texte_natif(bbox, "FEMA")
+
+
+def test_la_carte_detecte_un_texte_court_pres_dun_logo():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    carte.ajouter(
+        "image",
+        BBox(pt_vers_emu(32), pt_vers_emu(704), pt_vers_emu(78), pt_vers_emu(750)),
+        "test-logo",
+    )
+    texte = BBox(pt_vers_emu(80), pt_vers_emu(722), pt_vers_emu(132), pt_vers_emu(742))
+
+    assert carte.proche_petit_visuel(texte)

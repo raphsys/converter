@@ -16,6 +16,7 @@ from pdfexact.extract.images import (
     extraire_images_rasterisees,
 )
 from pdfexact.extract.links import appliquer_liens
+from pdfexact.extract.layout_map import construire_layout_map
 from pdfexact.extract.ocr import extraire_ocr, extraire_rapidocr
 from pdfexact.extract.text import extraire_texte, extraire_texte_glyphes
 from pdfexact.extract.vector import (
@@ -82,6 +83,9 @@ def _remplir_page(
         print(f"      images inline: {len(images_inline)} bloc(s)", file=sys.stderr)
     if verbose and zones_visuelles:
         print(f"      zones vectorielles immuables: {len(zones_visuelles)}", file=sys.stderr)
+    layout_map = None
+    if text_mode == "rapidocr" and ocr_layout == "hybrid":
+        layout_map = construire_layout_map(page_pdf, zones_visuelles=zones_images, dpi=dpi)
 
     if text_mode == "glyph-images":
         page_ir.elements.extend(extraire_glyphes_images(page_pdf, document.media, dpi=dpi))
@@ -98,6 +102,7 @@ def _remplir_page(
                 layout=ocr_layout,
                 zones_ignorees=zones_images,
                 media=document.media,
+                layout_map=layout_map,
             )
         )
         return

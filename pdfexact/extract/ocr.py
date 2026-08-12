@@ -377,6 +377,39 @@ def _corriger_elements_ocr(
     return corriges
 
 
+def _dedoublonner_elements_ocr(
+    elements: list[tuple[str, float, BBox]],
+) -> list[tuple[str, float, BBox]]:
+    """Évite deux textes concurrents posés dans la même boîte OCR."""
+    gardes: list[tuple[str, float, BBox]] = []
+    for texte, score, bbox in sorted(elements, key=lambda item: (item[2].y0, item[2].x0, -len(item[0]))):
+        doublon = None
+        for index, (texte_garde, score_garde, bbox_garde) in enumerate(gardes):
+            couverture = _intersection(
+                (bbox.x0, bbox.y0, bbox.x1, bbox.y1),
+                (bbox_garde.x0, bbox_garde.y0, bbox_garde.x1, bbox_garde.y1),
+            ) / max(min(bbox.largeur * bbox.hauteur, bbox_garde.largeur * bbox_garde.hauteur), 1)
+            meme_ligne = abs((bbox.y0 + bbox.y1) - (bbox_garde.y0 + bbox_garde.y1)) <= max(
+                bbox.hauteur, bbox_garde.hauteur
+            )
+            inclus_horizontal = (
+                min(bbox.x1, bbox_garde.x1) - max(bbox.x0, bbox_garde.x0)
+            ) / max(min(bbox.largeur, bbox_garde.largeur), 1) > 0.78
+            if couverture > 0.88 or (meme_ligne and inclus_horizontal):
+                doublon = index
+                break
+        if doublon is None:
+            gardes.append((texte, score, bbox))
+            continue
+
+        texte_garde, score_garde, bbox_garde = gardes[doublon]
+        qualite = (score or 0.0) + min(len(texte), 80) / 80
+        qualite_garde = (score_garde or 0.0) + min(len(texte_garde), 80) / 80
+        if qualite > qualite_garde:
+            gardes[doublon] = (texte, score, bbox)
+    return gardes
+
+
 def _texte_paragraphe(lignes: list[OcrLine]) -> str:
     morceaux: list[str] = []
     for ligne in lignes:
@@ -520,11 +553,10 @@ def _ligne_figure_isolee(ligne: OcrLine) -> bool:
 
 
 def _ajuster_largeur_ocr(ligne: Line, polices: dict) -> None:
-    """Ajuste sans jamais étirer les caractères OCR.
+    """Ajuste la largeur OCR sans toucher au corps PDF.
 
-    L'ancien comportement répartissait aussi les écarts positifs : un texte OCR reconnu
-    plus court que sa boîte était artificiellement espacé. Ici on réduit seulement les
-    lignes trop larges.
+    La taille vient du PDF et doit rester stable. Quand Word compose plus large que la
+    boîte PDF, on compense uniquement par l'espacement inter-caractères.
     """
     span = ligne.spans[0] if ligne.spans else None
     if span is None or span.police.font_id not in polices:
@@ -534,17 +566,19 @@ def _ajuster_largeur_ocr(ligne: Line, polices: dict) -> None:
 
     cible_pt = emu_vers_pt(ligne.largeur_cible_emu)
     mesuree_pt = mesurer_largeur_pt(span.texte, polices[span.police.font_id], span.size_pt)
-    if mesuree_pt <= cible_pt or cible_pt <= 0:
+    if cible_pt <= 0:
         return
 
-    ratio = max(0.55, min(1.0, cible_pt / mesuree_pt * 0.96))
-    span.size_pt = round(span.size_pt * ratio, 2)
-    mesuree_pt = mesurer_largeur_pt(span.texte, polices[span.police.font_id], span.size_pt)
-    if mesuree_pt <= cible_pt:
+    securite = 0.90 if span.size_pt >= 24 else 0.96
+    cible_sure_pt = cible_pt * securite
+    if mesuree_pt <= cible_sure_pt:
         return
 
     caracteres = max(len(span.texte), 1)
-    span.espacement_twips = min(0, round(pt_vers_twips((cible_pt - mesuree_pt) / caracteres)))
+    span.espacement_twips = min(
+        0,
+        round(pt_vers_twips((cible_sure_pt - mesuree_pt) / caracteres)),
+    )
 
 
 def _textbox(
@@ -554,14 +588,19 @@ def _textbox(
     bbox: BBox,
     facteur_emu: float,
     ajuster_largeur: bool = True,
+    layout_map=None,
 ) -> TextBox:
     bbox = _limiter_bbox(page, bbox)
+    if layout_map is not None:
+        bbox = layout_map.recaler_ligne_ocr(bbox, texte)
     police, size_pt, couleur = _trace_style(page, polices, bbox, facteur_emu)
+    hauteur_ligne = max(bbox.hauteur, pt_vers_emu(size_pt * 1.18))
+    bbox = BBox(bbox.x0, bbox.y0, bbox.x1, min(pt_vers_emu(page.rect.height), bbox.y0 + hauteur_ligne))
     span = Span(texte=texte, police=police, size_pt=size_pt, couleur=couleur)
     ligne = Line(
         bbox=bbox,
         spans=[span],
-        hauteur_ligne_emu=max(bbox.hauteur, 1),
+        hauteur_ligne_emu=max(hauteur_ligne, 1),
         largeur_cible_emu=max(bbox.largeur, 1),
         alignement=_alignement_ligne(page, bbox, texte),
     )
@@ -579,6 +618,7 @@ def extraire_rapidocr(
     layout: str = "blocks",
     zones_ignorees: list[BBox] | None = None,
     media: dict | None = None,
+    layout_map=None,
 ):
     """Retourne du vrai texte Word visible, reconnu par RapidOCR et positionné."""
     zones_ignorees = zones_ignorees or []
@@ -595,10 +635,12 @@ def extraire_rapidocr(
     facteur = 72.0 / dpi
     facteur_emu = 12700.0
     blocs = []
-    lignes_ocr = [
-        OcrLine(ligne.texte, ligne.score, _limiter_bbox(page, ligne.bbox))
-        for ligne in _lignes_rapidocr(result, facteur)
-    ]
+    lignes_ocr = []
+    for ligne in _lignes_rapidocr(result, facteur):
+        bbox = _limiter_bbox(page, ligne.bbox)
+        if layout == "hybrid" and layout_map is not None:
+            bbox = layout_map.contraindre_bbox_texte(bbox, ligne.texte)
+        lignes_ocr.append(OcrLine(ligne.texte, ligne.score, bbox))
     zones_formules = [
         ligne.bbox
         for ligne in lignes_ocr
@@ -638,7 +680,7 @@ def extraire_rapidocr(
         texte = _normaliser_texte_ocr((texte or "").strip())
         if texte:
             elements.append((texte, score, _limiter_bbox(page, _boite_rapidocr(points, facteur))))
-    elements = _corriger_elements_ocr(elements)
+    elements = _dedoublonner_elements_ocr(_corriger_elements_ocr(elements))
 
     ignores = 0
     utilises: set[int] = set()
@@ -650,11 +692,28 @@ def extraire_rapidocr(
                     continue
                 if not centre_dans(bbox, bloc.bbox):
                     continue
-                if _est_dans_zone_ignoree(bbox, zones_ignorees):
+                if _est_dans_zone_ignoree(bbox, zones_ignorees) or (
+                    layout == "hybrid"
+                    and layout_map is not None
+                    and (
+                        layout_map.touche_visuel(bbox)
+                        or layout_map.contredit_texte_natif(bbox, texte)
+                        or (len(texte.strip()) <= 8 and layout_map.proche_petit_visuel(bbox))
+                    )
+                ):
                     ignores += 1
                     utilises.add(index)
                     continue
-                blocs.append(_textbox(page, polices, texte, bbox, facteur_emu))
+                blocs.append(
+                    _textbox(
+                        page,
+                        polices,
+                        texte,
+                        bbox,
+                        facteur_emu,
+                        layout_map=layout_map if layout == "hybrid" else None,
+                    )
+                )
                 utilises.add(index)
 
         if layout == "blocks":
