@@ -49,6 +49,8 @@ def _run_xml(span, relations=None) -> str:
         proprietes.append("<w:b/>")
     if span.police.italique:
         proprietes.append("<w:i/>")
+    if getattr(span, "invisible", False):
+        proprietes.append("<w:vanish/>")
     proprietes.append(f'<w:color w:val="{span.couleur}"/>')
     demi_points = max(round(span.size_pt * 2), 1)
     proprietes.append(f'<w:sz w:val="{demi_points}"/>')
@@ -79,12 +81,13 @@ def zone_texte_xml(ligne: Line, identifiant: int, z: int, relations=None) -> str
     """
     interligne = max(pt_vers_twips(emu_vers_pt(ligne.hauteur_ligne_emu)), 1)
     runs = "".join(_run_xml(span, relations) for span in ligne.spans)
+    alignement = getattr(ligne, "alignement", "left") or "left"
 
     paragraphe = (
         "<w:p><w:pPr>"
         f'<w:spacing w:before="0" w:after="0" w:line="{interligne}" w:lineRule="exact"/>'
         '<w:ind w:left="0" w:right="0" w:firstLine="0"/>'
-        '<w:jc w:val="left"/>'
+        f'<w:jc w:val="{alignement}"/>'
         "</w:pPr>"
         f"{runs}</w:p>"
     )
@@ -101,10 +104,119 @@ def zone_texte_xml(ligne: Line, identifiant: int, z: int, relations=None) -> str
         "</wps:spPr>"
         f"<wps:txbx><w:txbxContent>{paragraphe}</w:txbxContent></wps:txbx>"
         '<wps:bodyPr rot="0" spcFirstLastPara="0" vertOverflow="overflow" '
-        'horzOverflow="overflow" vert="horz" wrap="none" '
+        'horzOverflow="clip" vert="horz" wrap="none" '
         'lIns="0" tIns="0" rIns="0" bIns="0" anchor="t" anchorCtr="0">'
         "<a:noAutofit/></wps:bodyPr>"
         "</wps:wsp></a:graphicData></a:graphic>"
     )
 
     return _ancre(ligne.bbox, identifiant, z, f"Ligne {identifiant}", contenu)
+
+
+def image_xml(element, identifiant: int, z: int, rel_id: str, derriere: bool = False) -> str:
+    """Rend une image, ou une région rastérisée, comme image flottante ancrée."""
+    largeur = max(element.bbox.largeur, 1)
+    hauteur = max(element.bbox.hauteur, 1)
+
+    contenu = (
+        "<a:graphic><a:graphicData "
+        'uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        "<pic:pic>"
+        f'<pic:nvPicPr><pic:cNvPr id="{identifiant}" name="{element.media_ref}"/>'
+        "<pic:cNvPicPr/></pic:nvPicPr>"
+        f'<pic:blipFill><a:blip r:embed="{rel_id}"/>'
+        "<a:stretch><a:fillRect/></a:stretch></pic:blipFill>"
+        '<pic:spPr><a:xfrm><a:off x="0" y="0"/>'
+        f'<a:ext cx="{largeur}" cy="{hauteur}"/></a:xfrm>'
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+        "</pic:pic></a:graphicData></a:graphic>"
+    )
+
+    return _ancre(element.bbox, identifiant, z, f"Image {identifiant}", contenu, derriere)
+
+
+def _commandes_xml(chemins, origine_x: int, origine_y: int) -> str:
+    """Traduit les chemins en éléments de a:path, en coordonnées relatives à la bbox."""
+    morceaux = []
+    for chemin in chemins:
+        for operateur, points in chemin:
+            relatifs = [(x - origine_x, y - origine_y) for x, y in points]
+            balises = "".join(f'<a:pt x="{x}" y="{y}"/>' for x, y in relatifs)
+
+            if operateur == "move":
+                morceaux.append(f"<a:moveTo>{balises}</a:moveTo>")
+            elif operateur == "line":
+                morceaux.append(f"<a:lnTo>{balises}</a:lnTo>")
+            elif operateur == "cubic":
+                morceaux.append(f"<a:cubicBezTo>{balises}</a:cubicBezTo>")
+            elif operateur == "quad":
+                morceaux.append(f"<a:quadBezTo>{balises}</a:quadBezTo>")
+            elif operateur == "close":
+                morceaux.append("<a:close/>")
+    return "".join(morceaux)
+
+
+def forme_xml(element, identifiant: int, z: int, derriere: bool = False) -> str:
+    """Rend une forme vectorielle en géométrie personnalisée DrawingML."""
+    largeur = max(element.bbox.largeur, 1)
+    hauteur = max(element.bbox.hauteur, 1)
+
+    if element.remplissage:
+        alpha = ""
+        if element.alpha < 1.0:
+            alpha = f'<a:alpha val="{max(0, round(element.alpha * 100000))}"/>'
+        remplissage = (
+            f'<a:solidFill><a:srgbClr val="{element.remplissage}">{alpha}</a:srgbClr>'
+            "</a:solidFill>"
+        )
+    else:
+        remplissage = "<a:noFill/>"
+
+    if element.contour and element.epaisseur_emu > 0:
+        pointilles = f'<a:prstDash val="{element.pointilles}"/>' if element.pointilles else ""
+        trait = (
+            f'<a:ln w="{element.epaisseur_emu}">'
+            f'<a:solidFill><a:srgbClr val="{element.contour}"/></a:solidFill>'
+            f"{pointilles}</a:ln>"
+        )
+    else:
+        trait = "<a:ln><a:noFill/></a:ln>"
+
+    commandes = _commandes_xml(element.chemins, element.bbox.x0, element.bbox.y0)
+
+    contenu = (
+        "<a:graphic><a:graphicData "
+        'uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">'
+        "<wps:wsp><wps:cNvSpPr/>"
+        "<wps:spPr>"
+        f'<a:xfrm><a:off x="0" y="0"/><a:ext cx="{largeur}" cy="{hauteur}"/></a:xfrm>'
+        "<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/>"
+        f'<a:rect l="0" t="0" r="{largeur}" b="{hauteur}"/>'
+        f'<a:pathLst><a:path w="{largeur}" h="{hauteur}">{commandes}</a:path></a:pathLst>'
+        "</a:custGeom>"
+        f"{remplissage}{trait}"
+        "</wps:spPr>"
+        '<wps:bodyPr rot="0" anchor="t"/>'
+        "</wps:wsp></a:graphicData></a:graphic>"
+    )
+
+    return _ancre(element.bbox, identifiant, z, f"Forme {identifiant}", contenu, derriere)
+
+
+def zone_lien_xml(element, identifiant: int, z: int, rel_id: str) -> str:
+    """Rend un lien de zone comme rectangle invisible cliquable."""
+    largeur = max(element.bbox.largeur, 1)
+    hauteur = max(element.bbox.hauteur, 1)
+
+    contenu = (
+        "<a:graphic><a:graphicData "
+        'uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">'
+        "<wps:wsp><wps:cNvSpPr/><wps:spPr>"
+        f'<a:xfrm><a:off x="0" y="0"/><a:ext cx="{largeur}" cy="{hauteur}"/></a:xfrm>'
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+        "<a:noFill/><a:ln><a:noFill/></a:ln>"
+        f'<a:hlinkClick r:id="{rel_id}"/>'
+        "</wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic>"
+    )
+
+    return _ancre(element.bbox, identifiant, z, f"Lien {identifiant}", contenu)

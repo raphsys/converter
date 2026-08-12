@@ -11,3 +11,7 @@ dist/
 # fonts/local/, ou l'audit de licences met en quarantaine le non redistribuable.
 /fonts/*
 !/fonts/LISEZ-MOI.md
+
+.fastocr/
+tests/logs_converter/
+tests/tests_documents_convertis/

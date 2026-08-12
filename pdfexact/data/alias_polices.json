@@ -19,7 +19,7 @@
     "nimbussanl": "Nimbus Sans",
     "nimbussanslt": "Nimbus Sans",
 
-    "times": "Liberation Serif",
+    "times": "Nimbus Roman",
     "timesnewroman": "Liberation Serif",
     "timesroman": "Nimbus Roman",
     "nimbusromno9l": "Nimbus Roman",
@@ -27,6 +27,7 @@
 
     "couriernew": "Liberation Mono",
     "courier": "Nimbus Mono PS",
+    "lettergothic": "Nimbus Mono PS",
     "nimbusmonl": "Nimbus Mono PS",
     "nimbusmonops": "Nimbus Mono PS",
 
@@ -38,6 +39,7 @@
     "newcenturyschlbk": "C059",
 
     "urwbookmanl": "URW Bookman",
+    "bookman": "URW Bookman",
     "bookmanoldstyle": "URW Bookman",
 
     "urwgothicl": "URW Gothic",
@@ -55,7 +57,14 @@
     "segoeui": "DejaVu Sans",
     "calibri": "Carlito",
     "cambria": "Caladea",
-    "georgia": "Gelasio"
+    "georgia": "Gelasio",
+
+    "franklingothic": "Libre Franklin",
+    "franklingothicbook": "Libre Franklin",
+    "joanna": "Liberation Serif",
+    "joannamt": "Liberation Serif",
+    "bankgothic": "Liberation Sans Narrow",
+    "bankgothicbt": "Liberation Sans Narrow"
   },
 
   "styles": {

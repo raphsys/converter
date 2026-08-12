@@ -7,6 +7,7 @@ qui sont exactement ce dont l'approche a besoin.
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from pdfexact.ir import Document
 from pdfexact.render.docx_writer import construire_document_xml
@@ -82,9 +83,10 @@ class GestionnaireRelations:
         ]
         for relation in self._entrees:
             mode = ' TargetMode="External"' if relation.externe else ""
+            cible = escape(relation.cible, {'"': "&quot;"})
             lignes.append(
                 f'<Relationship Id="{relation.identifiant}" Type="{relation.type_rel}" '
-                f'Target="{relation.cible}"{mode}/>'
+                f'Target="{cible}"{mode}/>'
             )
         lignes.append("</Relationships>")
         return "".join(lignes)

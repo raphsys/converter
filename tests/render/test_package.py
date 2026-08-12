@@ -140,6 +140,15 @@ def test_une_relation_externe_est_marquee():
     assert 'TargetMode="External"' in gestionnaire.vers_xml()
 
 
+def test_une_cible_de_relation_est_echappee():
+    gestionnaire = GestionnaireRelations()
+
+    gestionnaire.ajouter('https://example.org/?a=1&b="deux"', "hyperlink", externe=True)
+
+    xml = gestionnaire.vers_xml()
+    assert "a=1&amp;b=&quot;deux&quot;" in xml
+
+
 def test_une_relation_interne_nest_pas_marquee():
     gestionnaire = GestionnaireRelations()
 

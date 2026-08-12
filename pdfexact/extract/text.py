@@ -10,6 +10,11 @@ dans le docx**, pas de celle du PDF : c'est avec elles que Word composera.
   baseline à `ascendante` du haut de la zone.
 - Sommet de la zone : baseline du PDF moins cette ascendante.
 """
+from functools import lru_cache
+
+from fontTools.agl import toUnicode
+from fontTools.ttLib import TTFont
+
 from pdfexact.extract.fonts import (
     ascendante_pt,
     descendante_pt,
@@ -29,6 +34,9 @@ _ESPACEMENT_PAR_CARACTERE = True
 
 
 def _couleur_hexa(valeur: int) -> str:
+    if isinstance(valeur, tuple):
+        rouge, vert, bleu = (max(0, min(255, round(canal * 255))) for canal in valeur[:3])
+        return f"{rouge:02X}{vert:02X}{bleu:02X}"
     return f"{int(valeur) & 0xFFFFFF:06X}"
 
 
@@ -60,6 +68,42 @@ def _resoudre_police(nom_du_span: str, polices: dict) -> str:
             return identifiant
 
     return next(iter(polices))
+
+
+def _style_depuis_nom(nom: str, drapeaux: int = 0) -> tuple[bool, bool]:
+    minuscule = nom.lower()
+    gras = bool(drapeaux & _BIT_GRAS) or any(
+        mot in minuscule for mot in ("bold", "demi", "black", "heavy", "extrabold")
+    )
+    italique = bool(drapeaux & _BIT_ITALIQUE) or any(
+        mot in minuscule for mot in ("italic", "oblique")
+    )
+    return gras, italique
+
+
+@lru_cache(maxsize=128)
+def _ordre_glyphes(chemin) -> tuple[str, ...]:
+    try:
+        return tuple(TTFont(chemin, fontNumber=0, lazy=True).getGlyphOrder())
+    except Exception:  # noqa: BLE001
+        return ()
+
+
+def _texte_depuis_glyphe(code: int, gid: int, asset) -> str:
+    """Reconstruit le caractère depuis le glyph id quand le Unicode PDF est douteux."""
+    if asset.chemin:
+        ordre = _ordre_glyphes(asset.chemin)
+        if 0 <= gid < len(ordre):
+            try:
+                texte = toUnicode(ordre[gid])
+            except KeyError:
+                texte = ""
+            if texte:
+                return texte
+    try:
+        return chr(code)
+    except (TypeError, ValueError):
+        return ""
 
 
 def _corriger_espacement(ligne: Line, polices: dict) -> None:
@@ -94,13 +138,14 @@ def _span_ir(span: dict, polices: dict) -> Span | None:
     asset = polices[font_id]
     drapeaux = int(span.get("flags", 0))
 
+    gras, italique = _style_depuis_nom(span.get("font", ""), drapeaux)
     return Span(
         texte=texte,
         police=FontRef(
             font_id=font_id,
             famille=asset.famille,
-            gras=bool(drapeaux & _BIT_GRAS),
-            italique=bool(drapeaux & _BIT_ITALIQUE),
+            gras=gras,
+            italique=italique,
         ),
         size_pt=round(float(span.get("size", 12.0)), 2),
         couleur=_couleur_hexa(span.get("color", 0)),
@@ -155,5 +200,56 @@ def extraire_texte(page, polices: dict) -> list[TextBox]:
         ]
         if lignes_ir:
             blocs_ir.append(TextBox(bbox=_bbox_depuis_liste(bloc["bbox"]), lignes=lignes_ir))
+
+    return blocs_ir
+
+
+def extraire_texte_glyphes(page, polices: dict) -> list[TextBox]:
+    """Retourne une zone par glyphe, avec police/couleur/style au niveau caractère."""
+    blocs_ir: list[TextBox] = []
+
+    for trace in page.get_texttrace():
+        font_id = _resoudre_police(trace.get("font", ""), polices)
+        asset = polices[font_id]
+        size_pt = round(float(trace.get("size", 12.0)), 2)
+        ascendante = ascendante_pt(asset, size_pt)
+        descendante = descendante_pt(asset, size_pt)
+        hauteur_emu = max(pt_vers_emu(ascendante + descendante), 1)
+        couleur = _couleur_hexa(trace.get("color", 0))
+        gras, italique = _style_depuis_nom(trace.get("font", ""), int(trace.get("flags", 0)))
+
+        for code, gid, origine, boite_pt in trace.get("chars", ()):
+            texte = _texte_depuis_glyphe(code, gid, asset)
+            if not texte:
+                continue
+
+            x0, _y0, x1, _y1 = boite_pt
+            baseline_pt = float(origine[1])
+            haut_emu = pt_vers_emu(baseline_pt - ascendante)
+            boite = BBox(
+                pt_vers_emu(x0),
+                haut_emu,
+                max(pt_vers_emu(x1), pt_vers_emu(x0) + 1),
+                haut_emu + hauteur_emu,
+            )
+            span = Span(
+                texte=texte,
+                police=FontRef(
+                    font_id=font_id,
+                    famille=asset.famille,
+                    gras=gras,
+                    italique=italique,
+                ),
+                size_pt=size_pt,
+                couleur=couleur,
+            )
+            ligne = Line(
+                bbox=boite,
+                spans=[span],
+                hauteur_ligne_emu=hauteur_emu,
+                largeur_cible_emu=max(boite.largeur, 1),
+            )
+            _corriger_espacement(ligne, polices)
+            blocs_ir.append(TextBox(bbox=boite, lignes=[ligne]))
 
     return blocs_ir

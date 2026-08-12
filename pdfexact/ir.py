@@ -64,6 +64,7 @@ class Span:
     couleur: str
     espacement_twips: int = 0
     lien: str | None = None
+    invisible: bool = False
 
 
 @dataclass
@@ -74,6 +75,7 @@ class Line:
     spans: list[Span]
     hauteur_ligne_emu: int
     largeur_cible_emu: int
+    alignement: str = "left"
 
 
 @dataclass
@@ -82,6 +84,24 @@ class TextBox:
 
     bbox: BBox
     lignes: list[Line]
+
+
+@dataclass
+class FlowParagraph:
+    """Paragraphe Word réel, dans le flux, reconstruit depuis des lignes OCR."""
+
+    bbox: BBox
+    texte: str
+    police: FontRef
+    size_pt: float
+    couleur: str
+    alignement: str = "left"
+    retrait_gauche_emu: int = 0
+    retrait_droite_emu: int = 0
+    retrait_premiere_ligne_emu: int = 0
+    espace_avant_emu: int = 0
+    espace_apres_emu: int = 0
+    interligne_emu: int = 0
 
 
 @dataclass
@@ -118,7 +138,7 @@ class LinkZone:
     page_cible: int | None = None
 
 
-Element = Union[TextBox, ImageEl, ShapeEl, RasterEl, LinkZone]
+Element = Union[TextBox, FlowParagraph, ImageEl, ShapeEl, RasterEl, LinkZone]
 
 
 @dataclass
