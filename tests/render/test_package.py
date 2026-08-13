@@ -294,6 +294,34 @@ def test_tableau_rend_fond_et_bordures_de_cellule(tmp_path):
     assert '<w:left w:val="single" w:sz="4" w:space="0" w:color="00AA00"/>' in xml
 
 
+def test_tableau_rend_direction_verticale_de_cellule(tmp_path):
+    table = TableEl(
+        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(110), pt_vers_emu(170)),
+        rows=[
+            TableRow(
+                bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(110), pt_vers_emu(170)),
+                cells=[
+                    TableCell(
+                        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(110), pt_vers_emu(170)),
+                        texte="Vertical header",
+                        direction_texte="btLr",
+                    ),
+                ],
+            )
+        ],
+        col_widths_emu=[pt_vers_emu(38)],
+        police=FontRef("Test", "Arial", False, False),
+        size_pt=8,
+    )
+    document = Document(pages=[Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR, elements=[table])])
+    sortie = tmp_path / "table_cell_vertical.docx"
+
+    ecrire_docx(document, sortie)
+
+    xml = _lire(sortie, "word/document.xml").decode()
+    assert '<w:textDirection w:val="btLr"/>' in xml
+
+
 def test_le_gestionnaire_de_relations_numerote_a_partir_de_un():
     gestionnaire = GestionnaireRelations()
 

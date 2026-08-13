@@ -183,9 +183,22 @@ def _span_cellule(page, polices: dict, cell_bbox: BBox, texte: str, geometrie: P
             couleur=couleur,
             souligne=decoration.souligne,
             barre=decoration.barre,
-            surlignage=decoration.surlignage,
         )
     ]
+
+
+def _direction_texte_cellule(cell_bbox: BBox, texte: str, fond: str | None) -> str | None:
+    """Détecte les en-têtes de tableau tournés dans des cellules hautes et étroites."""
+    if not texte.strip():
+        return None
+    if cell_bbox.largeur <= 0 or cell_bbox.hauteur <= 0:
+        return None
+
+    largeur_pt = cell_bbox.largeur / pt_vers_emu(1)
+    ratio = cell_bbox.hauteur / max(cell_bbox.largeur, 1)
+    if fond and _est_noir(fond) and largeur_pt <= 48 and ratio >= 1.25:
+        return "btLr"
+    return None
 
 
 def _couleur_fond_cellule(cell: BBox, fonds: list[FillCandidate]) -> str | None:
@@ -323,14 +336,16 @@ def extraire_tableaux(page, polices: dict, geometrie: PageGeometry | None = None
                 if row_index < len(textes) and col_index < len(textes[row_index]):
                     texte = textes[row_index][col_index] or ""
                 cell_bbox = _bbox_depuis_tuple(cell_rect)
+                fond = _couleur_fond_cellule(cell_bbox, fonds)
                 cells.append(
                     TableCell(
                         bbox=cell_bbox,
                         texte=texte,
                         col_span=span,
-                        fond=_couleur_fond_cellule(cell_bbox, fonds),
+                        fond=fond,
                         spans=_span_cellule(page, polices, cell_bbox, texte, geometrie),
                         bordures=_bordure_cellule(cell_bbox, lignes),
+                        direction_texte=_direction_texte_cellule(cell_bbox, texte, fond),
                     )
                 )
                 col_index = next_index

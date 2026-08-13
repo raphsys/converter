@@ -188,6 +188,11 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
             )
             shading = f'<w:shd w:fill="{cell.fond}"/>' if cell.fond else ""
             borders = _bordures_cellule(cell)
+            direction_texte = (
+                f'<w:textDirection w:val="{cell.direction_texte}"/>'
+                if getattr(cell, "direction_texte", None)
+                else ""
+            )
             spans = cell.spans or [
                 Span(
                     texte=cell.texte,
@@ -201,7 +206,7 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
                 "<w:tc>"
                 "<w:tcPr>"
                 f'<w:tcW w:w="{tc_width}" w:type="dxa"/>'
-                f"{grid_span}{shading}{borders}"
+                f"{grid_span}{shading}{borders}{direction_texte}"
                 '<w:tcMar><w:top w:w="15" w:type="dxa"/><w:left w:w="25" w:type="dxa"/>'
                 '<w:bottom w:w="15" w:type="dxa"/><w:right w:w="25" w:type="dxa"/></w:tcMar>'
                 "</w:tcPr>"

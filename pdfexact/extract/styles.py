@@ -28,7 +28,6 @@ _HIGHLIGHT_WORD = {
     "FF00FF": "magenta",
     "0000FF": "blue",
     "FF0000": "red",
-    "000000": "black",
 }
 
 
@@ -47,7 +46,7 @@ def _bbox_dessin(dessin, geometrie: PageGeometry | None = None) -> BBox:
 
 def _couleur_highlight(valeur) -> str | None:
     hexa = _couleur_hexa(valeur)
-    return _HIGHLIGHT_WORD.get(hexa, "yellow")
+    return _HIGHLIGHT_WORD.get(hexa)
 
 
 def decorations_texte(page, bbox: BBox, geometrie: PageGeometry | None = None) -> TextDecoration:
@@ -66,7 +65,7 @@ def decorations_texte(page, bbox: BBox, geometrie: PageGeometry | None = None) -
         if fill is not None:
             aire = _intersection(boite, bbox)
             if aire >= max(bbox.largeur * bbox.hauteur * 0.35, 1):
-                surlignage = _couleur_highlight(fill)
+                surlignage = _couleur_highlight(fill) or surlignage
             continue
 
         contour = dessin.get("color")

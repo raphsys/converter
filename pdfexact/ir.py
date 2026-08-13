@@ -155,6 +155,7 @@ class TableCell:
     spans: list[Span] = field(default_factory=list)
     alignement: str = "center"
     bordures: dict[str, TableBorder] = field(default_factory=dict)
+    direction_texte: str | None = None
 
 
 @dataclass
