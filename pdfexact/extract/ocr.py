@@ -569,7 +569,14 @@ def _ajuster_largeur_ocr(ligne: Line, polices: dict) -> None:
     if cible_pt <= 0:
         return
 
-    securite = 0.90 if span.size_pt >= 24 else 0.96
+    if span.size_pt >= 24:
+        securite = 0.90
+    elif len(span.texte) >= 70:
+        securite = 0.92
+    elif len(span.texte) >= 35:
+        securite = 0.94
+    else:
+        securite = 0.96
     cible_sure_pt = cible_pt * securite
     if mesuree_pt <= cible_sure_pt:
         return

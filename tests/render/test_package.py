@@ -1,11 +1,12 @@
 import subprocess
 import zipfile
+from pathlib import Path
 from xml.etree import ElementTree
 
 import pytest
 
 from pdfexact.geometry import pt_vers_emu
-from pdfexact.ir import Document, MediaItem, Page
+from pdfexact.ir import Document, FontAsset, MediaItem, Page
 from pdfexact.render.package import GestionnaireRelations, ecrire_docx
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -102,6 +103,31 @@ def test_les_media_sont_ecrits(tmp_path):
     with zipfile.ZipFile(sortie) as z:
         assert "word/media/image1.png" in z.namelist()
         assert z.read("word/media/image1.png") == b"\x89PNG\r\n\x1a\n"
+
+
+def test_les_polices_reconnues_sont_embarquees(tmp_path):
+    source = tmp_path / "police.ttf"
+    source.write_bytes(b"\0" * 64)
+    document = _document_deux_pages()
+    document.polices["Test-Regular"] = FontAsset(
+        font_id="Test-Regular",
+        famille="Test",
+        donnees=None,
+        extension="",
+        embarquee=False,
+        chemin=Path(source),
+        reconnue=True,
+    )
+    sortie = tmp_path / "avec_police.docx"
+
+    ecrire_docx(document, sortie)
+
+    with zipfile.ZipFile(sortie) as z:
+        noms = set(z.namelist())
+        assert "word/fontTable.xml" in noms
+        assert "word/_rels/fontTable.xml.rels" in noms
+        assert any(nom.startswith("word/fonts/") and nom.endswith(".odttf") for nom in noms)
+        assert "fontTable.xml" in z.read("word/_rels/document.xml.rels").decode()
 
 
 def test_un_document_sans_page_reste_valide(tmp_path):
