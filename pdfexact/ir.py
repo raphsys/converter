@@ -140,6 +140,13 @@ class RasterEl:
 
 
 @dataclass
+class TableBorder:
+    couleur: str = "000000"
+    sz: int = 4
+    visible: bool = True
+
+
+@dataclass
 class TableCell:
     bbox: BBox
     texte: str
@@ -147,6 +154,7 @@ class TableCell:
     fond: str | None = None
     spans: list[Span] = field(default_factory=list)
     alignement: str = "center"
+    bordures: dict[str, TableBorder] = field(default_factory=dict)
 
 
 @dataclass

@@ -156,6 +156,26 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
         for w in element.col_widths_emu
     )
     rows_xml = []
+
+    def _bordures_cellule(cell) -> str:
+        if not cell.bordures:
+            return ""
+        noms = {
+            "top": "top",
+            "left": "left",
+            "bottom": "bottom",
+            "right": "right",
+        }
+        parties = []
+        for cle, balise in noms.items():
+            bordure = cell.bordures.get(cle)
+            if bordure is not None and bordure.visible:
+                parties.append(
+                    f'<w:{balise} w:val="single" w:sz="{bordure.sz}" '
+                    f'w:space="0" w:color="{bordure.couleur}"/>'
+                )
+        return f"<w:tcBorders>{''.join(parties)}</w:tcBorders>"
+
     for row in element.rows:
         tr_height = max(pt_vers_twips(emu_vers_pt(row.bbox.hauteur)), 1)
         cells_xml = []
@@ -167,6 +187,7 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
                 else ""
             )
             shading = f'<w:shd w:fill="{cell.fond}"/>' if cell.fond else ""
+            borders = _bordures_cellule(cell)
             spans = cell.spans or [
                 Span(
                     texte=cell.texte,
@@ -180,7 +201,7 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
                 "<w:tc>"
                 "<w:tcPr>"
                 f'<w:tcW w:w="{tc_width}" w:type="dxa"/>'
-                f"{grid_span}{shading}"
+                f"{grid_span}{shading}{borders}"
                 '<w:tcMar><w:top w:w="15" w:type="dxa"/><w:left w:w="25" w:type="dxa"/>'
                 '<w:bottom w:w="15" w:type="dxa"/><w:right w:w="25" w:type="dxa"/></w:tcMar>'
                 "</w:tcPr>"
