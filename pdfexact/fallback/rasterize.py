@@ -48,7 +48,11 @@ def _blanc_vers_transparent(octets: bytes) -> bytes:
 
 
 def rasteriser_region(
-    page, bbox, media: dict, dpi: int = 300, fond_transparent: bool = False
+    page,
+    bbox,
+    media: dict,
+    dpi: int = 300,
+    fond_transparent: bool = False,
 ) -> RasterEl:
     """Rend la région indiquée en PNG et retourne l'élément qui la remplace."""
     rect = pymupdf.Rect(

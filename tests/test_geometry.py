@@ -4,6 +4,7 @@ import pytest
 from pdfexact.geometry import (
     EMU_PER_PT,
     BBox,
+    PageGeometry,
     bbox_depuis_rect,
     emu_vers_pt,
     pt_vers_emu,
@@ -78,3 +79,29 @@ def test_boites_qui_se_touchent_ne_se_chevauchent_pas():
 
 def test_une_boite_incluse_dans_une_autre_se_chevauche():
     assert se_chevauchent(BBox(0, 0, 100, 100), BBox(10, 10, 20, 20))
+
+
+def test_page_tournee_90_devient_paysage():
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.set_rotation(90)
+
+    geometrie = PageGeometry.depuis_page(page)
+
+    assert geometrie.paysage
+    assert round(geometrie.largeur_pt) == 792
+    assert round(geometrie.hauteur_pt) == 612
+
+
+def test_rectangle_natif_est_converti_en_coordonnees_affichees():
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.set_rotation(90)
+    geometrie = PageGeometry.depuis_page(page)
+
+    bbox = geometrie.bbox_depuis_rect_natif(pymupdf.Rect(72, 50, 147, 738))
+
+    assert round(emu_vers_pt(bbox.x0)) == 54
+    assert round(emu_vers_pt(bbox.y0)) == 72
+    assert round(emu_vers_pt(bbox.x1)) == 742
+    assert round(emu_vers_pt(bbox.y1)) == 147

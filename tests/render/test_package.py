@@ -6,7 +6,8 @@ from xml.etree import ElementTree
 import pytest
 
 from pdfexact.geometry import pt_vers_emu
-from pdfexact.ir import Document, FontAsset, MediaItem, Page
+from pdfexact.geometry import BBox
+from pdfexact.ir import Document, FontAsset, FontRef, MediaItem, Page, TableCell, TableEl, TableRow
 from pdfexact.render.package import GestionnaireRelations, ecrire_docx
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -61,6 +62,19 @@ def test_la_taille_de_page_est_en_twips(docx_deux_pages):
     premiere = next(racine.iter(f"{W}pgSz"))
     assert premiere.get(f"{W}w") == "11900"  # 595 pt x 20
     assert premiere.get(f"{W}h") == "16840"  # 842 pt x 20
+
+
+def test_une_page_paysage_declare_son_orientation(tmp_path):
+    document = Document(
+        pages=[Page(index=0, largeur_emu=pt_vers_emu(842), hauteur_emu=pt_vers_emu(595))]
+    )
+    sortie = tmp_path / "paysage.docx"
+
+    ecrire_docx(document, sortie)
+
+    racine = ElementTree.fromstring(_lire(sortie, "word/document.xml"))
+    taille = next(racine.iter(f"{W}pgSz"))
+    assert taille.get(f"{W}orient") == "landscape"
 
 
 def test_les_marges_sont_nulles(docx_deux_pages):
@@ -136,6 +150,38 @@ def test_un_document_sans_page_reste_valide(tmp_path):
     ecrire_docx(Document(), sortie)
 
     ElementTree.fromstring(_lire(sortie, "word/document.xml"))
+
+
+def test_un_tableau_est_rendu_comme_vrai_tableau_word(tmp_path):
+    table = TableEl(
+        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(240), pt_vers_emu(130)),
+        rows=[
+            TableRow(
+                bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(240), pt_vers_emu(100)),
+                cells=[
+                    TableCell(
+                        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(156), pt_vers_emu(100)),
+                        texte="A",
+                    ),
+                    TableCell(
+                        bbox=BBox(pt_vers_emu(156), pt_vers_emu(72), pt_vers_emu(240), pt_vers_emu(100)),
+                        texte="B",
+                    ),
+                ],
+            )
+        ],
+        col_widths_emu=[pt_vers_emu(84), pt_vers_emu(84)],
+        police=FontRef("Test", "Arial", False, False),
+        size_pt=8,
+    )
+    document = Document(pages=[Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR, elements=[table])])
+    sortie = tmp_path / "table.docx"
+
+    ecrire_docx(document, sortie)
+
+    racine = ElementTree.fromstring(_lire(sortie, "word/document.xml"))
+    assert len(list(racine.iter(f"{W}tbl"))) == 1
+    assert len(list(racine.iter(f"{W}tc"))) == 2
 
 
 def test_le_gestionnaire_de_relations_numerote_a_partir_de_un():

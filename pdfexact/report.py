@@ -23,6 +23,7 @@ class Rapport:
     clusters_rasterises: int = 0
     images: int = 0
     formes: int = 0
+    tableaux: int = 0
     liens: int = 0
 
     def vers_json(self) -> str:
@@ -41,6 +42,8 @@ class Rapport:
             details.append(f"{self.images} image(s)")
         if self.formes:
             details.append(f"{self.formes} forme(s) vectorielle(s)")
+        if self.tableaux:
+            details.append(f"{self.tableaux} tableau(x)")
         if self.clusters_rasterises:
             details.append(f"{self.clusters_rasterises} zone(s) rastérisée(s)")
         if self.liens:

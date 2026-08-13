@@ -21,17 +21,36 @@ def _point(couple) -> tuple[int, int]:
     return (pt_vers_emu(couple[0]), pt_vers_emu(couple[1]))
 
 
-def _chemin_depuis_item(item) -> list:
+def _point_transforme(couple, geometrie=None) -> tuple[int, int]:
+    if geometrie is None:
+        return _point(couple)
+    import pymupdf
+
+    point = pymupdf.Point(couple[0], couple[1]) * geometrie.rotation_matrix
+    return _point((point.x, point.y))
+
+
+def _chemin_depuis_item(item, geometrie=None) -> list:
     """Traduit une primitive PyMuPDF en commandes de chemin."""
     operateur = item[0]
 
     if operateur == "l":
-        return [("move", (_point(item[1]),)), ("line", (_point(item[2]),))]
+        return [
+            ("move", (_point_transforme(item[1], geometrie),)),
+            ("line", (_point_transforme(item[2], geometrie),)),
+        ]
 
     if operateur == "c":
         return [
-            ("move", (_point(item[1]),)),
-            ("cubic", (_point(item[2]), _point(item[3]), _point(item[4]))),
+            ("move", (_point_transforme(item[1], geometrie),)),
+            (
+                "cubic",
+                (
+                    _point_transforme(item[2], geometrie),
+                    _point_transforme(item[3], geometrie),
+                    _point_transforme(item[4], geometrie),
+                ),
+            ),
         ]
 
     if operateur == "re":
@@ -42,25 +61,25 @@ def _chemin_depuis_item(item) -> list:
             (rect.x1, rect.y1),
             (rect.x0, rect.y1),
         ]
-        commandes = [("move", (_point(coins[0]),))]
-        commandes += [("line", (_point(coin),)) for coin in coins[1:]]
+        commandes = [("move", (_point_transforme(coins[0], geometrie),))]
+        commandes += [("line", (_point_transforme(coin, geometrie),)) for coin in coins[1:]]
         commandes.append(("close", ()))
         return commandes
 
     if operateur == "qu":
         quad = item[1]
         sommets = [quad.ul, quad.ur, quad.lr, quad.ll]
-        commandes = [("move", (_point((sommets[0].x, sommets[0].y)),))]
-        commandes += [("line", (_point((s.x, s.y)),)) for s in sommets[1:]]
+        commandes = [("move", (_point_transforme((sommets[0].x, sommets[0].y), geometrie),))]
+        commandes += [("line", (_point_transforme((s.x, s.y), geometrie),)) for s in sommets[1:]]
         commandes.append(("close", ()))
         return commandes
 
     return []
 
 
-def _boite_rendable(rect) -> BBox:
+def _boite_rendable(rect, geometrie=None) -> BBox:
     """Une ligne parfaitement horizontale a une bbox plate : on lui donne une épaisseur."""
-    boite = bbox_depuis_rect(rect)
+    boite = geometrie.bbox_depuis_rect_natif(rect) if geometrie else bbox_depuis_rect(rect)
     return BBox(
         boite.x0,
         boite.y0,
@@ -69,14 +88,14 @@ def _boite_rendable(rect) -> BBox:
     )
 
 
-def extraire_vectoriel(page) -> list[ShapeEl]:
+def extraire_vectoriel(page, geometrie=None) -> list[ShapeEl]:
     """Retourne les formes vectorielles de la page, en EMU."""
     formes: list[ShapeEl] = []
 
     for dessin in page.get_drawings():
         chemins = [
             commandes
-            for commandes in (_chemin_depuis_item(item) for item in dessin.get("items", []))
+            for commandes in (_chemin_depuis_item(item, geometrie) for item in dessin.get("items", []))
             if commandes
         ]
         if not chemins:
@@ -85,7 +104,7 @@ def extraire_vectoriel(page) -> list[ShapeEl]:
         dashes = dessin.get("dashes")
         formes.append(
             ShapeEl(
-                bbox=_boite_rendable(dessin["rect"]),
+                bbox=_boite_rendable(dessin["rect"], geometrie),
                 chemins=chemins,
                 remplissage=_couleur_hexa(dessin.get("fill")),
                 contour=_couleur_hexa(dessin.get("color")),

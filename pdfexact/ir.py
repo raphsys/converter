@@ -130,6 +130,30 @@ class RasterEl:
 
 
 @dataclass
+class TableCell:
+    bbox: BBox
+    texte: str
+    col_span: int = 1
+    fond: str | None = None
+
+
+@dataclass
+class TableRow:
+    bbox: BBox
+    cells: list[TableCell]
+
+
+@dataclass
+class TableEl:
+    bbox: BBox
+    rows: list[TableRow]
+    col_widths_emu: list[int]
+    police: FontRef
+    size_pt: float
+    couleur: str = "000000"
+
+
+@dataclass
 class LinkZone:
     """Lien couvrant une zone sans texte. Les liens sur du texte vivent dans Span.lien."""
 
@@ -138,7 +162,7 @@ class LinkZone:
     page_cible: int | None = None
 
 
-Element = Union[TextBox, FlowParagraph, ImageEl, ShapeEl, RasterEl, LinkZone]
+Element = Union[TextBox, FlowParagraph, ImageEl, ShapeEl, RasterEl, TableEl, LinkZone]
 
 
 @dataclass

@@ -8,7 +8,7 @@ import hashlib
 
 import pymupdf
 
-from pdfexact.geometry import bbox_depuis_rect
+from pdfexact.geometry import PageGeometry, bbox_depuis_rect
 from pdfexact.ir import ImageEl, MediaItem
 
 EXTENSIONS_SUPPORTEES = {"png", "jpeg", "jpg"}
@@ -42,7 +42,13 @@ def _octets_et_extension(doc, xref) -> tuple[bytes, str]:
     return pixmap.tobytes("png"), "png"
 
 
-def extraire_images(page, doc, media: dict) -> list[ImageEl]:
+def _bbox_image(rect, geometrie: PageGeometry | None = None):
+    if geometrie is None:
+        return bbox_depuis_rect(rect)
+    return geometrie.bbox_depuis_rect_natif(rect)
+
+
+def extraire_images(page, doc, media: dict, geometrie: PageGeometry | None = None) -> list[ImageEl]:
     """Retourne les placements d'images de la page et enrichit le registre `media`.
 
     get_images() liste une entrée par référence dans les ressources de page, pas par
@@ -64,14 +70,20 @@ def extraire_images(page, doc, media: dict) -> list[ImageEl]:
             )
 
         for rect in page.get_image_rects(xref):
-            boite = bbox_depuis_rect(rect)
+            boite = _bbox_image(rect, geometrie)
             if boite.largeur > 0 and boite.hauteur > 0 and not _est_artefact_image(boite):
                 elements.append(ImageEl(bbox=boite, media_ref=media_ref))
 
     return elements
 
 
-def extraire_images_rasterisees(page, doc, media: dict, dpi: int = 200) -> list[ImageEl]:
+def extraire_images_rasterisees(
+    page,
+    doc,
+    media: dict,
+    dpi: int = 200,
+    geometrie: PageGeometry | None = None,
+) -> list[ImageEl]:
     """Capture chaque placement d'image tel qu'il est rendu sur la page.
 
     Contrairement à `extract_image`, cette voie respecte la matrice de placement PDF
@@ -84,7 +96,7 @@ def extraire_images_rasterisees(page, doc, media: dict, dpi: int = 200) -> list[
     vus: set[tuple[int, int, int, int]] = set()
     for xref in sorted({entree[0] for entree in page.get_images(full=True)}):
         for rect in page.get_image_rects(xref):
-            boite = bbox_depuis_rect(rect)
+            boite = _bbox_image(rect, geometrie)
             cle = (boite.x0, boite.y0, boite.x1, boite.y1)
             if (
                 boite.largeur <= 0
@@ -116,7 +128,10 @@ def _ratio_intersection(a, b) -> float:
 
 
 def extraire_images_inline(
-    page, media: dict, deja_posees: list[ImageEl] | None = None
+    page,
+    media: dict,
+    deja_posees: list[ImageEl] | None = None,
+    geometrie: PageGeometry | None = None,
 ) -> list[ImageEl]:
     """Extrait les gros blocs image inline visibles dans le flux PDF.
 
@@ -140,9 +155,16 @@ def extraire_images_inline(
         if bloc.get("type") != 1:
             continue
         boite_points = tuple(float(v) for v in bloc.get("bbox", (0, 0, 0, 0)))
-        if _aire(boite_points) < SEUIL_IMAGE_INLINE_PT2:
+        boite = _bbox_image(pymupdf.Rect(*boite_points), geometrie)
+        boite_affiche_points = (
+            boite.x0 / 12700.0,
+            boite.y0 / 12700.0,
+            boite.x1 / 12700.0,
+            boite.y1 / 12700.0,
+        )
+        if _aire(boite_affiche_points) < SEUIL_IMAGE_INLINE_PT2:
             continue
-        if any(_ratio_intersection(boite_points, existante) > 0.8 for existante in boites_deja_posees):
+        if any(_ratio_intersection(boite_affiche_points, existante) > 0.8 for existante in boites_deja_posees):
             continue
 
         donnees = bloc.get("image")
@@ -159,7 +181,6 @@ def extraire_images_inline(
                 media_ref=media_ref, donnees=donnees, extension=extension
             )
 
-        boite = bbox_depuis_rect(pymupdf.Rect(*boite_points))
         if boite.largeur > 0 and boite.hauteur > 0 and not _est_artefact_image(boite):
             elements.append(ImageEl(bbox=boite, media_ref=media_ref))
 
@@ -167,7 +188,11 @@ def extraire_images_inline(
 
 
 def extraire_images_inline_rasterisees(
-    page, media: dict, deja_posees: list[ImageEl] | None = None, dpi: int = 200
+    page,
+    media: dict,
+    deja_posees: list[ImageEl] | None = None,
+    dpi: int = 200,
+    geometrie: PageGeometry | None = None,
 ) -> list[ImageEl]:
     """Capture les grosses images inline telles qu'elles apparaissent sur la page.
 
@@ -193,12 +218,18 @@ def extraire_images_inline_rasterisees(
         if bloc.get("type") != 1:
             continue
         boite_points = tuple(float(v) for v in bloc.get("bbox", (0, 0, 0, 0)))
-        if _aire(boite_points) < SEUIL_IMAGE_INLINE_PT2:
+        boite = _bbox_image(pymupdf.Rect(*boite_points), geometrie)
+        boite_affiche_points = (
+            boite.x0 / 12700.0,
+            boite.y0 / 12700.0,
+            boite.x1 / 12700.0,
+            boite.y1 / 12700.0,
+        )
+        if _aire(boite_affiche_points) < SEUIL_IMAGE_INLINE_PT2:
             continue
-        if any(_ratio_intersection(boite_points, existante) > 0.8 for existante in boites_deja_posees):
+        if any(_ratio_intersection(boite_affiche_points, existante) > 0.8 for existante in boites_deja_posees):
             continue
 
-        boite = bbox_depuis_rect(pymupdf.Rect(*boite_points))
         cle = (boite.x0, boite.y0, boite.x1, boite.y1)
         if (
             boite.largeur <= 0

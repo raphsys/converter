@@ -15,6 +15,7 @@ from pdfexact.ir import (
     Page,
     RasterEl,
     ShapeEl,
+    TableEl,
     Span,
     TextBox,
 )
@@ -22,6 +23,7 @@ from pdfexact.render.drawing import (
     _run_xml,
     forme_xml,
     image_xml,
+    table_xml,
     zone_lien_xml,
     zone_texte_xml,
 )
@@ -47,9 +49,10 @@ def _section_xml(page: Page) -> str:
     """Section aux dimensions exactes de la page PDF, sans aucune marge."""
     largeur = pt_vers_twips(emu_vers_pt(page.largeur_emu))
     hauteur = pt_vers_twips(emu_vers_pt(page.hauteur_emu))
+    orientation = ' w:orient="landscape"' if page.largeur_emu > page.hauteur_emu else ""
     return (
         "<w:sectPr>"
-        f'<w:pgSz w:w="{largeur}" w:h="{hauteur}"/>'
+        f'<w:pgSz w:w="{largeur}" w:h="{hauteur}"{orientation}/>'
         '<w:pgMar w:top="0" w:right="0" w:bottom="0" w:left="0" '
         'w:header="0" w:footer="0" w:gutter="0"/>'
         "</w:sectPr>"
@@ -60,11 +63,12 @@ def _section_flux_xml(page: Page) -> str:
     """Section Word éditable : mêmes dimensions page, marges utilisables."""
     largeur = pt_vers_twips(emu_vers_pt(page.largeur_emu))
     hauteur = pt_vers_twips(emu_vers_pt(page.hauteur_emu))
+    orientation = ' w:orient="landscape"' if page.largeur_emu > page.hauteur_emu else ""
     marge_h = pt_vers_twips(42)
     marge_v = pt_vers_twips(36)
     return (
         "<w:sectPr>"
-        f'<w:pgSz w:w="{largeur}" w:h="{hauteur}"/>'
+        f'<w:pgSz w:w="{largeur}" w:h="{hauteur}"{orientation}/>'
         f'<w:pgMar w:top="{marge_v}" w:right="{marge_h}" '
         f'w:bottom="{marge_v}" w:left="{marge_h}" '
         'w:header="0" w:footer="0" w:gutter="0"/>'
@@ -96,6 +100,9 @@ def _ancres_de_page(page: Page, compteur: list, relations, media: dict) -> str:
 
         elif isinstance(element, ShapeEl):
             morceaux.append(forme_xml(element, compteur[0], z))
+
+        elif isinstance(element, TableEl):
+            morceaux.append(table_xml(element, compteur[0], z, relations))
 
         elif isinstance(element, LinkZone) and element.uri:
             rel_id = relations.ajouter(element.uri, "hyperlink", externe=True)
@@ -215,6 +222,9 @@ def _ancres_xml(elements, compteur: list, relations, media: dict) -> str:
 
         elif isinstance(element, ShapeEl):
             morceaux.append(forme_xml(element, compteur[0], z))
+
+        elif isinstance(element, TableEl):
+            morceaux.append(table_xml(element, compteur[0], z, relations))
 
         elif isinstance(element, LinkZone) and element.uri:
             rel_id = relations.ajouter(element.uri, "hyperlink", externe=True)

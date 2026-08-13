@@ -18,6 +18,7 @@ from pdfexact.extract.images import (
 from pdfexact.extract.links import appliquer_liens
 from pdfexact.extract.layout_map import construire_layout_map
 from pdfexact.extract.ocr import extraire_ocr, extraire_rapidocr
+from pdfexact.extract.tables import extraire_tableaux
 from pdfexact.extract.text import extraire_texte, extraire_texte_glyphes
 from pdfexact.extract.vector import (
     SEUIL_CHEMINS_PAR_DEFAUT,
@@ -27,8 +28,8 @@ from pdfexact.extract.vector import (
     regrouper,
 )
 from pdfexact.fallback.rasterize import page_a_des_degrades, rasteriser_region
-from pdfexact.geometry import BBox, pt_vers_emu
-from pdfexact.ir import Document, FlowParagraph, ImageEl, LinkZone, Page, RasterEl, ShapeEl
+from pdfexact.geometry import BBox, PageGeometry
+from pdfexact.ir import Document, FlowParagraph, ImageEl, LinkZone, Page, RasterEl, ShapeEl, TableEl, TextBox
 from pdfexact.report import PageDegradee, Rapport
 
 
@@ -47,11 +48,12 @@ def _remplir_page(
     verbose,
 ):
     """Construit les éléments d'une page, dans l'ordre de superposition."""
+    geometrie = PageGeometry.depuis_page(page_pdf)
     degrades = page_a_des_degrades(doc, page_pdf)
     zones_visuelles: list[BBox] = []
     aire_page = max(page_ir.largeur_emu * page_ir.hauteur_emu, 1)
 
-    for cluster in regrouper(extraire_vectoriel(page_pdf)):
+    for cluster in regrouper(extraire_vectoriel(page_pdf, geometrie=geometrie)):
         boite_cluster = boite_du_cluster(cluster)
         if doit_rasteriser(cluster, degrades, seuil_raster):
             raster = rasteriser_region(page_pdf, boite_cluster, document.media, dpi=dpi)
@@ -69,13 +71,28 @@ def _remplir_page(
             page_ir.elements.extend(cluster)
 
     if text_mode == "rapidocr" and ocr_layout in {"reflow", "hybrid"}:
-        images = extraire_images_rasterisees(page_pdf, doc, document.media, dpi=dpi)
+        images = extraire_images_rasterisees(
+            page_pdf,
+            doc,
+            document.media,
+            dpi=dpi,
+            geometrie=geometrie,
+        )
         images_inline = extraire_images_inline_rasterisees(
-            page_pdf, document.media, deja_posees=images, dpi=dpi
+            page_pdf,
+            document.media,
+            deja_posees=images,
+            dpi=dpi,
+            geometrie=geometrie,
         )
     else:
-        images = extraire_images(page_pdf, doc, document.media)
-        images_inline = extraire_images_inline(page_pdf, document.media, deja_posees=images)
+        images = extraire_images(page_pdf, doc, document.media, geometrie=geometrie)
+        images_inline = extraire_images_inline(
+            page_pdf,
+            document.media,
+            deja_posees=images,
+            geometrie=geometrie,
+        )
     page_ir.elements.extend(images)
     page_ir.elements.extend(images_inline)
     zones_images = zones_visuelles + [image.bbox for image in images + images_inline]
@@ -83,9 +100,24 @@ def _remplir_page(
         print(f"      images inline: {len(images_inline)} bloc(s)", file=sys.stderr)
     if verbose and zones_visuelles:
         print(f"      zones vectorielles immuables: {len(zones_visuelles)}", file=sys.stderr)
+
+    tableaux = []
+    if text_mode == "rapidocr" and ocr_layout == "hybrid":
+        tableaux = extraire_tableaux(page_pdf, polices, geometrie=geometrie)
+        if tableaux:
+            page_ir.elements.extend(tableaux)
+            zones_images.extend(tableau.bbox for tableau in tableaux)
+            if verbose:
+                print(f"      tableaux Word: {len(tableaux)}", file=sys.stderr)
+
     layout_map = None
     if text_mode == "rapidocr" and ocr_layout == "hybrid":
-        layout_map = construire_layout_map(page_pdf, zones_visuelles=zones_images, dpi=dpi)
+        layout_map = construire_layout_map(
+            page_pdf,
+            zones_visuelles=zones_images,
+            dpi=dpi,
+            geometrie=geometrie,
+        )
 
     if text_mode == "glyph-images":
         page_ir.elements.extend(extraire_glyphes_images(page_pdf, document.media, dpi=dpi))
@@ -103,6 +135,7 @@ def _remplir_page(
                 zones_ignorees=zones_images,
                 media=document.media,
                 layout_map=layout_map,
+                geometrie=geometrie,
             )
         )
         return
@@ -171,10 +204,11 @@ def extraire(
                     file=sys.stderr,
                 )
             page_pdf = doc[index]
+            geometrie = PageGeometry.depuis_page(page_pdf)
             page_ir = Page(
                 index=index,
-                largeur_emu=pt_vers_emu(page_pdf.rect.width),
-                hauteur_emu=pt_vers_emu(page_pdf.rect.height),
+                largeur_emu=geometrie.largeur_emu,
+                hauteur_emu=geometrie.hauteur_emu,
             )
 
             if rasteriser_pages:
@@ -257,13 +291,15 @@ def extraire(
                     rapport.images += 1
                 elif isinstance(element, ShapeEl):
                     rapport.formes += 1
+                elif isinstance(element, TableEl):
+                    rapport.tableaux += 1
                 elif isinstance(element, LinkZone):
                     rapport.liens += 1
         rapport.liens += sum(
             1
             for page in document.pages
             for element in page.elements
-            if not isinstance(element, (FlowParagraph, ImageEl, ShapeEl, RasterEl, LinkZone))
+            if isinstance(element, TextBox)
             for ligne in element.lignes
             for span in ligne.spans
             if span.lien

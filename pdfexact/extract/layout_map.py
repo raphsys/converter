@@ -8,7 +8,9 @@ boites OCR seules.
 from dataclasses import dataclass, field
 from math import ceil, floor
 
-from pdfexact.geometry import BBox, bbox_depuis_rect, pt_vers_emu, se_chevauchent, union
+import pymupdf
+
+from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, pt_vers_emu, se_chevauchent, union
 
 GRILLE_DIXIEME_MM_EMU = 3600
 
@@ -245,10 +247,12 @@ def construire_layout_map(
     page,
     zones_visuelles: list[BBox] | None = None,
     dpi: int | None = None,
+    geometrie: PageGeometry | None = None,
 ) -> PageLayoutMap:
+    geometrie = geometrie or PageGeometry.depuis_page(page)
     carte = PageLayoutMap(
-        largeur_emu=pt_vers_emu(page.rect.width),
-        hauteur_emu=pt_vers_emu(page.rect.height),
+        largeur_emu=geometrie.largeur_emu,
+        hauteur_emu=geometrie.hauteur_emu,
     )
     z_index = 0
 
@@ -264,7 +268,7 @@ def construire_layout_map(
                     premier_span = (ligne.get("spans") or [{}])[0]
                     carte.ajouter(
                         "native-line",
-                        _bbox_depuis_liste(ligne["bbox"]),
+                        _bbox_depuis_liste(ligne["bbox"], geometrie),
                         "pymupdf-dict",
                         z_index,
                         text=texte,
@@ -277,7 +281,7 @@ def construire_layout_map(
         elif bloc.get("type") == 1:
             carte.ajouter(
                 "inline-image",
-                _bbox_depuis_liste(bloc.get("bbox", (0, 0, 0, 0))),
+                _bbox_depuis_liste(bloc.get("bbox", (0, 0, 0, 0)), geometrie),
                 "pymupdf-dict",
                 z_index,
             )
@@ -295,7 +299,7 @@ def construire_layout_map(
                 texte = ""
             carte.ajouter(
                 "glyph",
-                _bbox_depuis_liste(boite_pt),
+                _bbox_depuis_liste(boite_pt, geometrie),
                 "pymupdf-texttrace",
                 z_index,
                 text=texte,
@@ -311,7 +315,12 @@ def construire_layout_map(
     try:
         for xref in sorted({entree[0] for entree in page.get_images(full=True)}):
             for rect in page.get_image_rects(xref):
-                carte.ajouter("image", bbox_depuis_rect(rect), f"pymupdf-image:{xref}", z_index)
+                carte.ajouter(
+                    "image",
+                    geometrie.bbox_depuis_rect_natif(rect),
+                    f"pymupdf-image:{xref}",
+                    z_index,
+                )
                 z_index += 1
     except Exception:  # noqa: BLE001
         pass
@@ -360,13 +369,16 @@ def _ajouter_lignes_visuelles_natives(carte: PageLayoutMap, z_index: int) -> int
     return z_index
 
 
-def _bbox_depuis_liste(quadruplet) -> BBox:
-    return BBox(
-        pt_vers_emu(float(quadruplet[0])),
-        pt_vers_emu(float(quadruplet[1])),
-        pt_vers_emu(float(quadruplet[2])),
-        pt_vers_emu(float(quadruplet[3])),
+def _bbox_depuis_liste(quadruplet, geometrie: PageGeometry | None = None) -> BBox:
+    rect = pymupdf.Rect(
+        float(quadruplet[0]),
+        float(quadruplet[1]),
+        float(quadruplet[2]),
+        float(quadruplet[3]),
     )
+    if geometrie is None:
+        return bbox_depuis_rect(rect)
+    return geometrie.bbox_depuis_rect_natif(rect)
 
 
 def _limiter_page(bbox: BBox, largeur_emu: int, hauteur_emu: int) -> BBox:

@@ -12,6 +12,8 @@ from functools import lru_cache
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pymupdf
+
 from pdfexact.extract.blocks import (
     OcrLine,
     centre_dans,
@@ -19,7 +21,7 @@ from pdfexact.extract.blocks import (
     est_dans_zone,
 )
 from pdfexact.fallback.rasterize import rasteriser_region
-from pdfexact.geometry import BBox, emu_vers_pt, pt_vers_emu, pt_vers_twips
+from pdfexact.geometry import BBox, PageGeometry, emu_vers_pt, pt_vers_emu, pt_vers_twips
 from pdfexact.ir import FlowParagraph, FontRef, Line, Span, TextBox
 
 
@@ -131,7 +133,20 @@ def _intersection(a, b) -> float:
     return max(0.0, x1 - x0) * max(0.0, y1 - y0)
 
 
-def _trace_style(page, polices: dict, bbox: BBox, facteur_emu: float):
+def _bbox_trace_affiche(trace, geometrie: PageGeometry | None = None) -> tuple[float, float, float, float]:
+    rect = pymupdf.Rect(trace.get("bbox", (0, 0, 0, 0)))
+    if geometrie is not None:
+        rect = geometrie.rect_natif_vers_affiche(rect)
+    return (rect.x0, rect.y0, rect.x1, rect.y1)
+
+
+def _trace_style(
+    page,
+    polices: dict,
+    bbox: BBox,
+    facteur_emu: float,
+    geometrie: PageGeometry | None = None,
+):
     """Récupère police/taille/couleur depuis la trace PDF la plus proche."""
     cible = (
         bbox.x0 / facteur_emu,
@@ -142,7 +157,7 @@ def _trace_style(page, polices: dict, bbox: BBox, facteur_emu: float):
     meilleur = None
     meilleur_score = 0.0
     for trace in page.get_texttrace():
-        score = _intersection(cible, trace.get("bbox", (0, 0, 0, 0)))
+        score = _intersection(cible, _bbox_trace_affiche(trace, geometrie))
         if score > meilleur_score:
             meilleur = trace
             meilleur_score = score
@@ -496,6 +511,7 @@ def _paragraphes_reflow(
     polices: dict,
     lignes: list[OcrLine],
     facteur_emu: float,
+    geometrie: PageGeometry | None = None,
 ) -> list[FlowParagraph]:
     paragraphes: list[FlowParagraph] = []
     precedent_bas = 0
@@ -505,7 +521,7 @@ def _paragraphes_reflow(
         if not texte:
             continue
         bbox = _bbox_lignes(groupe)
-        police, size_pt, couleur = _trace_style(page, polices, bbox, facteur_emu)
+        police, size_pt, couleur = _trace_style(page, polices, bbox, facteur_emu, geometrie)
         hauteur_ligne = max(int(sum(l.bbox.hauteur for l in groupe) / len(groupe)), pt_vers_emu(size_pt * 1.05))
         espace_avant = max(0, bbox.y0 - precedent_bas)
         alignement = _alignement_paragraphe(page, groupe)
@@ -596,11 +612,12 @@ def _textbox(
     facteur_emu: float,
     ajuster_largeur: bool = True,
     layout_map=None,
+    geometrie: PageGeometry | None = None,
 ) -> TextBox:
     bbox = _limiter_bbox(page, bbox)
     if layout_map is not None:
         bbox = layout_map.recaler_ligne_ocr(bbox, texte)
-    police, size_pt, couleur = _trace_style(page, polices, bbox, facteur_emu)
+    police, size_pt, couleur = _trace_style(page, polices, bbox, facteur_emu, geometrie)
     hauteur_ligne = max(bbox.hauteur, pt_vers_emu(size_pt * 1.18))
     bbox = BBox(bbox.x0, bbox.y0, bbox.x1, min(pt_vers_emu(page.rect.height), bbox.y0 + hauteur_ligne))
     span = Span(texte=texte, police=police, size_pt=size_pt, couleur=couleur)
@@ -626,6 +643,7 @@ def extraire_rapidocr(
     zones_ignorees: list[BBox] | None = None,
     media: dict | None = None,
     layout_map=None,
+    geometrie: PageGeometry | None = None,
 ):
     """Retourne du vrai texte Word visible, reconnu par RapidOCR et positionné."""
     zones_ignorees = zones_ignorees or []
@@ -664,7 +682,7 @@ def extraire_rapidocr(
             if not _est_dans_zone_ignoree(ligne.bbox, zones_ignorees)
             and not _ligne_figure_isolee(ligne)
         ]
-        blocs.extend(_paragraphes_reflow(page, polices, lignes_texte, facteur_emu))
+        blocs.extend(_paragraphes_reflow(page, polices, lignes_texte, facteur_emu, geometrie))
         blocs.sort(key=lambda item: (item.bbox.y0, item.bbox.x0))
         if verbose:
             print(
@@ -719,6 +737,7 @@ def extraire_rapidocr(
                         bbox,
                         facteur_emu,
                         layout_map=layout_map if layout == "hybrid" else None,
+                        geometrie=geometrie,
                     )
                 )
                 utilises.add(index)
@@ -733,13 +752,13 @@ def extraire_rapidocr(
                 if _est_dans_zone_ignoree(bbox, zones_ignorees):
                     ignores += 1
                     continue
-                blocs.append(_textbox(page, polices, texte, bbox, facteur_emu))
+                blocs.append(_textbox(page, polices, texte, bbox, facteur_emu, geometrie=geometrie))
     else:
         for texte, _score, bbox in elements:
             if _est_dans_zone_ignoree(bbox, zones_ignorees):
                 ignores += 1
                 continue
-            blocs.append(_textbox(page, polices, texte, bbox, facteur_emu))
+            blocs.append(_textbox(page, polices, texte, bbox, facteur_emu, geometrie=geometrie))
 
     blocs.sort(key=lambda item: (item.bbox.y0, item.bbox.x0))
 

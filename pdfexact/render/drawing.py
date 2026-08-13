@@ -7,7 +7,7 @@ ne doit pouvoir décaler quoi que ce soit.
 from xml.sax.saxutils import escape
 
 from pdfexact.geometry import emu_vers_pt, pt_vers_twips
-from pdfexact.ir import Line
+from pdfexact.ir import Line, Span
 
 _GABARIT_ANCRE = (
     '<w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" '
@@ -133,6 +133,91 @@ def image_xml(element, identifiant: int, z: int, rel_id: str, derriere: bool = F
     )
 
     return _ancre(element.bbox, identifiant, z, f"Image {identifiant}", contenu, derriere)
+
+
+def table_xml(element, identifiant: int, z: int, relations=None) -> str:
+    """Rend un tableau PDF détecté en vrai tableau Word, ancré à la page."""
+    largeur = max(element.bbox.largeur, 1)
+    hauteur = max(element.bbox.hauteur, 1)
+    grid = "".join(
+        f'<w:gridCol w:w="{max(pt_vers_twips(emu_vers_pt(w)), 1)}"/>'
+        for w in element.col_widths_emu
+    )
+    rows_xml = []
+    for row in element.rows:
+        tr_height = max(pt_vers_twips(emu_vers_pt(row.bbox.hauteur)), 1)
+        cells_xml = []
+        for cell in row.cells:
+            tc_width = max(pt_vers_twips(emu_vers_pt(cell.bbox.largeur)), 1)
+            grid_span = (
+                f'<w:gridSpan w:val="{cell.col_span}"/>'
+                if cell.col_span > 1
+                else ""
+            )
+            shading = f'<w:shd w:fill="{cell.fond}"/>' if cell.fond else ""
+            span = Span(
+                texte=cell.texte,
+                police=element.police,
+                size_pt=element.size_pt,
+                couleur=element.couleur,
+            )
+            cells_xml.append(
+                "<w:tc>"
+                "<w:tcPr>"
+                f'<w:tcW w:w="{tc_width}" w:type="dxa"/>'
+                f"{grid_span}{shading}"
+                '<w:tcMar><w:top w:w="15" w:type="dxa"/><w:left w:w="25" w:type="dxa"/>'
+                '<w:bottom w:w="15" w:type="dxa"/><w:right w:w="25" w:type="dxa"/></w:tcMar>'
+                "</w:tcPr>"
+                '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>'
+                '<w:jc w:val="center"/></w:pPr>'
+                f"{_run_xml(span, relations)}</w:p>"
+                "</w:tc>"
+            )
+        rows_xml.append(
+            "<w:tr>"
+            f'<w:trPr><w:trHeight w:val="{tr_height}" w:hRule="atLeast"/></w:trPr>'
+            f"{''.join(cells_xml)}</w:tr>"
+        )
+
+    tbl = (
+        "<w:tbl>"
+        "<w:tblPr>"
+        f'<w:tblW w:w="{max(pt_vers_twips(emu_vers_pt(largeur)), 1)}" w:type="dxa"/>'
+        '<w:tblLayout w:type="fixed"/>'
+        '<w:tblBorders>'
+        '<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '</w:tblBorders>'
+        "</w:tblPr>"
+        f"<w:tblGrid>{grid}</w:tblGrid>"
+        f"{''.join(rows_xml)}"
+        "</w:tbl>"
+    )
+
+    contenu = (
+        "<a:graphic><a:graphicData "
+        'uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">'
+        '<wps:wsp><wps:cNvSpPr txBox="1"/>'
+        "<wps:spPr>"
+        '<a:xfrm><a:off x="0" y="0"/>'
+        f'<a:ext cx="{largeur}" cy="{hauteur}"/></a:xfrm>'
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+        "<a:noFill/><a:ln><a:noFill/></a:ln>"
+        "</wps:spPr>"
+        f"<wps:txbx><w:txbxContent>{tbl}</w:txbxContent></wps:txbx>"
+        '<wps:bodyPr rot="0" spcFirstLastPara="0" vertOverflow="clip" '
+        'horzOverflow="clip" vert="horz" wrap="none" '
+        'lIns="0" tIns="0" rIns="0" bIns="0" anchor="t" anchorCtr="0">'
+        "<a:noAutofit/></wps:bodyPr>"
+        "</wps:wsp></a:graphicData></a:graphic>"
+    )
+
+    return _ancre(element.bbox, identifiant, z, f"Tableau {identifiant}", contenu)
 
 
 def _commandes_xml(chemins, origine_x: int, origine_y: int) -> str:
