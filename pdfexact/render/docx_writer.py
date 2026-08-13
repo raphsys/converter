@@ -151,6 +151,10 @@ def _paragraphe_flux_xml(paragraphe: FlowParagraph, relations, sect_pr: str = ""
         police=police,
         size_pt=size_pt,
         couleur=paragraphe.couleur,
+        souligne=paragraphe.souligne,
+        barre=paragraphe.barre,
+        capitales=paragraphe.capitales,
+        surlignage=paragraphe.surlignage,
     )
     ppr = (
         "<w:pPr>"

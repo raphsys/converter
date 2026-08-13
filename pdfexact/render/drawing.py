@@ -49,9 +49,21 @@ def _run_xml(span, relations=None) -> str:
         proprietes.append("<w:b/>")
     if span.police.italique:
         proprietes.append("<w:i/>")
+    if getattr(span, "souligne", False):
+        proprietes.append('<w:u w:val="single"/>')
+    if getattr(span, "barre", False):
+        proprietes.append("<w:strike/>")
+    if getattr(span, "capitales", False):
+        proprietes.append("<w:caps/>")
+    if getattr(span, "exposant", False):
+        proprietes.append('<w:vertAlign w:val="superscript"/>')
+    elif getattr(span, "indice", False):
+        proprietes.append('<w:vertAlign w:val="subscript"/>')
     if getattr(span, "invisible", False):
         proprietes.append("<w:vanish/>")
     proprietes.append(f'<w:color w:val="{span.couleur}"/>')
+    if getattr(span, "surlignage", None):
+        proprietes.append(f'<w:highlight w:val="{span.surlignage}"/>')
     demi_points = max(round(span.size_pt * 2), 1)
     proprietes.append(f'<w:sz w:val="{demi_points}"/>')
     proprietes.append(f'<w:szCs w:val="{demi_points}"/>')
@@ -155,12 +167,15 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
                 else ""
             )
             shading = f'<w:shd w:fill="{cell.fond}"/>' if cell.fond else ""
-            span = Span(
-                texte=cell.texte,
-                police=element.police,
-                size_pt=element.size_pt,
-                couleur=element.couleur,
-            )
+            spans = cell.spans or [
+                Span(
+                    texte=cell.texte,
+                    police=element.police,
+                    size_pt=element.size_pt,
+                    couleur=element.couleur,
+                )
+            ]
+            runs = "".join(_run_xml(span, relations) for span in spans)
             cells_xml.append(
                 "<w:tc>"
                 "<w:tcPr>"
@@ -170,8 +185,8 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
                 '<w:bottom w:w="15" w:type="dxa"/><w:right w:w="25" w:type="dxa"/></w:tcMar>'
                 "</w:tcPr>"
                 '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>'
-                '<w:jc w:val="center"/></w:pPr>'
-                f"{_run_xml(span, relations)}</w:p>"
+                f'<w:jc w:val="{cell.alignement}"/></w:pPr>'
+                f"{runs}</w:p>"
                 "</w:tc>"
             )
         rows_xml.append(
@@ -186,12 +201,12 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
         f'<w:tblW w:w="{max(pt_vers_twips(emu_vers_pt(largeur)), 1)}" w:type="dxa"/>'
         '<w:tblLayout w:type="fixed"/>'
         '<w:tblBorders>'
-        '<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-        '<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-        '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-        '<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-        '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
-        '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        f'<w:top w:val="single" w:sz="{element.bordure_sz}" w:space="0" w:color="{element.bordure_couleur}"/>'
+        f'<w:left w:val="single" w:sz="{element.bordure_sz}" w:space="0" w:color="{element.bordure_couleur}"/>'
+        f'<w:bottom w:val="single" w:sz="{element.bordure_sz}" w:space="0" w:color="{element.bordure_couleur}"/>'
+        f'<w:right w:val="single" w:sz="{element.bordure_sz}" w:space="0" w:color="{element.bordure_couleur}"/>'
+        f'<w:insideH w:val="single" w:sz="{element.bordure_sz}" w:space="0" w:color="{element.bordure_couleur}"/>'
+        f'<w:insideV w:val="single" w:sz="{element.bordure_sz}" w:space="0" w:color="{element.bordure_couleur}"/>'
         '</w:tblBorders>'
         "</w:tblPr>"
         f"<w:tblGrid>{grid}</w:tblGrid>"

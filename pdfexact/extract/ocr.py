@@ -20,6 +20,7 @@ from pdfexact.extract.blocks import (
     detecter_blocs_page,
     est_dans_zone,
 )
+from pdfexact.extract.styles import decorations_texte
 from pdfexact.fallback.rasterize import rasteriser_region
 from pdfexact.geometry import BBox, PageGeometry, emu_vers_pt, pt_vers_emu, pt_vers_twips
 from pdfexact.ir import FlowParagraph, FontRef, Line, Span, TextBox
@@ -162,8 +163,15 @@ def _trace_style(
             meilleur = trace
             meilleur_score = score
 
+    decoration = decorations_texte(page, bbox, geometrie)
+
     if meilleur is None:
-        return FontRef("OCR", "Times New Roman", False, False), 10.0, "000000"
+        return (
+            FontRef("OCR", "Times New Roman", False, False),
+            10.0,
+            "000000",
+            decoration,
+        )
 
     from pdfexact.extract.text import _couleur_hexa, _resoudre_police, _style_depuis_nom
 
@@ -176,6 +184,7 @@ def _trace_style(
         FontRef(font_id, asset.famille, gras, italique),
         round(float(meilleur.get("size", 10.0)), 2),
         _couleur_hexa(meilleur.get("color", 0)),
+        decoration,
     )
 
 
@@ -521,7 +530,7 @@ def _paragraphes_reflow(
         if not texte:
             continue
         bbox = _bbox_lignes(groupe)
-        police, size_pt, couleur = _trace_style(page, polices, bbox, facteur_emu, geometrie)
+        police, size_pt, couleur, decoration = _trace_style(page, polices, bbox, facteur_emu, geometrie)
         hauteur_ligne = max(int(sum(l.bbox.hauteur for l in groupe) / len(groupe)), pt_vers_emu(size_pt * 1.05))
         espace_avant = max(0, bbox.y0 - precedent_bas)
         alignement = _alignement_paragraphe(page, groupe)
@@ -544,6 +553,9 @@ def _paragraphes_reflow(
                 espace_avant_emu=min(espace_avant, pt_vers_emu(8)),
                 espace_apres_emu=pt_vers_emu(0.5),
                 interligne_emu=hauteur_ligne,
+                souligne=decoration.souligne,
+                barre=decoration.barre,
+                surlignage=decoration.surlignage,
             )
         )
         precedent_bas = bbox.y1
@@ -617,10 +629,18 @@ def _textbox(
     bbox = _limiter_bbox(page, bbox)
     if layout_map is not None:
         bbox = layout_map.recaler_ligne_ocr(bbox, texte)
-    police, size_pt, couleur = _trace_style(page, polices, bbox, facteur_emu, geometrie)
+    police, size_pt, couleur, decoration = _trace_style(page, polices, bbox, facteur_emu, geometrie)
     hauteur_ligne = max(bbox.hauteur, pt_vers_emu(size_pt * 1.18))
     bbox = BBox(bbox.x0, bbox.y0, bbox.x1, min(pt_vers_emu(page.rect.height), bbox.y0 + hauteur_ligne))
-    span = Span(texte=texte, police=police, size_pt=size_pt, couleur=couleur)
+    span = Span(
+        texte=texte,
+        police=police,
+        size_pt=size_pt,
+        couleur=couleur,
+        souligne=decoration.souligne,
+        barre=decoration.barre,
+        surlignage=decoration.surlignage,
+    )
     ligne = Line(
         bbox=bbox,
         spans=[span],

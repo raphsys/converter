@@ -184,6 +184,71 @@ def test_un_tableau_est_rendu_comme_vrai_tableau_word(tmp_path):
     assert len(list(racine.iter(f"{W}tc"))) == 2
 
 
+def test_styles_de_span_sont_rendus_en_ooxml(tmp_path):
+    from pdfexact.ir import Line, Span, TextBox
+
+    span = Span(
+        texte="Style",
+        police=FontRef("Test", "Arial", True, True),
+        size_pt=11,
+        couleur="AA0000",
+        souligne=True,
+        barre=True,
+        capitales=True,
+        surlignage="yellow",
+    )
+    ligne = Line(
+        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(140), pt_vers_emu(86)),
+        spans=[span],
+        hauteur_ligne_emu=pt_vers_emu(14),
+        largeur_cible_emu=pt_vers_emu(68),
+    )
+    document = Document(
+        pages=[Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR, elements=[TextBox(ligne.bbox, [ligne])])]
+    )
+    sortie = tmp_path / "styles.docx"
+
+    ecrire_docx(document, sortie)
+
+    xml = _lire(sortie, "word/document.xml").decode()
+    assert "<w:b/>" in xml
+    assert "<w:i/>" in xml
+    assert '<w:u w:val="single"/>' in xml
+    assert "<w:strike/>" in xml
+    assert "<w:caps/>" in xml
+    assert '<w:highlight w:val="yellow"/>' in xml
+
+
+def test_tableau_utilise_couleur_et_epaisseur_de_bordure(tmp_path):
+    table = TableEl(
+        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(156), pt_vers_emu(100)),
+        rows=[
+            TableRow(
+                bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(156), pt_vers_emu(100)),
+                cells=[
+                    TableCell(
+                        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(156), pt_vers_emu(100)),
+                        texte="A",
+                    ),
+                ],
+            )
+        ],
+        col_widths_emu=[pt_vers_emu(84)],
+        police=FontRef("Test", "Arial", False, False),
+        size_pt=8,
+        bordure_couleur="336699",
+        bordure_sz=12,
+    )
+    document = Document(pages=[Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR, elements=[table])])
+    sortie = tmp_path / "table_border.docx"
+
+    ecrire_docx(document, sortie)
+
+    xml = _lire(sortie, "word/document.xml").decode()
+    assert 'w:sz="12"' in xml
+    assert 'w:color="336699"' in xml
+
+
 def test_le_gestionnaire_de_relations_numerote_a_partir_de_un():
     gestionnaire = GestionnaireRelations()
 

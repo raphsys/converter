@@ -12,8 +12,9 @@ import io
 import pymupdf
 
 from pdfexact.extract.text import _couleur_hexa, _resoudre_police, _style_depuis_nom
-from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, pt_vers_emu
-from pdfexact.ir import FontRef, TableCell, TableEl, TableRow
+from pdfexact.extract.styles import decorations_texte
+from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, pt_vers_emu, pt_vers_twips
+from pdfexact.ir import FontRef, Span, TableCell, TableEl, TableRow
 
 
 def _bbox_depuis_tuple(rect_tuple) -> BBox:
@@ -59,6 +60,24 @@ def _style_table(
     )
 
 
+def _span_cellule(page, polices: dict, cell_bbox: BBox, texte: str, geometrie: PageGeometry) -> list[Span]:
+    if not texte:
+        return []
+    police, size_pt, couleur = _style_table(page, polices, cell_bbox, geometrie)
+    decoration = decorations_texte(page, cell_bbox, geometrie)
+    return [
+        Span(
+            texte=texte,
+            police=police,
+            size_pt=size_pt,
+            couleur=couleur,
+            souligne=decoration.souligne,
+            barre=decoration.barre,
+            surlignage=decoration.surlignage,
+        )
+    ]
+
+
 def _couleur_fond_cellule(page, cell: BBox, geometrie: PageGeometry | None = None) -> str | None:
     meilleure = None
     meilleure_aire = 0
@@ -75,6 +94,27 @@ def _couleur_fond_cellule(page, cell: BBox, geometrie: PageGeometry | None = Non
     if meilleure is None or meilleure_aire < max(cell.largeur * cell.hauteur * 0.35, 1):
         return None
     return _couleur_hexa(meilleure)
+
+
+def _bordure_table(page, bbox: BBox, geometrie: PageGeometry) -> tuple[str, int]:
+    couleurs: dict[str, int] = {}
+    epaisseurs: list[float] = []
+    for dessin in page.get_drawings():
+        couleur = dessin.get("color")
+        if couleur is None:
+            continue
+        rect_pt = dessin.get("rect")
+        rect = geometrie.bbox_depuis_rect_natif(rect_pt)
+        if _intersection(rect, bbox) <= 0:
+            continue
+        if rect.largeur > bbox.largeur * 0.20 or rect.hauteur > bbox.hauteur * 0.20:
+            hexa = _couleur_hexa(couleur)
+            couleurs[hexa] = couleurs.get(hexa, 0) + 1
+            epaisseurs.append(float(dessin.get("width", 0.5) or 0.5))
+
+    couleur = max(couleurs.items(), key=lambda item: item[1])[0] if couleurs else "000000"
+    epaisseur_pt = sorted(epaisseurs)[len(epaisseurs) // 2] if epaisseurs else 0.5
+    return couleur, max(2, min(24, round(pt_vers_twips(epaisseur_pt) / 2)))
 
 
 def _col_widths(rows: list[TableRow], bbox: BBox, col_count: int) -> list[int]:
@@ -134,6 +174,7 @@ def extraire_tableaux(page, polices: dict, geometrie: PageGeometry | None = None
                         texte=texte,
                         col_span=span,
                         fond=_couleur_fond_cellule(page, cell_bbox, geometrie),
+                        spans=_span_cellule(page, polices, cell_bbox, texte, geometrie),
                     )
                 )
                 col_index = next_index
@@ -145,6 +186,7 @@ def extraire_tableaux(page, polices: dict, geometrie: PageGeometry | None = None
             continue
 
         police, size_pt, couleur = _style_table(page, polices, bbox, geometrie)
+        bordure_couleur, bordure_sz = _bordure_table(page, bbox, geometrie)
         elements.append(
             TableEl(
                 bbox=bbox,
@@ -153,6 +195,8 @@ def extraire_tableaux(page, polices: dict, geometrie: PageGeometry | None = None
                 police=police,
                 size_pt=size_pt,
                 couleur=couleur,
+                bordure_couleur=bordure_couleur,
+                bordure_sz=bordure_sz,
             )
         )
 

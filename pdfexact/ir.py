@@ -65,6 +65,12 @@ class Span:
     espacement_twips: int = 0
     lien: str | None = None
     invisible: bool = False
+    souligne: bool = False
+    barre: bool = False
+    capitales: bool = False
+    exposant: bool = False
+    indice: bool = False
+    surlignage: str | None = None
 
 
 @dataclass
@@ -102,6 +108,10 @@ class FlowParagraph:
     espace_avant_emu: int = 0
     espace_apres_emu: int = 0
     interligne_emu: int = 0
+    souligne: bool = False
+    barre: bool = False
+    capitales: bool = False
+    surlignage: str | None = None
 
 
 @dataclass
@@ -135,6 +145,8 @@ class TableCell:
     texte: str
     col_span: int = 1
     fond: str | None = None
+    spans: list[Span] = field(default_factory=list)
+    alignement: str = "center"
 
 
 @dataclass
@@ -151,6 +163,8 @@ class TableEl:
     police: FontRef
     size_pt: float
     couleur: str = "000000"
+    bordure_couleur: str = "000000"
+    bordure_sz: int = 4
 
 
 @dataclass
