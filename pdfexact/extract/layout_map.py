@@ -93,9 +93,9 @@ class PageLayoutMap:
         fiable. Quand une ligne native est geometriquement proche, on garde donc le texte
         OCR et on reprend la boite native exacte.
         """
-        candidat_visuel = self._meilleure_ligne_visuelle_native(bbox)
+        candidat_visuel = self._meilleure_ligne_visuelle_native(bbox, texte)
         if candidat_visuel is not None:
-            return candidat_visuel.bbox
+            return candidat_visuel
         candidat = self._meilleure_ligne_native(bbox, texte)
         if candidat is not None:
             return candidat.bbox
@@ -167,6 +167,8 @@ class PageLayoutMap:
             recouvrement_y = _ratio_vertical(bbox, item.bbox)
             if recouvrement_y < 0.35:
                 continue
+            if abs(item.bbox.x0 - bbox.x0) > pt_vers_emu(18):
+                continue
 
             distance_x = abs(((item.bbox.x0 + item.bbox.x1) / 2) - centre_x)
             proximite_x = 1.0 / (1.0 + distance_x / max(item.bbox.largeur, bbox.largeur, 1))
@@ -182,10 +184,12 @@ class PageLayoutMap:
 
         return meilleur if meilleur_score >= 1.25 else None
 
-    def _meilleure_ligne_visuelle_native(self, bbox: BBox) -> LayoutItem | None:
-        meilleur: LayoutItem | None = None
+    def _meilleure_ligne_visuelle_native(self, bbox: BBox, texte: str) -> BBox | None:
+        meilleur: BBox | None = None
         meilleur_score = 0.0
         centre_x = (bbox.x0 + bbox.x1) / 2
+        texte_compact = _compact(texte)
+        texte_long = len(texte_compact) >= 45
 
         for item in self.lignes_visuelles_natives():
             recouvrement_y = _ratio_vertical(bbox, item.bbox)
@@ -193,12 +197,22 @@ class PageLayoutMap:
                 continue
             if item.bbox.largeur < bbox.largeur * 0.92:
                 continue
-            if not item.bbox.x0 - pt_vers_emu(8) <= centre_x <= item.bbox.x1 + pt_vers_emu(8):
+
+            marge = pt_vers_emu(8)
+            bord_gauche_proche = abs(item.bbox.x0 - bbox.x0) <= marge
+            bord_droit_proche = abs(item.bbox.x1 - bbox.x1) <= marge
+            meme_largeur = 0.80 <= bbox.largeur / max(item.bbox.largeur, 1) <= 1.20
+            if not texte_long and not (bord_gauche_proche and bord_droit_proche and meme_largeur):
+                continue
+
+            if not item.bbox.x0 - marge <= centre_x <= item.bbox.x1 + marge:
                 continue
             distance_x0 = abs(item.bbox.x0 - bbox.x0)
             score = recouvrement_y + 1.0 / (1.0 + distance_x0 / max(item.bbox.largeur, 1))
             if score > meilleur_score:
-                meilleur = item
+                x0 = item.bbox.x0 if bord_gauche_proche else bbox.x0
+                x1 = max(item.bbox.x1, bbox.x1)
+                meilleur = BBox(x0, item.bbox.y0, x1, item.bbox.y1)
                 meilleur_score = score
 
         return meilleur if meilleur_score >= 1.15 else None

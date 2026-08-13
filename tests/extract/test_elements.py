@@ -331,6 +331,25 @@ def test_la_carte_ne_recale_pas_sur_un_texte_natif_incompatible():
     assert recale != natif
 
 
+def test_la_carte_ne_deplace_pas_une_ligne_vers_une_autre_colonne():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    natif = BBox(pt_vers_emu(86), pt_vers_emu(433), pt_vers_emu(533), pt_vers_emu(447))
+    ocr = BBox(pt_vers_emu(190), pt_vers_emu(433), pt_vers_emu(533), pt_vers_emu(447))
+    carte.ajouter(
+        "native-line",
+        natif,
+        "test",
+        text="The formal action by the President to make a state eligible for major",
+    )
+
+    recale = carte.recaler_ligne_ocr(
+        ocr,
+        "The formal action by the President to make a state eligible for major",
+    )
+
+    assert recale.x0 >= pt_vers_emu(180)
+
+
 def test_la_carte_recale_sur_une_ligne_native_fusionnee():
     carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
     carte.ajouter(
@@ -347,6 +366,41 @@ def test_la_carte_recale_sur_une_ligne_native_fusionnee():
     )
 
     assert recale.x1 == pt_vers_emu(560)
+    assert recale.x0 == pt_vers_emu(56)
+
+
+def test_la_carte_nelargit_pas_un_mot_court_sur_une_ligne_fusionnee():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    carte.ajouter(
+        "native-visual-line",
+        BBox(pt_vers_emu(86), pt_vers_emu(655), pt_vers_emu(293), pt_vers_emu(670)),
+        "test",
+        text="WWL Wind Water Line",
+    )
+    ocr = BBox(pt_vers_emu(86), pt_vers_emu(655), pt_vers_emu(110), pt_vers_emu(670))
+
+    recale = carte.recaler_ligne_ocr(ocr, "WWL")
+
+    assert recale.x1 < pt_vers_emu(140)
+
+
+def test_la_ligne_fusionnee_ne_deplace_pas_le_bord_gauche_ocr():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    carte.ajouter(
+        "native-visual-line",
+        BBox(pt_vers_emu(86), pt_vers_emu(433), pt_vers_emu(533), pt_vers_emu(447)),
+        "test",
+        text="Disaster declaration The formal action by the President to make a state eligible",
+    )
+    ocr = BBox(pt_vers_emu(190), pt_vers_emu(433), pt_vers_emu(533), pt_vers_emu(447))
+
+    recale = carte.recaler_ligne_ocr(
+        ocr,
+        "The formal action by the President to make a state eligible",
+    )
+
+    assert recale.x0 == pt_vers_emu(190)
+    assert recale.x1 == pt_vers_emu(533)
 
 
 def test_la_carte_contraint_une_ligne_ocr_longue_au_cadre_natif():
