@@ -47,6 +47,11 @@ _STYLES_EQUIVALENTS = {
     "book": "regular",
     "normal": "regular",
     "plain": "regular",
+    "regular": "regular",
+    "bold": "bold",
+    "bd": "bold",
+    "italic": "italic",
+    "ita": "italic",
     "oblique": "italic",
     "boldoblique": "bold italic",
     "bolditalic": "bold italic",
@@ -63,6 +68,16 @@ class PoliceIndexee:
     style: str
     chemin: Path
     source: str  # "dossier" ou "systeme"
+
+
+@dataclass(frozen=True)
+class ResolutionPolice:
+    """Résultat détaillé d'une résolution de police."""
+
+    demandee: str
+    police: PoliceIndexee | None
+    mode: str  # "exact", "famille_style", "alias", "famille", "manquante"
+    alias_depuis: str | None = None
 
 
 def normaliser_nom(nom_pdf: str) -> str:
@@ -149,18 +164,22 @@ class Bibliotheque:
         style, puis famille seule en Regular. Aucune correspondance approximative au-delà :
         mieux vaut retomber sur une substitution explicite qu'inventer un rapprochement.
         """
+        return self.resoudre_detail(nom_pdf).police
+
+    def resoudre_detail(self, nom_pdf: str) -> ResolutionPolice:
+        """Retrouve une police et indique si la correspondance est stricte ou substituée."""
         nom = normaliser_nom(nom_pdf).strip()
         if not nom:
-            return None
+            return ResolutionPolice(nom_pdf, None, "manquante")
 
         direct = self.par_nom.get(nom.lower())
         if direct is not None:
-            return direct
+            return ResolutionPolice(nom, direct, "exact")
 
         famille, style = _decouper_nom_postscript(nom)
         par_style = self.par_famille_style.get((famille.lower(), style))
         if par_style is not None:
-            return par_style
+            return ResolutionPolice(nom, par_style, "famille_style")
 
         # Équivalence métrique : la famille nommée par le PDF n'est pas installée, mais un
         # clone de mêmes chasses l'est. La mise en page reste juste, le dessin diffère peu.
@@ -169,12 +188,16 @@ class Bibliotheque:
         if cible is not None:
             par_alias = self.par_famille_style.get((cible.lower(), style))
             if par_alias is not None:
-                return par_alias
+                return ResolutionPolice(nom, par_alias, "alias", alias_depuis=famille)
             par_alias = self.par_famille_style.get((cible.lower(), "regular"))
             if par_alias is not None:
-                return par_alias
+                return ResolutionPolice(nom, par_alias, "alias", alias_depuis=famille)
 
-        return self.par_famille_style.get((famille.lower(), "regular"))
+        par_famille = self.par_famille_style.get((famille.lower(), "regular"))
+        if par_famille is not None:
+            return ResolutionPolice(nom, par_famille, "famille")
+
+        return ResolutionPolice(nom, None, "manquante")
 
 
 def _lire_noms_sfnt(chemin: Path) -> tuple[str, str, str] | None:

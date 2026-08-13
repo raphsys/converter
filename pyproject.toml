@@ -24,6 +24,7 @@ dev = [
 
 [project.scripts]
 pdfexact = "pdfexact.cli:main"
+pdfexact-fonts = "pdfexact.fonts_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["pdfexact*"]
