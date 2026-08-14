@@ -11,6 +11,7 @@ from pdfexact.ir import (
     Document,
     FontAsset,
     FontRef,
+    FlowParagraph,
     MediaItem,
     Page,
     TableBorder,
@@ -320,6 +321,44 @@ def test_tableau_rend_direction_verticale_de_cellule(tmp_path):
 
     xml = _lire(sortie, "word/document.xml").decode()
     assert '<w:textDirection w:val="btLr"/>' in xml
+
+
+def test_tableau_en_flux_word_natif_n_est_pas_dans_un_drawing(tmp_path):
+    police = FontRef("Test", "Arial", False, False)
+    paragraphe = FlowParagraph(
+        bbox=BBox(pt_vers_emu(72), pt_vers_emu(72), pt_vers_emu(220), pt_vers_emu(90)),
+        texte="Avant le tableau",
+        police=police,
+        size_pt=10,
+        couleur="000000",
+    )
+    table = TableEl(
+        bbox=BBox(pt_vers_emu(72), pt_vers_emu(100), pt_vers_emu(156), pt_vers_emu(130)),
+        rows=[
+            TableRow(
+                bbox=BBox(pt_vers_emu(72), pt_vers_emu(100), pt_vers_emu(156), pt_vers_emu(130)),
+                cells=[
+                    TableCell(
+                        bbox=BBox(pt_vers_emu(72), pt_vers_emu(100), pt_vers_emu(156), pt_vers_emu(130)),
+                        texte="Cellule",
+                    ),
+                ],
+            )
+        ],
+        col_widths_emu=[pt_vers_emu(84)],
+        police=police,
+        size_pt=8,
+    )
+    document = Document(
+        pages=[Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR, elements=[paragraphe, table])]
+    )
+    sortie = tmp_path / "native_flow_table.docx"
+
+    ecrire_docx(document, sortie)
+
+    xml = _lire(sortie, "word/document.xml").decode()
+    assert "<w:tbl>" in xml
+    assert "<w:drawing>" not in xml
 
 
 def test_le_gestionnaire_de_relations_numerote_a_partir_de_un():

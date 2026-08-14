@@ -49,7 +49,7 @@ def _recouvrement_min(a: BBox, b: BBox) -> float:
     return _intersection(a, b) / max(min(_aire(a), _aire(b)), 1)
 
 
-def _fond_vectoriel_significatif(cluster: list[ShapeEl], aire_page: int) -> bool:
+def _fond_vectoriel_significatif(cluster: list[ShapeEl], aire_page: int, flux_word: bool = False) -> bool:
     """Garde les grands aplats utiles au layout, pas les artefacts de glyphes/traits."""
     min_dimension = pt_vers_emu(4)
     min_aire = max(int(aire_page * 0.001), pt_vers_emu(8) * pt_vers_emu(8))
@@ -58,6 +58,8 @@ def _fond_vectoriel_significatif(cluster: list[ShapeEl], aire_page: int) -> bool
             continue
         couleur = element.remplissage.upper()
         if couleur in {"FFFFFF", "FEFEFE"}:
+            continue
+        if flux_word and couleur in {"000000", "010101", "020202", "808080", "C0C0C0"}:
             continue
         if element.bbox.largeur < min_dimension or element.bbox.hauteur < min_dimension:
             continue
@@ -88,7 +90,7 @@ def _remplir_page(
     tableaux_detectes: list[TableEl] = []
     zones_tableaux: list[BBox] = []
 
-    if text_mode == "rapidocr" and ocr_layout == "hybrid":
+    if text_mode == "rapidocr" and ocr_layout in {"hybrid", "word-native"}:
         tableaux_detectes = extraire_tableaux(page_pdf, polices, geometrie=geometrie)
         zones_tableaux = [tableau.bbox for tableau in tableaux_detectes]
 
@@ -101,13 +103,17 @@ def _remplir_page(
             if aire_cluster / aire_page <= 0.18:
                 zones_visuelles.append(raster.bbox)
             rapport.clusters_rasterises += 1
-        elif text_mode == "rapidocr" and ocr_layout in {"reflow", "hybrid"}:
+        elif text_mode == "rapidocr" and ocr_layout in {"reflow", "hybrid", "word-native"}:
             # En reflow, le texte devient un vrai flux Word. Les petits traits PDF
             # (soulignements, filets de page, artefacts glyphiques) ne doivent plus
             # rester en coordonnées absolues : ils se décorrèlent des paragraphes.
             if (
-                ocr_layout == "hybrid"
-                and _fond_vectoriel_significatif(cluster, aire_page)
+                ocr_layout in {"hybrid", "word-native"}
+                and _fond_vectoriel_significatif(
+                    cluster,
+                    aire_page,
+                    flux_word=ocr_layout == "word-native",
+                )
                 and not any(_recouvrement_min(boite_cluster, zone) > 0.18 for zone in zones_tableaux)
             ):
                 page_ir.elements.extend(cluster)
@@ -115,7 +121,7 @@ def _remplir_page(
         else:
             page_ir.elements.extend(cluster)
 
-    if text_mode == "rapidocr" and ocr_layout in {"reflow", "hybrid"}:
+    if text_mode == "rapidocr" and ocr_layout in {"reflow", "hybrid", "word-native"}:
         images = extraire_images_rasterisees(
             page_pdf,
             doc,
@@ -147,7 +153,7 @@ def _remplir_page(
         print(f"      zones vectorielles immuables: {len(zones_visuelles)}", file=sys.stderr)
 
     tableaux = []
-    if text_mode == "rapidocr" and ocr_layout == "hybrid":
+    if text_mode == "rapidocr" and ocr_layout in {"hybrid", "word-native"}:
         tableaux = tableaux_detectes
         if tableaux:
             page_ir.elements.extend(tableaux)

@@ -23,6 +23,7 @@ from pdfexact.render.drawing import (
     _run_xml,
     forme_xml,
     image_xml,
+    table_body_xml,
     table_xml,
     zone_lien_xml,
     zone_texte_xml,
@@ -239,15 +240,28 @@ def _ancres_xml(elements, compteur: list, relations, media: dict) -> str:
 
 def _page_flux_xml(page: Page, derniere: bool, compteur: list, relations, media: dict) -> str:
     morceaux = []
-    elements = page.elements
+    elements = sorted(
+        page.elements,
+        key=lambda element: (
+            getattr(getattr(element, "bbox", None), "y0", 0),
+            getattr(getattr(element, "bbox", None), "x0", 0),
+        ),
+    )
     section = "" if derniere else _section_flux_xml(page)
     largeur_max_image = page.largeur_emu - pt_vers_emu(120)
 
-    for element in elements:
+    for z, element in enumerate(elements, start=1):
         if isinstance(element, FlowParagraph):
             morceaux.append(_paragraphe_flux_xml(element, relations))
+        elif isinstance(element, TableEl):
+            morceaux.append(table_body_xml(element, relations))
         elif isinstance(element, (ImageEl, RasterEl)):
             morceaux.append(_image_inline_xml(element, compteur, relations, media, largeur_max_image))
+        elif isinstance(element, ShapeEl):
+            compteur[0] += 1
+            morceaux.append(
+                f"<w:p><w:r>{forme_xml(element, compteur[0], z, derriere=True)}</w:r></w:p>"
+            )
         else:
             continue
 

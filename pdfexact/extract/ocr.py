@@ -695,7 +695,7 @@ def extraire_rapidocr(
         for zone in zones_formules:
             blocs.append(rasteriser_region(page, zone, media, dpi=dpi))
     zones_ignorees = zones_ignorees + zones_formules
-    if layout == "reflow":
+    if layout in {"reflow", "word-native"}:
         lignes_texte = [
             ligne
             for ligne in lignes_ocr
@@ -708,7 +708,7 @@ def extraire_rapidocr(
             print(
                 f"      RapidOCR: {len(lignes_texte)} ligne(s) -> "
                 f"{len([b for b in blocs if isinstance(b, FlowParagraph)])} paragraphe(s) Word"
-                f" (reflow), formules={len(zones_formules)}",
+                f" ({layout}), formules={len(zones_formules)}",
                 file=sys.stderr,
             )
         return blocs

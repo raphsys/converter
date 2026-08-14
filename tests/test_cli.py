@@ -72,6 +72,19 @@ def test_la_granularite_ocr_est_acceptee(pdf_texte, tmp_path):
     assert code == 0
 
 
+def test_le_layout_word_native_est_accepte(pdf_texte, tmp_path):
+    code = main(
+        [
+            str(pdf_texte),
+            str(tmp_path / "s.docx"),
+            "--ocr-layout",
+            "word-native",
+        ]
+    )
+
+    assert code == 0
+
+
 def test_lanalyse_des_pages_accepte_les_intervalles():
     assert analyser_pages("1-3,7") == [0, 1, 2, 6]
 

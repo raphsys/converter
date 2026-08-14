@@ -147,10 +147,9 @@ def image_xml(element, identifiant: int, z: int, rel_id: str, derriere: bool = F
     return _ancre(element.bbox, identifiant, z, f"Image {identifiant}", contenu, derriere)
 
 
-def table_xml(element, identifiant: int, z: int, relations=None) -> str:
-    """Rend un tableau PDF détecté en vrai tableau Word, ancré à la page."""
+def table_body_xml(element, relations=None) -> str:
+    """Rend le contenu Word natif d'un tableau PDF détecté."""
     largeur = max(element.bbox.largeur, 1)
-    hauteur = max(element.bbox.hauteur, 1)
     grid = "".join(
         f'<w:gridCol w:w="{max(pt_vers_twips(emu_vers_pt(w)), 1)}"/>'
         for w in element.col_widths_emu
@@ -239,6 +238,14 @@ def table_xml(element, identifiant: int, z: int, relations=None) -> str:
         f"{''.join(rows_xml)}"
         "</w:tbl>"
     )
+    return tbl
+
+
+def table_xml(element, identifiant: int, z: int, relations=None) -> str:
+    """Rend un tableau PDF détecté en vrai tableau Word, ancré à la page."""
+    largeur = max(element.bbox.largeur, 1)
+    hauteur = max(element.bbox.hauteur, 1)
+    tbl = table_body_xml(element, relations)
 
     contenu = (
         "<a:graphic><a:graphicData "

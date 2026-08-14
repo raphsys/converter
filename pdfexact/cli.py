@@ -61,10 +61,10 @@ def convertir(
 
     if verbose:
         print(f"[2/4] Extraction PDF -> IR: {source}", file=sys.stderr)
-    if text_mode == "rapidocr" and ocr_layout == "hybrid" and ocr_granularity == "word":
+    if text_mode == "rapidocr" and ocr_layout in {"hybrid", "word-native"} and ocr_granularity == "word":
         ocr_granularity = "line"
         if verbose:
-            print("      hybrid: granularité OCR forcée à line", file=sys.stderr)
+            print(f"      {ocr_layout}: granularité OCR forcée à line", file=sys.stderr)
     document = extraire(
         source,
         pages=pages,
@@ -149,11 +149,11 @@ def _analyseur() -> argparse.ArgumentParser:
     )
     analyseur.add_argument(
         "--ocr-layout",
-        choices=("blocks", "page", "reflow", "hybrid"),
+        choices=("blocks", "page", "reflow", "hybrid", "word-native"),
         default="blocks",
         help=(
             "organisation RapidOCR : blocs positionnés, page entière, vrais paragraphes "
-            "Word, ou blocs hybrides page exacte"
+            "Word, blocs hybrides page exacte, ou document Word natif"
         ),
     )
     analyseur.add_argument(
