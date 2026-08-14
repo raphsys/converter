@@ -14,6 +14,7 @@ from pdfexact.ir import (
     FlowParagraph,
     MediaItem,
     Page,
+    ShapeEl,
     TableBorder,
     TableCell,
     TableEl,
@@ -358,6 +359,35 @@ def test_tableau_en_flux_word_natif_n_est_pas_dans_un_drawing(tmp_path):
 
     xml = _lire(sortie, "word/document.xml").decode()
     assert "<w:tbl>" in xml
+    assert "<w:drawing>" not in xml
+
+
+def test_fond_vectoriel_en_flux_devient_un_shading_word(tmp_path):
+    police = FontRef("Test", "Arial", False, False)
+    fond = ShapeEl(
+        bbox=BBox(pt_vers_emu(70), pt_vers_emu(90), pt_vers_emu(520), pt_vers_emu(115)),
+        chemins=[],
+        remplissage="000080",
+        contour=None,
+        epaisseur_emu=0,
+    )
+    paragraphe = FlowParagraph(
+        bbox=BBox(pt_vers_emu(120), pt_vers_emu(100), pt_vers_emu(470), pt_vers_emu(122)),
+        texte="ABBREVIATIONS AND ACRONYMS",
+        police=police,
+        size_pt=12,
+        couleur="FFFFFF",
+        alignement="center",
+    )
+    document = Document(
+        pages=[Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR, elements=[fond, paragraphe])]
+    )
+    sortie = tmp_path / "native_flow_shading.docx"
+
+    ecrire_docx(document, sortie)
+
+    xml = _lire(sortie, "word/document.xml").decode()
+    assert '<w:shd w:fill="000080"/>' in xml
     assert "<w:drawing>" not in xml
 
 

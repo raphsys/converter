@@ -192,6 +192,29 @@ def _est_dans_zone_ignoree(boite: BBox, zones_ignorees: list[BBox]) -> bool:
     return est_dans_zone(boite, zones_ignorees)
 
 
+def _touche_zone_ignoree(boite: BBox, zones_ignorees: list[BBox], seuil: float = 0.10) -> bool:
+    """Vrai si la boîte appartient visiblement à une zone protégée.
+
+    Les tableaux et figures sont ajoutés aux zones ignorées avant l'OCR. Une ligne OCR
+    issue d'une cellule peut ressembler à une formule ("KMSC-02-35") ; elle ne doit pas
+    être rasterisée puis réinsérée hors du tableau.
+    """
+    if _est_dans_zone_ignoree(boite, zones_ignorees):
+        return True
+    aire_boite = max(boite.largeur, 0) * max(boite.hauteur, 0)
+    if not aire_boite:
+        return False
+    for zone in zones_ignorees:
+        x0 = max(boite.x0, zone.x0)
+        y0 = max(boite.y0, zone.y0)
+        x1 = min(boite.x1, zone.x1)
+        y1 = min(boite.y1, zone.y1)
+        intersection = max(0, x1 - x0) * max(0, y1 - y0)
+        if intersection / aire_boite >= seuil:
+            return True
+    return False
+
+
 def _elements_rapidocr(result, granularite: str):
     if granularite == "line":
         for texte, score, points in zip(result.txts, result.scores, result.boxes):
@@ -689,7 +712,9 @@ def extraire_rapidocr(
     zones_formules = [
         ligne.bbox
         for ligne in lignes_ocr
-        if _semble_formule(ligne.texte) and _zone_raster_utile(ligne.bbox)
+        if _semble_formule(ligne.texte)
+        and _zone_raster_utile(ligne.bbox)
+        and not _touche_zone_ignoree(ligne.bbox, zones_ignorees)
     ]
     if media is not None:
         for zone in zones_formules:

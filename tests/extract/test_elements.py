@@ -4,7 +4,7 @@ import pymupdf
 from pdfexact.extract.images import extraire_images
 from pdfexact.extract.layout_map import PageLayoutMap, quantifier_bbox
 from pdfexact.extract.links import appliquer_liens
-from pdfexact.extract.ocr import _corriger_elements_ocr, _dedoublonner_elements_ocr
+from pdfexact.extract.ocr import _corriger_elements_ocr, _dedoublonner_elements_ocr, _touche_zone_ignoree
 from pdfexact.extract.text import extraire_texte
 from pdfexact.extract.fonts import collecter_polices
 from pdfexact.extract.vector import (
@@ -439,3 +439,10 @@ def test_la_carte_detecte_un_texte_court_pres_dun_logo():
     texte = BBox(pt_vers_emu(80), pt_vers_emu(722), pt_vers_emu(132), pt_vers_emu(742))
 
     assert carte.proche_petit_visuel(texte)
+
+
+def test_une_ligne_ocr_de_tableau_touche_la_zone_ignoree():
+    cellule = BBox(pt_vers_emu(72), pt_vers_emu(120), pt_vers_emu(140), pt_vers_emu(132))
+    tableau = BBox(pt_vers_emu(70), pt_vers_emu(90), pt_vers_emu(540), pt_vers_emu(720))
+
+    assert _touche_zone_ignoree(cellule, [tableau])

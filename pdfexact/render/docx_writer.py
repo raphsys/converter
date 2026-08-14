@@ -112,7 +112,58 @@ def _ancres_de_page(page: Page, compteur: list, relations, media: dict) -> str:
     return "".join(morceaux)
 
 
-def _paragraphe_flux_xml(paragraphe: FlowParagraph, relations, sect_pr: str = "") -> str:
+def _aire_bbox(bbox) -> int:
+    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+
+
+def _intersection_bbox(a, b) -> int:
+    x0 = max(a.x0, b.x0)
+    y0 = max(a.y0, b.y0)
+    x1 = min(a.x1, b.x1)
+    y1 = min(a.y1, b.y1)
+    return max(0, x1 - x0) * max(0, y1 - y0)
+
+
+def _fond_pour_paragraphe(paragraphe: FlowParagraph, fonds: list[ShapeEl]) -> str | None:
+    """Associe un aplat PDF au paragraphe Word qui le porte."""
+    aire_paragraphe = max(_aire_bbox(paragraphe.bbox), 1)
+    for fond in fonds:
+        if not fond.remplissage:
+            continue
+        intersection = _intersection_bbox(paragraphe.bbox, fond.bbox)
+        if intersection / aire_paragraphe >= 0.18:
+            return fond.remplissage
+
+        hauteur = max(paragraphe.bbox.hauteur, 1)
+        boite_elargie = type(paragraphe.bbox)(
+            paragraphe.bbox.x0,
+            paragraphe.bbox.y0 - hauteur,
+            paragraphe.bbox.x1,
+            paragraphe.bbox.y1 + hauteur,
+        )
+        if _intersection_bbox(boite_elargie, fond.bbox) / max(_aire_bbox(fond.bbox), 1) >= 0.35:
+            return fond.remplissage
+    return None
+
+
+def _couleur_sombre(couleur: str | None) -> bool:
+    if not couleur or len(couleur) != 6:
+        return False
+    try:
+        r = int(couleur[0:2], 16)
+        g = int(couleur[2:4], 16)
+        b = int(couleur[4:6], 16)
+    except ValueError:
+        return False
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 96
+
+
+def _paragraphe_flux_xml(
+    paragraphe: FlowParagraph,
+    relations,
+    sect_pr: str = "",
+    fond: str | None = None,
+) -> str:
     """Rend un paragraphe Word réel, pas une forme flottante."""
     espace_avant = max(pt_vers_twips(emu_vers_pt(paragraphe.espace_avant_emu)), 0)
     espace_apres = max(pt_vers_twips(emu_vers_pt(paragraphe.espace_apres_emu)), 0)
@@ -147,22 +198,27 @@ def _paragraphe_flux_xml(paragraphe: FlowParagraph, relations, sect_pr: str = ""
         size_pt = min(max(size_pt, 9.5), 12.0)
     else:
         size_pt = min(max(size_pt, 8.8), 10.6)
+    couleur = paragraphe.couleur
+    if fond and _couleur_sombre(fond) and couleur.upper() in {"000000", "111111"}:
+        couleur = "FFFFFF"
     span = Span(
         texte=paragraphe.texte,
         police=police,
         size_pt=size_pt,
-        couleur=paragraphe.couleur,
+        couleur=couleur,
         souligne=paragraphe.souligne,
         barre=paragraphe.barre,
         capitales=paragraphe.capitales,
         surlignage=paragraphe.surlignage,
     )
+    shading = f'<w:shd w:fill="{fond}"/>' if fond else ""
     ppr = (
         "<w:pPr>"
         f'<w:spacing w:before="{espace_avant}" w:after="{espace_apres}" '
         f'w:line="{max(180, min(interligne, 230))}" w:lineRule="auto"/>'
         f'<w:ind w:left="{gauche}" w:right="{droite}" w:firstLine="{premiere}"/>'
         f'<w:jc w:val="{paragraphe.alignement}"/>'
+        f"{shading}"
         f"{sect_pr}</w:pPr>"
     )
     return f"<w:p>{ppr}{_run_xml(span, relations)}</w:p>"
@@ -249,19 +305,27 @@ def _page_flux_xml(page: Page, derniere: bool, compteur: list, relations, media:
     )
     section = "" if derniere else _section_flux_xml(page)
     largeur_max_image = page.largeur_emu - pt_vers_emu(120)
+    fonds = [
+        element
+        for element in elements
+        if isinstance(element, ShapeEl) and element.remplissage
+    ]
 
     for z, element in enumerate(elements, start=1):
         if isinstance(element, FlowParagraph):
-            morceaux.append(_paragraphe_flux_xml(element, relations))
+            morceaux.append(
+                _paragraphe_flux_xml(
+                    element,
+                    relations,
+                    fond=_fond_pour_paragraphe(element, fonds),
+                )
+            )
         elif isinstance(element, TableEl):
             morceaux.append(table_body_xml(element, relations))
         elif isinstance(element, (ImageEl, RasterEl)):
             morceaux.append(_image_inline_xml(element, compteur, relations, media, largeur_max_image))
         elif isinstance(element, ShapeEl):
-            compteur[0] += 1
-            morceaux.append(
-                f"<w:p><w:r>{forme_xml(element, compteur[0], z, derriere=True)}</w:r></w:p>"
-            )
+            continue
         else:
             continue
 
