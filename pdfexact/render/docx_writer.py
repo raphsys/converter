@@ -44,6 +44,8 @@ _ENTETE = (
 )
 
 _PIED = "</w:body></w:document>"
+_MARGE_FLUX_H_PT = 42
+_MARGE_FLUX_V_PT = 36
 
 
 def _section_xml(page: Page) -> str:
@@ -65,8 +67,8 @@ def _section_flux_xml(page: Page) -> str:
     largeur = pt_vers_twips(emu_vers_pt(page.largeur_emu))
     hauteur = pt_vers_twips(emu_vers_pt(page.hauteur_emu))
     orientation = ' w:orient="landscape"' if page.largeur_emu > page.hauteur_emu else ""
-    marge_h = pt_vers_twips(42)
-    marge_v = pt_vers_twips(36)
+    marge_h = pt_vers_twips(_MARGE_FLUX_H_PT)
+    marge_v = pt_vers_twips(_MARGE_FLUX_V_PT)
     return (
         "<w:sectPr>"
         f'<w:pgSz w:w="{largeur}" w:h="{hauteur}"{orientation}/>'
@@ -156,6 +158,62 @@ def _couleur_sombre(couleur: str | None) -> bool:
     except ValueError:
         return False
     return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 96
+
+
+def _paragraphe_fond_fixe_xml(paragraphe: FlowParagraph, relations, fond: ShapeEl) -> str:
+    """Rend un bandeau/label comme bloc Word natif aux dimensions PDF."""
+    marge_gauche = pt_vers_emu(_MARGE_FLUX_H_PT)
+    largeur = max(pt_vers_twips(emu_vers_pt(fond.bbox.largeur)), 1)
+    hauteur = max(pt_vers_twips(emu_vers_pt(fond.bbox.hauteur)), 1)
+    indentation = max(pt_vers_twips(emu_vers_pt(fond.bbox.x0 - marge_gauche)), 0)
+    couleur = paragraphe.couleur
+    if _couleur_sombre(fond.remplissage) and couleur.upper() in {"000000", "111111"}:
+        couleur = "FFFFFF"
+    police = paragraphe.police
+    span = Span(
+        texte=paragraphe.texte,
+        police=police,
+        size_pt=paragraphe.size_pt,
+        couleur=couleur,
+        souligne=paragraphe.souligne,
+        barre=paragraphe.barre,
+        capitales=paragraphe.capitales,
+        surlignage=paragraphe.surlignage,
+    )
+    avant = max(pt_vers_twips(emu_vers_pt(paragraphe.espace_avant_emu)), 0)
+    espace = (
+        "<w:p><w:pPr>"
+        f'<w:spacing w:before="{min(avant, 80)}" w:after="0" w:line="1" w:lineRule="exact"/>'
+        "</w:pPr></w:p>"
+        if avant
+        else ""
+    )
+    return (
+        f"{espace}"
+        "<w:tbl>"
+        "<w:tblPr>"
+        f'<w:tblW w:w="{largeur}" w:type="dxa"/>'
+        '<w:tblLayout w:type="fixed"/>'
+        f'<w:tblInd w:w="{indentation}" w:type="dxa"/>'
+        '<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/>'
+        '<w:bottom w:val="nil"/><w:right w:val="nil"/>'
+        '<w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>'
+        "</w:tblPr>"
+        f'<w:tblGrid><w:gridCol w:w="{largeur}"/></w:tblGrid>'
+        "<w:tr>"
+        f'<w:trPr><w:trHeight w:val="{hauteur}" w:hRule="exact"/></w:trPr>'
+        "<w:tc><w:tcPr>"
+        f'<w:tcW w:w="{largeur}" w:type="dxa"/>'
+        f'<w:shd w:fill="{fond.remplissage}"/>'
+        '<w:vAlign w:val="center"/>'
+        '<w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/>'
+        '<w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tcMar>'
+        "</w:tcPr>"
+        '<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>'
+        f'<w:jc w:val="{paragraphe.alignement}"/></w:pPr>'
+        f"{_run_xml(span, relations)}</w:p>"
+        "</w:tc></w:tr></w:tbl>"
+    )
 
 
 def _paragraphe_flux_xml(
@@ -313,11 +371,24 @@ def _page_flux_xml(page: Page, derniere: bool, compteur: list, relations, media:
 
     for z, element in enumerate(elements, start=1):
         if isinstance(element, FlowParagraph):
+            fond = _fond_pour_paragraphe(element, fonds)
+            if fond:
+                fond_element = next(
+                    (
+                        item
+                        for item in fonds
+                        if item.remplissage == fond and _fond_pour_paragraphe(element, [item]) == fond
+                    ),
+                    None,
+                )
+                if fond_element is not None and fond_element.bbox.largeur > element.bbox.largeur * 1.08:
+                    morceaux.append(_paragraphe_fond_fixe_xml(element, relations, fond_element))
+                    continue
             morceaux.append(
                 _paragraphe_flux_xml(
                     element,
                     relations,
-                    fond=_fond_pour_paragraphe(element, fonds),
+                    fond=fond,
                 )
             )
         elif isinstance(element, TableEl):
