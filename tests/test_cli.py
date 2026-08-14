@@ -3,6 +3,7 @@ import zipfile
 
 import pytest
 
+import pdfexact.cli as cli
 from pdfexact.cli import analyser_pages, main
 from pdfexact.report import PageDegradee, Rapport
 
@@ -83,6 +84,35 @@ def test_le_layout_word_native_est_accepte(pdf_texte, tmp_path):
     )
 
     assert code == 0
+
+
+def test_le_profil_visual_exact_force_le_pipeline_fidele(pdf_texte, tmp_path, monkeypatch):
+    appels = {}
+
+    def faux_convertir(_source, _destination, **kwargs):
+        appels.update(kwargs)
+        return Rapport(pages_totales=1)
+
+    monkeypatch.setattr(cli, "convertir", faux_convertir)
+
+    code = main(
+        [
+            str(pdf_texte),
+            str(tmp_path / "s.docx"),
+            "--visual-exact",
+            "--text-mode",
+            "spans",
+            "--ocr-layout",
+            "word-native",
+            "--ocr-granularity",
+            "char",
+        ]
+    )
+
+    assert code == 0
+    assert appels["text_mode"] == "rapidocr"
+    assert appels["ocr_layout"] == "hybrid"
+    assert appels["ocr_granularity"] == "line"
 
 
 def test_lanalyse_des_pages_accepte_les_intervalles():

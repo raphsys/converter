@@ -124,6 +124,15 @@ def _analyseur() -> argparse.ArgumentParser:
         help="rend chaque page en image pleine page pour privilégier la fidélité visuelle",
     )
     analyseur.add_argument(
+        "--visual-exact",
+        "--exact",
+        action="store_true",
+        help=(
+            "profil fidélité visuelle : comprend les blocs avec RapidOCR puis rend en "
+            "hybrid ancré page par page ; c'est le mode recommandé pour l'aspect identique"
+        ),
+    )
+    analyseur.add_argument(
         "--text-mode",
         choices=("spans", "glyphs", "glyph-images", "rapidocr"),
         default="spans",
@@ -153,7 +162,7 @@ def _analyseur() -> argparse.ArgumentParser:
         default="blocks",
         help=(
             "organisation RapidOCR : blocs positionnés, page entière, vrais paragraphes "
-            "Word, blocs hybrides page exacte, ou document Word natif"
+            "Word, blocs hybrides page exacte, ou document Word natif éditable"
         ),
     )
     analyseur.add_argument(
@@ -181,6 +190,17 @@ def main(argv=None) -> int:
     except ValueError as erreur:
         print(f"sélection de pages invalide : {erreur}", file=sys.stderr)
         return 2
+
+    if arguments.visual_exact:
+        arguments.text_mode = "rapidocr"
+        arguments.ocr_layout = "hybrid"
+        arguments.ocr_granularity = "line"
+        if arguments.verbose:
+            print(
+                "[profil] fidélité visuelle : --text-mode rapidocr "
+                "--ocr-layout hybrid --ocr-granularity line",
+                file=sys.stderr,
+            )
 
     try:
         if arguments.ocr_engine == "fastocr":
