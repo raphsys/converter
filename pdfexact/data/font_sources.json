@@ -1,0 +1,57 @@
+{
+  "_lisez_moi": [
+    "Sources de polices autorisées pour le téléchargement automatique.",
+    "Clé : famille PDF normalisée en minuscules sans ponctuation.",
+    "Valeur : liste de fichiers TTF/OTF/TTC complets. Le dépôt Google Fonts officiel est",
+    "aussi interrogé automatiquement quand une clé n'est pas listée ici.",
+    "Ne pas ajouter de polices propriétaires sans droit de redistribution."
+  ],
+  "sources": {
+    "sourcesans3": [
+      {
+        "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-Regular.ttf",
+        "filename": "SourceSans3-Regular.ttf",
+        "style": "regular",
+        "source": "adobe-fonts/source-sans",
+        "license": "OFL-1.1"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-Bold.ttf",
+        "filename": "SourceSans3-Bold.ttf",
+        "style": "bold",
+        "source": "adobe-fonts/source-sans",
+        "license": "OFL-1.1"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-Medium.ttf",
+        "filename": "SourceSans3-Medium.ttf",
+        "style": "medium",
+        "source": "adobe-fonts/source-sans",
+        "license": "OFL-1.1"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/TTF/SourceSans3-MediumIt.ttf",
+        "filename": "SourceSans3-MediumIt.ttf",
+        "style": "medium italic",
+        "source": "adobe-fonts/source-sans",
+        "license": "OFL-1.1"
+      }
+    ],
+    "texgyrepagella": [
+      {
+        "url": "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyrepagella-regular.otf",
+        "filename": "texgyrepagella-regular.otf",
+        "style": "regular",
+        "source": "ctan/tex-gyre",
+        "license": "GUST-Font-License"
+      },
+      {
+        "url": "https://mirrors.ctan.org/fonts/tex-gyre/opentype/texgyrepagella-italic.otf",
+        "filename": "texgyrepagella-italic.otf",
+        "style": "italic",
+        "source": "ctan/tex-gyre",
+        "license": "GUST-Font-License"
+      }
+    ]
+  }
+}

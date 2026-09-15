@@ -1,0 +1,398 @@
+"""Détection IA des zones documentaires.
+
+Cette couche reprend le principe de Vysi : la page est d'abord rendue en image,
+un détecteur visuel identifie les zones logiques, puis les boîtes sont ramenées
+dans le repère PDF/EMU pour guider OCR, paragraphes et rendu Word.
+"""
+from __future__ import annotations
+
+import importlib.util
+import os
+from collections.abc import Iterable, Mapping
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any
+
+import pymupdf
+
+from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, pt_vers_emu
+from pdfexact.layout.model import LayoutPage
+
+DEFAULT_LAYOUT_PROVIDER = "paddlex"
+DEFAULT_LAYOUT_MODEL = "ppstructurev3/PP-DocLayout_plus-L"
+_MODEL_CACHE: dict[tuple[str, str], Any] = {}
+
+TEXT_LABELS = {
+    "text",
+    "content",
+    "title",
+    "paragraph_title",
+    "figure_title",
+    "table_title",
+    "caption",
+    "header",
+    "footer",
+    "reference",
+    "list",
+}
+
+
+@dataclass(frozen=True)
+class LayoutAIZone:
+    zone_id: str
+    label: str
+    role: str
+    confidence: float | None
+    bbox: BBox
+    source: str
+    model_id: str
+
+    def to_report(self) -> dict[str, Any]:
+        value = asdict(self)
+        value["bbox"] = [self.bbox.x0, self.bbox.y0, self.bbox.x1, self.bbox.y1]
+        return value
+
+
+@dataclass(frozen=True)
+class LayoutAIPage:
+    status: str
+    provider: str
+    model_id: str
+    model_path: str | None
+    zones: tuple[LayoutAIZone, ...]
+    warnings: tuple[str, ...] = ()
+
+    def to_report(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "provider": self.provider,
+            "model_id": self.model_id,
+            "model_path": self.model_path,
+            "zone_count": len(self.zones),
+            "warnings": list(self.warnings),
+            "zones": [zone.to_report() for zone in self.zones],
+        }
+
+
+def detecter_layout_ia(
+    page,
+    analyse: LayoutPage,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    model_root: str | Path | None = None,
+    device: str | None = None,
+    render_scale: float = 1.5,
+) -> LayoutAIPage:
+    provider = (provider or os.environ.get("PDFEXACT_LAYOUT_PROVIDER") or DEFAULT_LAYOUT_PROVIDER).strip().casefold()
+    requested_model = model or os.environ.get("PDFEXACT_LAYOUT_MODEL") or DEFAULT_LAYOUT_MODEL
+    root = _resolve_model_root(model_root)
+    model_path = _resolve_model_path(root, requested_model)
+    model_id = _model_id(model_path, root, requested_model)
+
+    if provider in {"", "none", "off", "0", "false"}:
+        return _fallback(analyse, provider, model_id, model_path, "layout_ai_disabled")
+    if provider != "paddlex":
+        return _fallback(analyse, provider, model_id, model_path, f"unsupported_provider:{provider}")
+    if model_path is None or not model_path.is_dir():
+        return _fallback(analyse, provider, model_id, model_path, f"model_not_found:{requested_model}")
+    if not (_module_available("paddle") and _module_available("paddlex")):
+        return _fallback(analyse, provider, model_id, model_path, "paddle_or_paddlex_missing")
+
+    try:
+        zones = _detecter_paddlex(
+            page,
+            provider=provider,
+            model_path=model_path,
+            model_id=model_id,
+            device=device,
+            render_scale=render_scale,
+        )
+    except Exception as exc:  # noqa: BLE001 - le fallback garde la conversion robuste
+        return _fallback(analyse, provider, model_id, model_path, f"layout_ai_error:{type(exc).__name__}")
+
+    if not zones:
+        return _fallback(analyse, provider, model_id, model_path, "layout_ai_empty")
+    return LayoutAIPage(
+        status="layout_ai_detected",
+        provider=provider,
+        model_id=model_id,
+        model_path=str(model_path),
+        zones=tuple(_dedoublonner(zones)),
+    )
+
+
+def _detecter_paddlex(
+    page,
+    *,
+    provider: str,
+    model_path: Path,
+    model_id: str,
+    device: str | None,
+    render_scale: float,
+) -> list[LayoutAIZone]:
+    os.environ.setdefault("DISABLE_MODEL_SOURCE_CHECK", "True")
+    os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+    from paddlex import create_model  # type: ignore[import-not-found]
+
+    resolved_device = device or os.environ.get("PDFEXACT_LAYOUT_DEVICE", "cpu")
+    cache_key = (str(model_path), resolved_device)
+    model = _MODEL_CACHE.get(cache_key)
+    if model is None:
+        model = create_model(
+            model_name=model_path.name,
+            model_dir=str(model_path),
+            device=resolved_device,
+        )
+        _MODEL_CACHE[cache_key] = model
+    with TemporaryDirectory(prefix="pdfexact-layout-ai-") as dossier:
+        image_path = Path(dossier) / "page.png"
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(render_scale, render_scale), alpha=False)
+        pix.save(str(image_path))
+        raw = model.predict(input=str(image_path), batch_size=1, layout_nms=True)
+        return _normaliser_detections(
+            raw,
+            provider=provider,
+            model_id=model_id,
+            page_width_pt=float(page.rect.width),
+            page_height_pt=float(page.rect.height),
+            image_width=float(pix.width),
+            image_height=float(pix.height),
+        )
+
+
+def _normaliser_detections(
+    raw: Any,
+    *,
+    provider: str,
+    model_id: str,
+    page_width_pt: float,
+    page_height_pt: float,
+    image_width: float,
+    image_height: float,
+) -> list[LayoutAIZone]:
+    detections = []
+    for item in _iter_detection_dicts(raw):
+        bbox = item.get("bbox", item.get("coordinate", item.get("coordinates", item.get("box"))))
+        if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+            continue
+        try:
+            x0, y0, x1, y1 = (float(value) for value in bbox)
+        except (TypeError, ValueError):
+            continue
+        sx = page_width_pt / max(1.0, image_width)
+        sy = page_height_pt / max(1.0, image_height)
+        rect = _clamp_pt((x0 * sx, y0 * sy, x1 * sx, y1 * sy), page_width_pt, page_height_pt)
+        if rect is None:
+            continue
+        label = str(item.get("label", item.get("label_name", item.get("category_name", item.get("type", "unknown")))))
+        confidence = item.get("score", item.get("confidence"))
+        try:
+            confidence = float(confidence) if confidence is not None else None
+        except (TypeError, ValueError):
+            confidence = None
+        detections.append(
+            LayoutAIZone(
+                zone_id=f"ai_z{len(detections) + 1:04d}",
+                label=label,
+                role=_role(label),
+                confidence=confidence,
+                bbox=bbox_depuis_rect(pymupdf.Rect(*rect)),
+                source=provider,
+                model_id=model_id,
+            )
+        )
+    return detections
+
+
+def _fallback(
+    analyse: LayoutPage,
+    provider: str,
+    model_id: str,
+    model_path: Path | None,
+    warning: str,
+) -> LayoutAIPage:
+    zones = _zones_geometriques(analyse)
+    return LayoutAIPage(
+        status="layout_ai_fallback",
+        provider=provider or "geometric",
+        model_id=model_id,
+        model_path=str(model_path) if model_path else None,
+        zones=zones,
+        warnings=(warning,),
+    )
+
+
+def _zones_geometriques(analyse: LayoutPage) -> tuple[LayoutAIZone, ...]:
+    zones: list[LayoutAIZone] = []
+    for block in analyse.text_blocks:
+        if block.bbox.largeur < pt_vers_emu(16) or block.bbox.hauteur < pt_vers_emu(6):
+            continue
+        zones.append(
+            LayoutAIZone(
+                zone_id=f"geo_t{len(zones) + 1:04d}",
+                label="native_text_block",
+                role="text",
+                confidence=None,
+                bbox=block.bbox,
+                source="geometric",
+                model_id="native_text_block_fallback",
+            )
+        )
+    return tuple(sorted(zones, key=lambda item: (item.bbox.y0, item.bbox.x0)))
+
+
+def _role(label: str) -> str:
+    norm = label.strip().casefold().replace(" ", "_").replace("-", "_")
+    if "caption" in norm or "figure_title" in norm or "table_title" in norm:
+        return "caption"
+    if norm in TEXT_LABELS or "text" in norm:
+        return "text"
+    if "table" in norm:
+        return "table"
+    if "formula" in norm or "equation" in norm:
+        return "formula"
+    if "image" in norm or "figure" in norm or "chart" in norm:
+        return "visual"
+    return "other"
+
+
+def _iter_detection_dicts(raw: Any):
+    raw = _plain(raw)
+    if isinstance(raw, Mapping):
+        for key in ("boxes", "layout_det_res", "results", "res", "objects"):
+            nested = raw.get(key)
+            if nested is not None:
+                yield from _iter_detection_dicts(nested)
+                return
+        if any(key in raw for key in ("bbox", "coordinate", "coordinates", "box")):
+            yield raw
+        return
+    if isinstance(raw, (list, tuple)) or (
+        isinstance(raw, Iterable) and not isinstance(raw, (str, bytes, bytearray, Mapping))
+    ):
+        for value in raw:
+            yield from _iter_detection_dicts(value)
+        return
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return value
+    json_value = getattr(value, "json", None)
+    if isinstance(json_value, Mapping):
+        return json_value
+    if callable(json_value):
+        try:
+            result = json_value()
+            if isinstance(result, Mapping):
+                return result
+        except Exception:
+            pass
+    method = getattr(value, "to_dict", None)
+    if callable(method):
+        try:
+            result = method()
+            if isinstance(result, Mapping):
+                return result
+        except Exception:
+            pass
+    return value
+
+
+def _resolve_model_root(value: str | Path | None) -> Path:
+    if value:
+        return Path(value).expanduser().resolve()
+    env = os.environ.get("PDFEXACT_AI_MODELS_ROOT") or os.environ.get("VYSI_AI_MODELS_ROOT")
+    if env:
+        return Path(env).expanduser().resolve()
+    vysi_root = Path("/home/raphael/Mes_Projets/vysi/ai_models")
+    if vysi_root.exists():
+        return vysi_root.resolve()
+    return (Path.cwd() / "ai_models").resolve()
+
+
+def _resolve_model_path(root: Path, requested: str) -> Path | None:
+    direct = Path(requested).expanduser()
+    if direct.is_absolute():
+        return direct.resolve() if direct.exists() else None
+    candidates = [requested]
+    if "/" not in requested:
+        candidates.append(f"ppstructurev3/{requested}")
+    for candidate in candidates:
+        path = root / candidate
+        if path.exists():
+            return path.resolve()
+        folded = _resolve_casefold(root, candidate)
+        if folded is not None and folded.exists():
+            return folded.resolve()
+    return None
+
+
+def _resolve_casefold(root: Path, relative: str) -> Path | None:
+    current = root
+    for part in Path(relative).parts:
+        if not current.is_dir():
+            return None
+        matches = [item for item in current.iterdir() if item.name.casefold() == part.casefold()]
+        if len(matches) != 1:
+            return None
+        current = matches[0]
+    return current
+
+
+def _model_id(path: Path | None, root: Path, requested: str) -> str:
+    if path is None:
+        return requested
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.name
+
+
+def _module_available(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, AttributeError, ValueError):
+        return False
+
+
+def _clamp_pt(
+    bbox: tuple[float, float, float, float],
+    width: float,
+    height: float,
+) -> tuple[float, float, float, float] | None:
+    x0, y0, x1, y1 = bbox
+    x0 = max(0.0, min(width, x0))
+    y0 = max(0.0, min(height, y0))
+    x1 = max(0.0, min(width, x1))
+    y1 = max(0.0, min(height, y1))
+    if x1 - x0 < 2 or y1 - y0 < 2:
+        return None
+    return (x0, y0, x1, y1)
+
+
+def _aire(bbox: BBox) -> int:
+    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+
+
+def _intersection(a: BBox, b: BBox) -> int:
+    x0 = max(a.x0, b.x0)
+    y0 = max(a.y0, b.y0)
+    x1 = min(a.x1, b.x1)
+    y1 = min(a.y1, b.y1)
+    return max(0, x1 - x0) * max(0, y1 - y0)
+
+
+def _dedoublonner(zones: list[LayoutAIZone]) -> list[LayoutAIZone]:
+    gardees: list[LayoutAIZone] = []
+    for zone in sorted(zones, key=lambda item: (item.confidence or 0.0, _aire(item.bbox)), reverse=True):
+        if any(
+            _intersection(zone.bbox, autre.bbox) / max(min(_aire(zone.bbox), _aire(autre.bbox)), 1) > 0.92
+            and zone.role == autre.role
+            for autre in gardees
+        ):
+            continue
+        gardees.append(zone)
+    return sorted(gardees, key=lambda item: (item.bbox.y0, item.bbox.x0))

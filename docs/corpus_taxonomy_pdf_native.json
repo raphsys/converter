@@ -1,0 +1,5812 @@
+{
+  "pdf_count": 150,
+  "total_pages": 4184,
+  "class_page_counts": {
+    "single_column_text": 2613,
+    "image_heavy": 773,
+    "sparse_or_cover_page": 763,
+    "real_table_candidate": 548,
+    "long_plain_text": 433,
+    "two_column_text": 364,
+    "orientation/landscape_or_rotated": 349,
+    "colored_bands_or_fills": 340,
+    "dense_vector_formula_or_chart": 327,
+    "multi_column_3plus": 30,
+    "scanned_or_fullpage_image": 28,
+    "false_table_columns_candidate": 4
+  },
+  "examples": {
+    "colored_bands_or_fills": [
+      {
+        "file": "0688ba309c87485d_000029.pdf",
+        "page": 1,
+        "chars": 5289,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 8055,
+        "lines": 1992,
+        "fills": [
+          [
+            "231F20",
+            1122
+          ],
+          [
+            "BD2953",
+            639
+          ],
+          [
+            "D4E6F6",
+            101
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 1,
+        "chars": 126,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 2,
+        "chars": 252,
+        "cols": 2,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 3,
+        "chars": 602,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 4,
+        "chars": 572,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 5,
+        "chars": 689,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 6,
+        "chars": 912,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 7,
+        "chars": 1826,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 5,
+            "cols": 3,
+            "bbox": [
+              426.0,
+              168.0,
+              630.0,
+              278.0
+            ],
+            "bbox_ratio": 0.046,
+            "real_lines": 0,
+            "nonwhite_fills": 1,
+            "avg_cell_len": 7.3,
+            "max_cell_len": 13,
+            "false_like": false
+          },
+          {
+            "rows": 5,
+            "cols": 2,
+            "bbox": [
+              48.4,
+              186.1,
+              174.4,
+              284.5
+            ],
+            "bbox_ratio": 0.026,
+            "real_lines": 0,
+            "nonwhite_fills": 9,
+            "avg_cell_len": 7.2,
+            "max_cell_len": 12,
+            "false_like": false
+          }
+        ],
+        "drawings": 20138,
+        "lines": 19992,
+        "fills": [
+          [
+            "000000",
+            11924
+          ],
+          [
+            "7F807F",
+            626
+          ],
+          [
+            "FF7E7E",
+            193
+          ]
+        ]
+      }
+    ],
+    "dense_vector_formula_or_chart": [
+      {
+        "file": "0688ba309c87485d_000029.pdf",
+        "page": 1,
+        "chars": 5289,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 8055,
+        "lines": 1992,
+        "fills": [
+          [
+            "231F20",
+            1122
+          ],
+          [
+            "BD2953",
+            639
+          ],
+          [
+            "D4E6F6",
+            101
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 7,
+        "chars": 1826,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 5,
+            "cols": 3,
+            "bbox": [
+              426.0,
+              168.0,
+              630.0,
+              278.0
+            ],
+            "bbox_ratio": 0.046,
+            "real_lines": 0,
+            "nonwhite_fills": 1,
+            "avg_cell_len": 7.3,
+            "max_cell_len": 13,
+            "false_like": false
+          },
+          {
+            "rows": 5,
+            "cols": 2,
+            "bbox": [
+              48.4,
+              186.1,
+              174.4,
+              284.5
+            ],
+            "bbox_ratio": 0.026,
+            "real_lines": 0,
+            "nonwhite_fills": 9,
+            "avg_cell_len": 7.2,
+            "max_cell_len": 12,
+            "false_like": false
+          }
+        ],
+        "drawings": 20138,
+        "lines": 19992,
+        "fills": [
+          [
+            "000000",
+            11924
+          ],
+          [
+            "7F807F",
+            626
+          ],
+          [
+            "FF7E7E",
+            193
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 18,
+        "chars": 1836,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 26,
+            "cols": 3,
+            "bbox": [
+              76.0,
+              181.5,
+              562.0,
+              611.5
+            ],
+            "bbox_ratio": 0.431,
+            "real_lines": 0,
+            "nonwhite_fills": 37,
+            "avg_cell_len": 21.0,
+            "max_cell_len": 67,
+            "false_like": false
+          }
+        ],
+        "drawings": 46,
+        "lines": 40,
+        "fills": [
+          [
+            "000000",
+            38
+          ],
+          [
+            "FFFFFF",
+            2
+          ],
+          [
+            "FFFF9A",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 17,
+        "chars": 1113,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.02,
+        "tables": [
+          {
+            "rows": 24,
+            "cols": 15,
+            "bbox": [
+              159.3,
+              132.2,
+              584.6,
+              560.4
+            ],
+            "bbox_ratio": 0.376,
+            "real_lines": 0,
+            "nonwhite_fills": 37,
+            "avg_cell_len": 9.9,
+            "max_cell_len": 42,
+            "false_like": false
+          }
+        ],
+        "drawings": 49,
+        "lines": 41,
+        "fills": [
+          [
+            "000000",
+            39
+          ],
+          [
+            "FFFFFF",
+            3
+          ],
+          [
+            "C0C0C0",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 23,
+        "chars": 1920,
+        "cols": 2,
+        "imgs": 8,
+        "img_cover": 0.09,
+        "tables": [
+          {
+            "rows": 8,
+            "cols": 5,
+            "bbox": [
+              79.4,
+              132.8,
+              709.9,
+              555.9
+            ],
+            "bbox_ratio": 0.55,
+            "real_lines": 4,
+            "nonwhite_fills": 65,
+            "avg_cell_len": 254.9,
+            "max_cell_len": 522,
+            "false_like": false
+          }
+        ],
+        "drawings": 229,
+        "lines": 50,
+        "fills": [
+          [
+            "000000",
+            55
+          ],
+          [
+            "FFFFFF",
+            37
+          ],
+          [
+            "808080",
+            19
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 29,
+        "chars": 228,
+        "cols": 0,
+        "imgs": 46,
+        "img_cover": 0.11,
+        "tables": [
+          {
+            "rows": 3,
+            "cols": 2,
+            "bbox": [
+              111.5,
+              132.0,
+              677.0,
+              547.5
+            ],
+            "bbox_ratio": 0.485,
+            "real_lines": 0,
+            "nonwhite_fills": 7,
+            "avg_cell_len": 50.2,
+            "max_cell_len": 87,
+            "false_like": false
+          }
+        ],
+        "drawings": 127,
+        "lines": 102,
+        "fills": [
+          [
+            "FE9832",
+            5
+          ],
+          [
+            "FD9832",
+            3
+          ],
+          [
+            "FC9732",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 32,
+        "chars": 293,
+        "cols": 0,
+        "imgs": 12,
+        "img_cover": 0.05,
+        "tables": [],
+        "drawings": 779,
+        "lines": 766,
+        "fills": [
+          [
+            "FFFFFF",
+            767
+          ],
+          [
+            "FFFF9A",
+            5
+          ],
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 35,
+        "chars": 1367,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.02,
+        "tables": [],
+        "drawings": 58,
+        "lines": 56,
+        "fills": [
+          [
+            "000000",
+            38
+          ],
+          [
+            "C0C0C0",
+            18
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      }
+    ],
+    "single_column_text": [
+      {
+        "file": "0688ba309c87485d_000029.pdf",
+        "page": 1,
+        "chars": 5289,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 8055,
+        "lines": 1992,
+        "fills": [
+          [
+            "231F20",
+            1122
+          ],
+          [
+            "BD2953",
+            639
+          ],
+          [
+            "D4E6F6",
+            101
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 3,
+        "chars": 602,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 4,
+        "chars": 572,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 5,
+        "chars": 689,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 9,
+        "chars": 577,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 11,
+        "chars": 558,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 4,
+        "lines": 0,
+        "fills": [
+          [
+            "FFFFFF",
+            2
+          ],
+          [
+            "343467",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 18,
+        "chars": 1836,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 26,
+            "cols": 3,
+            "bbox": [
+              76.0,
+              181.5,
+              562.0,
+              611.5
+            ],
+            "bbox_ratio": 0.431,
+            "real_lines": 0,
+            "nonwhite_fills": 37,
+            "avg_cell_len": 21.0,
+            "max_cell_len": 67,
+            "false_like": false
+          }
+        ],
+        "drawings": 46,
+        "lines": 40,
+        "fills": [
+          [
+            "000000",
+            38
+          ],
+          [
+            "FFFFFF",
+            2
+          ],
+          [
+            "FFFF9A",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 19,
+        "chars": 644,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      }
+    ],
+    "long_plain_text": [
+      {
+        "file": "0688ba309c87485d_000029.pdf",
+        "page": 1,
+        "chars": 5289,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 8055,
+        "lines": 1992,
+        "fills": [
+          [
+            "231F20",
+            1122
+          ],
+          [
+            "BD2953",
+            639
+          ],
+          [
+            "D4E6F6",
+            101
+          ]
+        ]
+      },
+      {
+        "file": "0ee4ccc10db4aa05_000562.pdf",
+        "page": 3,
+        "chars": 4023,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0ee4ccc10db4aa05_000562.pdf",
+        "page": 4,
+        "chars": 3655,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0ee4ccc10db4aa05_000562.pdf",
+        "page": 5,
+        "chars": 4586,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0ee4ccc10db4aa05_000562.pdf",
+        "page": 6,
+        "chars": 4355,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0ee4ccc10db4aa05_000562.pdf",
+        "page": 7,
+        "chars": 3479,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0ee4ccc10db4aa05_000562.pdf",
+        "page": 8,
+        "chars": 4064,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0ee4ccc10db4aa05_000562.pdf",
+        "page": 9,
+        "chars": 4574,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      }
+    ],
+    "orientation/landscape_or_rotated": [
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 1,
+        "chars": 126,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 2,
+        "chars": 252,
+        "cols": 2,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 3,
+        "chars": 602,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 4,
+        "chars": 572,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 5,
+        "chars": 689,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 6,
+        "chars": 912,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 7,
+        "chars": 1826,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 5,
+            "cols": 3,
+            "bbox": [
+              426.0,
+              168.0,
+              630.0,
+              278.0
+            ],
+            "bbox_ratio": 0.046,
+            "real_lines": 0,
+            "nonwhite_fills": 1,
+            "avg_cell_len": 7.3,
+            "max_cell_len": 13,
+            "false_like": false
+          },
+          {
+            "rows": 5,
+            "cols": 2,
+            "bbox": [
+              48.4,
+              186.1,
+              174.4,
+              284.5
+            ],
+            "bbox_ratio": 0.026,
+            "real_lines": 0,
+            "nonwhite_fills": 9,
+            "avg_cell_len": 7.2,
+            "max_cell_len": 12,
+            "false_like": false
+          }
+        ],
+        "drawings": 20138,
+        "lines": 19992,
+        "fills": [
+          [
+            "000000",
+            11924
+          ],
+          [
+            "7F807F",
+            626
+          ],
+          [
+            "FF7E7E",
+            193
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 8,
+        "chars": 365,
+        "cols": 1,
+        "imgs": 3,
+        "img_cover": 0.39,
+        "tables": [],
+        "drawings": 78,
+        "lines": 3,
+        "fills": [
+          [
+            "FEFBBC",
+            23
+          ],
+          [
+            "B27905",
+            8
+          ],
+          [
+            "FFFFFF",
+            5
+          ]
+        ]
+      }
+    ],
+    "image_heavy": [
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 1,
+        "chars": 126,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 2,
+        "chars": 252,
+        "cols": 2,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 3,
+        "chars": 602,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 4,
+        "chars": 572,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 5,
+        "chars": 689,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 6,
+        "chars": 912,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 7,
+        "chars": 1826,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 5,
+            "cols": 3,
+            "bbox": [
+              426.0,
+              168.0,
+              630.0,
+              278.0
+            ],
+            "bbox_ratio": 0.046,
+            "real_lines": 0,
+            "nonwhite_fills": 1,
+            "avg_cell_len": 7.3,
+            "max_cell_len": 13,
+            "false_like": false
+          },
+          {
+            "rows": 5,
+            "cols": 2,
+            "bbox": [
+              48.4,
+              186.1,
+              174.4,
+              284.5
+            ],
+            "bbox_ratio": 0.026,
+            "real_lines": 0,
+            "nonwhite_fills": 9,
+            "avg_cell_len": 7.2,
+            "max_cell_len": 12,
+            "false_like": false
+          }
+        ],
+        "drawings": 20138,
+        "lines": 19992,
+        "fills": [
+          [
+            "000000",
+            11924
+          ],
+          [
+            "7F807F",
+            626
+          ],
+          [
+            "FF7E7E",
+            193
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 8,
+        "chars": 365,
+        "cols": 1,
+        "imgs": 3,
+        "img_cover": 0.39,
+        "tables": [],
+        "drawings": 78,
+        "lines": 3,
+        "fills": [
+          [
+            "FEFBBC",
+            23
+          ],
+          [
+            "B27905",
+            8
+          ],
+          [
+            "FFFFFF",
+            5
+          ]
+        ]
+      }
+    ],
+    "two_column_text": [
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 2,
+        "chars": 252,
+        "cols": 2,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "343467",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 23,
+        "chars": 1920,
+        "cols": 2,
+        "imgs": 8,
+        "img_cover": 0.09,
+        "tables": [
+          {
+            "rows": 8,
+            "cols": 5,
+            "bbox": [
+              79.4,
+              132.8,
+              709.9,
+              555.9
+            ],
+            "bbox_ratio": 0.55,
+            "real_lines": 4,
+            "nonwhite_fills": 65,
+            "avg_cell_len": 254.9,
+            "max_cell_len": 522,
+            "false_like": false
+          }
+        ],
+        "drawings": 229,
+        "lines": 50,
+        "fills": [
+          [
+            "000000",
+            55
+          ],
+          [
+            "FFFFFF",
+            37
+          ],
+          [
+            "808080",
+            19
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 26,
+        "chars": 931,
+        "cols": 2,
+        "imgs": 35,
+        "img_cover": 0.02,
+        "tables": [
+          {
+            "rows": 4,
+            "cols": 18,
+            "bbox": [
+              93.9,
+              220.1,
+              706.1,
+              534.3
+            ],
+            "bbox_ratio": 0.397,
+            "real_lines": 3,
+            "nonwhite_fills": 9,
+            "avg_cell_len": 52.0,
+            "max_cell_len": 148,
+            "false_like": false
+          }
+        ],
+        "drawings": 78,
+        "lines": 3,
+        "fills": [
+          [
+            "FFFFFF",
+            12
+          ],
+          [
+            "000000",
+            11
+          ],
+          [
+            "EAEAEA",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0ce09dfabe575822_000354.pdf",
+        "page": 1,
+        "chars": 713,
+        "cols": 2,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 4,
+        "lines": 4,
+        "fills": [
+          [
+            "000000",
+            4
+          ]
+        ]
+      },
+      {
+        "file": "0ce09dfabe575822_000354.pdf",
+        "page": 13,
+        "chars": 1535,
+        "cols": 2,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 4,
+        "lines": 4,
+        "fills": [
+          [
+            "000000",
+            4
+          ]
+        ]
+      },
+      {
+        "file": "0fd83d2aa11747d4_000152.pdf",
+        "page": 6,
+        "chars": 2101,
+        "cols": 2,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [
+          {
+            "rows": 9,
+            "cols": 6,
+            "bbox": [
+              78.7,
+              135.2,
+              533.1,
+              691.0
+            ],
+            "bbox_ratio": 0.521,
+            "real_lines": 1,
+            "nonwhite_fills": 50,
+            "avg_cell_len": 104.4,
+            "max_cell_len": 349,
+            "false_like": false
+          }
+        ],
+        "drawings": 84,
+        "lines": 79,
+        "fills": [
+          [
+            "000000",
+            76
+          ],
+          [
+            "C0C0C0",
+            6
+          ],
+          [
+            "000080",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0fd83d2aa11747d4_000152.pdf",
+        "page": 7,
+        "chars": 2442,
+        "cols": 2,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [
+          {
+            "rows": 13,
+            "cols": 6,
+            "bbox": [
+              78.9,
+              72.8,
+              533.1,
+              715.2
+            ],
+            "bbox_ratio": 0.602,
+            "real_lines": 0,
+            "nonwhite_fills": 72,
+            "avg_cell_len": 85.7,
+            "max_cell_len": 496,
+            "false_like": false
+          }
+        ],
+        "drawings": 117,
+        "lines": 113,
+        "fills": [
+          [
+            "000000",
+            111
+          ],
+          [
+            "C0C0C0",
+            6
+          ]
+        ]
+      },
+      {
+        "file": "0fd83d2aa11747d4_000152.pdf",
+        "page": 22,
+        "chars": 2719,
+        "cols": 2,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [
+          {
+            "rows": 22,
+            "cols": 12,
+            "bbox": [
+              66.6,
+              196.0,
+              562.5,
+              717.6
+            ],
+            "bbox_ratio": 0.534,
+            "real_lines": 0,
+            "nonwhite_fills": 442,
+            "avg_cell_len": 8.1,
+            "max_cell_len": 43,
+            "false_like": false
+          }
+        ],
+        "drawings": 624,
+        "lines": 585,
+        "fills": [
+          [
+            "000000",
+            624
+          ]
+        ]
+      }
+    ],
+    "real_table_candidate": [
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 7,
+        "chars": 1826,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 5,
+            "cols": 3,
+            "bbox": [
+              426.0,
+              168.0,
+              630.0,
+              278.0
+            ],
+            "bbox_ratio": 0.046,
+            "real_lines": 0,
+            "nonwhite_fills": 1,
+            "avg_cell_len": 7.3,
+            "max_cell_len": 13,
+            "false_like": false
+          },
+          {
+            "rows": 5,
+            "cols": 2,
+            "bbox": [
+              48.4,
+              186.1,
+              174.4,
+              284.5
+            ],
+            "bbox_ratio": 0.026,
+            "real_lines": 0,
+            "nonwhite_fills": 9,
+            "avg_cell_len": 7.2,
+            "max_cell_len": 12,
+            "false_like": false
+          }
+        ],
+        "drawings": 20138,
+        "lines": 19992,
+        "fills": [
+          [
+            "000000",
+            11924
+          ],
+          [
+            "7F807F",
+            626
+          ],
+          [
+            "FF7E7E",
+            193
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 16,
+        "chars": 872,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 13,
+            "cols": 2,
+            "bbox": [
+              50.2,
+              218.0,
+              734.2,
+              512.4
+            ],
+            "bbox_ratio": 0.415,
+            "real_lines": 0,
+            "nonwhite_fills": 5,
+            "avg_cell_len": 25.5,
+            "max_cell_len": 56,
+            "false_like": false
+          }
+        ],
+        "drawings": 30,
+        "lines": 0,
+        "fills": [
+          [
+            "FFFFFF",
+            23
+          ],
+          [
+            "FFFF99",
+            4
+          ],
+          [
+            "343467",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "077bbf325240285f_000547.pdf",
+        "page": 18,
+        "chars": 1836,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.04,
+        "tables": [
+          {
+            "rows": 26,
+            "cols": 3,
+            "bbox": [
+              76.0,
+              181.5,
+              562.0,
+              611.5
+            ],
+            "bbox_ratio": 0.431,
+            "real_lines": 0,
+            "nonwhite_fills": 37,
+            "avg_cell_len": 21.0,
+            "max_cell_len": 67,
+            "false_like": false
+          }
+        ],
+        "drawings": 46,
+        "lines": 40,
+        "fills": [
+          [
+            "000000",
+            38
+          ],
+          [
+            "FFFFFF",
+            2
+          ],
+          [
+            "FFFF9A",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 10,
+        "chars": 1498,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.02,
+        "tables": [
+          {
+            "rows": 13,
+            "cols": 9,
+            "bbox": [
+              81.2,
+              134.5,
+              384.1,
+              505.3
+            ],
+            "bbox_ratio": 0.232,
+            "real_lines": 1,
+            "nonwhite_fills": 14,
+            "avg_cell_len": 78.2,
+            "max_cell_len": 683,
+            "false_like": false
+          }
+        ],
+        "drawings": 35,
+        "lines": 1,
+        "fills": [
+          [
+            "CCECFF",
+            5
+          ],
+          [
+            "00FFCC",
+            4
+          ],
+          [
+            "FFFF00",
+            4
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 15,
+        "chars": 1007,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.02,
+        "tables": [
+          {
+            "rows": 15,
+            "cols": 15,
+            "bbox": [
+              101.9,
+              136.0,
+              665.6,
+              510.9
+            ],
+            "bbox_ratio": 0.436,
+            "real_lines": 0,
+            "nonwhite_fills": 30,
+            "avg_cell_len": 6.3,
+            "max_cell_len": 41,
+            "false_like": false
+          }
+        ],
+        "drawings": 47,
+        "lines": 38,
+        "fills": [
+          [
+            "000000",
+            38
+          ],
+          [
+            "FFFFFF",
+            3
+          ],
+          [
+            "FFFF9A",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 17,
+        "chars": 1113,
+        "cols": 1,
+        "imgs": 2,
+        "img_cover": 0.02,
+        "tables": [
+          {
+            "rows": 24,
+            "cols": 15,
+            "bbox": [
+              159.3,
+              132.2,
+              584.6,
+              560.4
+            ],
+            "bbox_ratio": 0.376,
+            "real_lines": 0,
+            "nonwhite_fills": 37,
+            "avg_cell_len": 9.9,
+            "max_cell_len": 42,
+            "false_like": false
+          }
+        ],
+        "drawings": 49,
+        "lines": 41,
+        "fills": [
+          [
+            "000000",
+            39
+          ],
+          [
+            "FFFFFF",
+            3
+          ],
+          [
+            "C0C0C0",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 21,
+        "chars": 1675,
+        "cols": 1,
+        "imgs": 8,
+        "img_cover": 0.09,
+        "tables": [
+          {
+            "rows": 8,
+            "cols": 6,
+            "bbox": [
+              78.8,
+              133.5,
+              710.5,
+              555.5
+            ],
+            "bbox_ratio": 0.55,
+            "real_lines": 5,
+            "nonwhite_fills": 54,
+            "avg_cell_len": 182.7,
+            "max_cell_len": 443,
+            "false_like": false
+          }
+        ],
+        "drawings": 180,
+        "lines": 8,
+        "fills": [
+          [
+            "FFFFFF",
+            38
+          ],
+          [
+            "808080",
+            19
+          ],
+          [
+            "00FF9A",
+            14
+          ]
+        ]
+      },
+      {
+        "file": "0c6daef79b7165c1_000744.pdf",
+        "page": 22,
+        "chars": 854,
+        "cols": 0,
+        "imgs": 2,
+        "img_cover": 0.02,
+        "tables": [
+          {
+            "rows": 3,
+            "cols": 2,
+            "bbox": [
+              540.3,
+              471.4,
+              670.1,
+              523.7
+            ],
+            "bbox_ratio": 0.014,
+            "real_lines": 0,
+            "nonwhite_fills": 2,
+            "avg_cell_len": 19.7,
+            "max_cell_len": 41,
+            "false_like": false
+          }
+        ],
+        "drawings": 106,
+        "lines": 18,
+        "fills": [
+          [
+            "000000",
+            30
+          ],
+          [
+            "FFFFFF",
+            22
+          ],
+          [
+            "FFFFCC",
+            6
+          ]
+        ]
+      }
+    ],
+    "sparse_or_cover_page": [
+      {
+        "file": "08a544974cc24982_000345.pdf",
+        "page": 5,
+        "chars": 124,
+        "cols": 0,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "0af94714aca12cb6_000569.pdf",
+        "page": 6,
+        "chars": 345,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "0fd83d2aa11747d4_000152.pdf",
+        "page": 2,
+        "chars": 409,
+        "cols": 1,
+        "imgs": 1,
+        "img_cover": 0.04,
+        "tables": [],
+        "drawings": 1,
+        "lines": 0,
+        "fills": [
+          [
+            "33339A",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "0fd83d2aa11747d4_000152.pdf",
+        "page": 18,
+        "chars": 445,
+        "cols": 1,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 2,
+        "lines": 2,
+        "fills": [
+          [
+            "000000",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "14b447aa995bb919_000342.pdf",
+        "page": 1,
+        "chars": 2810,
+        "cols": 0,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 5,
+        "lines": 5,
+        "fills": [
+          [
+            "000000",
+            5
+          ]
+        ]
+      },
+      {
+        "file": "14b447aa995bb919_000342.pdf",
+        "page": 2,
+        "chars": 2930,
+        "cols": 0,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 1,
+        "lines": 1,
+        "fills": [
+          [
+            "000000",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "14b447aa995bb919_000342.pdf",
+        "page": 4,
+        "chars": 2438,
+        "cols": 0,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "1502a0fd18dceec0_000676.pdf",
+        "page": 2,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      }
+    ],
+    "multi_column_3plus": [
+      {
+        "file": "0fd83d2aa11747d4_000152.pdf",
+        "page": 61,
+        "chars": 1942,
+        "cols": 3,
+        "imgs": 6,
+        "img_cover": 0.25,
+        "tables": [
+          {
+            "rows": 4,
+            "cols": 5,
+            "bbox": [
+              18.5,
+              16.1,
+              594.0,
+              774.2
+            ],
+            "bbox_ratio": 0.9,
+            "real_lines": 34,
+            "nonwhite_fills": 162,
+            "avg_cell_len": 275.0,
+            "max_cell_len": 1475,
+            "false_like": false
+          }
+        ],
+        "drawings": 266,
+        "lines": 38,
+        "fills": [
+          [
+            "000000",
+            83
+          ],
+          [
+            "E60000",
+            49
+          ],
+          [
+            "0070FF",
+            26
+          ]
+        ]
+      },
+      {
+        "file": "1e4a0b0010051cc2_000153.pdf",
+        "page": 97,
+        "chars": 286,
+        "cols": 3,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "3443c4a45a8b57b0_000187.pdf",
+        "page": 10,
+        "chars": 1896,
+        "cols": 3,
+        "imgs": 21,
+        "img_cover": 0.17,
+        "tables": [],
+        "drawings": 13,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "3443c4a45a8b57b0_000187.pdf",
+        "page": 11,
+        "chars": 2531,
+        "cols": 3,
+        "imgs": 48,
+        "img_cover": 0.23,
+        "tables": [],
+        "drawings": 8,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "3f548bb027e5e853_000672.pdf",
+        "page": 1,
+        "chars": 3186,
+        "cols": 3,
+        "imgs": 1299,
+        "img_cover": 0.0,
+        "tables": [],
+        "drawings": 21,
+        "lines": 21,
+        "fills": [
+          [
+            "0000FF",
+            19
+          ],
+          [
+            "000000",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "3f548bb027e5e853_000672.pdf",
+        "page": 2,
+        "chars": 2975,
+        "cols": 3,
+        "imgs": 1299,
+        "img_cover": 0.0,
+        "tables": [],
+        "drawings": 20,
+        "lines": 20,
+        "fills": [
+          [
+            "0000FF",
+            18
+          ],
+          [
+            "000000",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "3f548bb027e5e853_000672.pdf",
+        "page": 3,
+        "chars": 3152,
+        "cols": 3,
+        "imgs": 1299,
+        "img_cover": 0.0,
+        "tables": [],
+        "drawings": 21,
+        "lines": 21,
+        "fills": [
+          [
+            "0000FF",
+            19
+          ],
+          [
+            "000000",
+            2
+          ]
+        ]
+      },
+      {
+        "file": "3f548bb027e5e853_000672.pdf",
+        "page": 4,
+        "chars": 3243,
+        "cols": 3,
+        "imgs": 1299,
+        "img_cover": 0.0,
+        "tables": [],
+        "drawings": 20,
+        "lines": 20,
+        "fills": [
+          [
+            "0000FF",
+            18
+          ],
+          [
+            "000000",
+            2
+          ]
+        ]
+      }
+    ],
+    "scanned_or_fullpage_image": [
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 110,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 1.0,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 111,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 1.0,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 114,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 0.74,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 115,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 0.74,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 116,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 0.74,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 118,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 0.74,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 119,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 0.74,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      },
+      {
+        "file": "6885cb45c5f01efd_000282.pdf",
+        "page": 120,
+        "chars": 0,
+        "cols": 0,
+        "imgs": 1,
+        "img_cover": 0.74,
+        "tables": [],
+        "drawings": 0,
+        "lines": 0,
+        "fills": []
+      }
+    ],
+    "false_table_columns_candidate": [
+      {
+        "file": "cb3536e7070a8a08_000341.pdf",
+        "page": 1,
+        "chars": 5095,
+        "cols": 3,
+        "imgs": 1,
+        "img_cover": 0.07,
+        "tables": [
+          {
+            "rows": 3,
+            "cols": 2,
+            "bbox": [
+              36.0,
+              81.0,
+              213.8,
+              738.0
+            ],
+            "bbox_ratio": 0.241,
+            "real_lines": 0,
+            "nonwhite_fills": 0,
+            "avg_cell_len": 468.5,
+            "max_cell_len": 925,
+            "false_like": true
+          }
+        ],
+        "drawings": 3,
+        "lines": 0,
+        "fills": [
+          [
+            "FFFFFF",
+            2
+          ],
+          [
+            "283A97",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "cb3536e7070a8a08_000341.pdf",
+        "page": 2,
+        "chars": 4699,
+        "cols": 3,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [
+          {
+            "rows": 2,
+            "cols": 2,
+            "bbox": [
+              220.0,
+              81.2,
+              574.7,
+              738.0
+            ],
+            "bbox_ratio": 0.481,
+            "real_lines": 0,
+            "nonwhite_fills": 0,
+            "avg_cell_len": 607.0,
+            "max_cell_len": 1157,
+            "false_like": true
+          }
+        ],
+        "drawings": 5,
+        "lines": 0,
+        "fills": [
+          [
+            "283A97",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "cb3536e7070a8a08_000341.pdf",
+        "page": 3,
+        "chars": 4653,
+        "cols": 2,
+        "imgs": 0,
+        "img_cover": 0,
+        "tables": [
+          {
+            "rows": 2,
+            "cols": 2,
+            "bbox": [
+              36.0,
+              81.2,
+              392.0,
+              738.0
+            ],
+            "bbox_ratio": 0.482,
+            "real_lines": 0,
+            "nonwhite_fills": 0,
+            "avg_cell_len": 639.8,
+            "max_cell_len": 1172,
+            "false_like": true
+          }
+        ],
+        "drawings": 5,
+        "lines": 0,
+        "fills": [
+          [
+            "283A97",
+            1
+          ],
+          [
+            "FFFFFF",
+            1
+          ]
+        ]
+      },
+      {
+        "file": "cddc0da7b710c500_000262.pdf",
+        "page": 6,
+        "chars": 8785,
+        "cols": 1,
+        "imgs": 4,
+        "img_cover": 0.05,
+        "tables": [
+          {
+            "rows": 2,
+            "cols": 2,
+            "bbox": [
+              37.5,
+              26.2,
+              1189.1,
+              226.2
+            ],
+            "bbox_ratio": 0.238,
+            "real_lines": 0,
+            "nonwhite_fills": 0,
+            "avg_cell_len": 130.0,
+            "max_cell_len": 249,
+            "false_like": true
+          }
+        ],
+        "drawings": 15,
+        "lines": 0,
+        "fills": [
+          [
+            "FFFFFF",
+            9
+          ]
+        ]
+      }
+    ]
+  },
+  "top_fonts": [
+    [
+      "TimesNewRomanPSMT",
+      1428
+    ],
+    [
+      "TimesNewRomanPS-BoldMT",
+      781
+    ],
+    [
+      "Times-Roman",
+      666
+    ],
+    [
+      "TimesNewRoman",
+      288
+    ],
+    [
+      "Arial-BoldMT",
+      274
+    ],
+    [
+      "Helvetica-Bold",
+      271
+    ],
+    [
+      "Times-Bold",
+      269
+    ],
+    [
+      "Times-Italic",
+      255
+    ],
+    [
+      "ArialMT",
+      239
+    ],
+    [
+      "TimesNewRomanPS-BoldItalicMT",
+      207
+    ],
+    [
+      "Helvetica",
+      204
+    ],
+    [
+      "TimesNewRoman,Bold",
+      201
+    ],
+    [
+      "TimesNewRomanPS-ItalicMT",
+      138
+    ],
+    [
+      "BPMMPA+TimesNewRomanPSMT",
+      120
+    ],
+    [
+      "BPMNAB+TimesNewRomanPS-BoldMT",
+      119
+    ],
+    [
+      "TimesNewRoman,Italic",
+      116
+    ],
+    [
+      "Palatino-Roman",
+      108
+    ],
+    [
+      "AEMNHP+Courier",
+      105
+    ],
+    [
+      "Arial",
+      104
+    ],
+    [
+      "Courier",
+      92
+    ],
+    [
+      "BPEDKE+Helvetica",
+      87
+    ],
+    [
+      "BPEDFN+NewCenturySchlbk-Roman",
+      86
+    ],
+    [
+      "ArialNarrow-Bold",
+      82
+    ],
+    [
+      "ArialMS",
+      78
+    ],
+    [
+      "KFGGLH+TimesNewRoman",
+      76
+    ],
+    [
+      "OXBEIE+MyriadPro-SemiboldCond",
+      76
+    ],
+    [
+      "TLZIAU+MyriadPro-Cond",
+      75
+    ],
+    [
+      "PFLKWC+MyriadPro-Regular",
+      75
+    ],
+    [
+      "Courier-Bold",
+      73
+    ],
+    [
+      "QNVQKA+MyriadPro-BoldCond",
+      71
+    ],
+    [
+      "KFGEOC+TimesNewRoman,Bold",
+      68
+    ],
+    [
+      "Arial-ItalicMS",
+      68
+    ],
+    [
+      "ZapfDingbats",
+      64
+    ],
+    [
+      "NKRYUG+ArialNarrow",
+      63
+    ],
+    [
+      "Arial,Bold",
+      60
+    ],
+    [
+      "ZXIKGS+ArialMT",
+      59
+    ],
+    [
+      "PCDABG+Arial-BoldMT",
+      59
+    ],
+    [
+      "Symbol",
+      51
+    ],
+    [
+      "LegacySans-Medium",
+      45
+    ],
+    [
+      "LegacySans-Book",
+      44
+    ],
+    [
+      "LegacySans-MediumItalic",
+      44
+    ],
+    [
+      "Aldus-Roman",
+      44
+    ],
+    [
+      "LegacySans-Bold",
+      44
+    ],
+    [
+      "NKRYUG+Arial-ItalicMT",
+      41
+    ],
+    [
+      "Arial-BoldItalicMT",
+      40
+    ],
+    [
+      "Arial-ItalicMT",
+      39
+    ],
+    [
+      "ArialNarrow",
+      35
+    ],
+    [
+      "NewCenturySchlbk-Roman",
+      35
+    ],
+    [
+      "AEMNPN+Courier-Bold",
+      34
+    ],
+    [
+      "AvantGarde-Book",
+      33
+    ]
+  ],
+  "page_sizes": [
+    [
+      "(612, 792, 0)",
+      3306
+    ],
+    [
+      "(432, 648, 0)",
+      222
+    ],
+    [
+      "(792, 612, 90)",
+      145
+    ],
+    [
+      "(792, 612, 0)",
+      104
+    ],
+    [
+      "(504, 698, 0)",
+      28
+    ],
+    [
+      "(717, 537, 90)",
+      21
+    ],
+    [
+      "(718, 538, 90)",
+      20
+    ],
+    [
+      "(595, 842, 0)",
+      19
+    ],
+    [
+      "(796, 588, 270)",
+      19
+    ],
+    [
+      "(595, 794, 0)",
+      19
+    ],
+    [
+      "(612, 791, 0)",
+      17
+    ],
+    [
+      "(612, 612, 0)",
+      12
+    ],
+    [
+      "(593, 767, 0)",
+      10
+    ],
+    [
+      "(594, 783, 0)",
+      8
+    ],
+    [
+      "(496, 721, 0)",
+      8
+    ],
+    [
+      "(594, 774, 0)",
+      8
+    ],
+    [
+      "(1224, 792, 0)",
+      6
+    ],
+    [
+      "(567, 756, 0)",
+      6
+    ],
+    [
+      "(767, 593, 90)",
+      5
+    ],
+    [
+      "(1224, 792, 90)",
+      5
+    ]
+  ],
+  "docs": [
+    {
+      "file": "0688ba309c87485d_000029.pdf",
+      "pages": 1,
+      "classes": {
+        "colored_bands_or_fills": 1,
+        "dense_vector_formula_or_chart": 1,
+        "single_column_text": 1,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "Times-BoldItalic": 1,
+        "Helvetica": 1,
+        "Helvetica-Bold": 1,
+        "Times-Roman": 1,
+        "Times-Italic": 1,
+        "Lucida": 1,
+        "Lucida-Italic": 1,
+        "Times-Bold": 1
+      }
+    },
+    {
+      "file": "077bbf325240285f_000547.pdf",
+      "pages": 20,
+      "classes": {
+        "orientation/landscape_or_rotated": 20,
+        "image_heavy": 20,
+        "colored_bands_or_fills": 20,
+        "two_column_text": 1,
+        "single_column_text": 7,
+        "dense_vector_formula_or_chart": 2,
+        "real_table_candidate": 3
+      },
+      "fonts": {
+        "Arial-BoldMT": 20,
+        "FIBLBM+ArialUnicodeMS": 20,
+        "ArialMT": 14,
+        "FIBNLC+Wingdings-Regular": 4,
+        "ArialNarrow": 1,
+        "TimesNewRomanPSMT": 2,
+        "TimesNewRomanPS-BoldMT": 1
+      }
+    },
+    {
+      "file": "08a544974cc24982_000345.pdf",
+      "pages": 5,
+      "classes": {
+        "single_column_text": 4,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "RQWHHN+TimesNewRoman": 5,
+        "TGFVGW+TimesNewRoman,Italic": 3
+      }
+    },
+    {
+      "file": "0af94714aca12cb6_000569.pdf",
+      "pages": 6,
+      "classes": {
+        "single_column_text": 5,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "Times-Bold": 6,
+        "Times-Roman": 6,
+        "Symbol": 1,
+        "Times-Italic": 6,
+        "Helvetica-Bold": 1
+      }
+    },
+    {
+      "file": "0c6daef79b7165c1_000744.pdf",
+      "pages": 57,
+      "classes": {
+        "orientation/landscape_or_rotated": 57,
+        "image_heavy": 57,
+        "colored_bands_or_fills": 28,
+        "single_column_text": 11,
+        "real_table_candidate": 13,
+        "dense_vector_formula_or_chart": 5,
+        "two_column_text": 2
+      },
+      "fonts": {
+        "ArialMT": 57,
+        "Arial-BoldItalicMT": 3,
+        "TimesNewRomanPS-BoldMT": 2,
+        "Arial-BoldMT": 55,
+        "Arial-ItalicMT": 2,
+        "Tahoma-Bold": 4,
+        "Verdana-Bold": 4,
+        "TimesNewRomanPSMT": 2
+      }
+    },
+    {
+      "file": "0ce09dfabe575822_000354.pdf",
+      "pages": 17,
+      "classes": {
+        "two_column_text": 2,
+        "single_column_text": 15
+      },
+      "fonts": {
+        "BBDMNE+TimesNewRoman": 17,
+        "BBDMOK+TimesNewRoman,Bold": 1
+      }
+    },
+    {
+      "file": "0ee4ccc10db4aa05_000562.pdf",
+      "pages": 10,
+      "classes": {
+        "single_column_text": 10,
+        "long_plain_text": 7
+      },
+      "fonts": {
+        "Arial-ItalicMT": 1,
+        "ArialMT": 1,
+        "TimesNewRomanPS-BoldMT": 5,
+        "TimesNewRomanPSMT": 10,
+        "TimesNewRomanPS-ItalicMT": 10,
+        "EHPDIJ+WP-MathExtendedA": 1,
+        "Arial-BoldMT": 8
+      }
+    },
+    {
+      "file": "0fd83d2aa11747d4_000152.pdf",
+      "pages": 76,
+      "classes": {
+        "image_heavy": 26,
+        "dense_vector_formula_or_chart": 34,
+        "sparse_or_cover_page": 2,
+        "colored_bands_or_fills": 36,
+        "single_column_text": 54,
+        "long_plain_text": 10,
+        "real_table_candidate": 36,
+        "two_column_text": 6,
+        "orientation/landscape_or_rotated": 3,
+        "multi_column_3plus": 1
+      },
+      "fonts": {
+        "YRQWDM+JoannaMT-SemiBold": 1,
+        "JSDKBQ+FranklinGothic-Book": 1,
+        "JSDKBQ+JoannaMT-SemiBoldItalic": 1,
+        "TUBNLW+ArialNarrow-Bold": 1,
+        "CourierNewPSMT": 1,
+        "ArialNarrow-Bold": 66,
+        "ArialMT": 4,
+        "OBABHI+BankGothicBT-Medium": 13,
+        "TimesNewRomanPSMT": 65,
+        "Arial-BoldMT": 26,
+        "OBAGHB+SymbolMT": 3,
+        "TimesNewRomanPS-BoldMT": 47,
+        "TimesNewRomanPS-BoldItalicMT": 1,
+        "TimesNewRomanPS-ItalicMT": 1,
+        "YECDKT+ESRIDefaultMarker": 1,
+        "UJBHQV+ESRIShields": 1,
+        "VHFGHJ+Arial-BoldItalicMT": 9,
+        "LSKMXL+ESRINorth": 1,
+        "LBVYMF+Arial-BoldMT": 9,
+        "OWBYOD+ArialMT": 9,
+        "FBSSOO+Arial-ItalicMT": 9,
+        "Arial": 1,
+        "SSNTGO+TimesNewRomanPS-BoldItalicMT": 8
+      }
+    },
+    {
+      "file": "108c2281e298bc68_000364.pdf",
+      "pages": 4,
+      "classes": {
+        "two_column_text": 1,
+        "real_table_candidate": 2,
+        "single_column_text": 3,
+        "dense_vector_formula_or_chart": 1
+      },
+      "fonts": {
+        "Times-Roman": 4,
+        "Times-Bold": 4,
+        "MPBKCN+Arial0150": 4,
+        "Helvetica-Bold": 4,
+        "Times-Italic": 1,
+        "Helvetica": 1
+      }
+    },
+    {
+      "file": "114462c1ca5dfdc4_000347.pdf",
+      "pages": 16,
+      "classes": {
+        "real_table_candidate": 3,
+        "two_column_text": 13,
+        "image_heavy": 4,
+        "single_column_text": 3,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "POEAPN+Universal-GreekwithMathPi": 12,
+        "Times-Roman": 16,
+        "Times-Bold": 10,
+        "Times-Italic": 14,
+        "PPOELD+MathTechnicalP01": 1
+      }
+    },
+    {
+      "file": "11c83236ca2a595a_000150.pdf",
+      "pages": 22,
+      "classes": {
+        "orientation/landscape_or_rotated": 22,
+        "colored_bands_or_fills": 6,
+        "real_table_candidate": 12,
+        "image_heavy": 5,
+        "dense_vector_formula_or_chart": 2,
+        "single_column_text": 3
+      },
+      "fonts": {
+        "BANNGP+Arial": 22,
+        "BANNPP+Arial,Italic": 1,
+        "BANNIA+Arial,Bold": 22,
+        "Times-Roman": 20,
+        "BANOKN+Tahoma": 5,
+        "BANOKO+Wingdings": 2,
+        "BAOCAL+Tahoma,Bold": 2
+      }
+    },
+    {
+      "file": "13ae197dccc7ea8a_000811.pdf",
+      "pages": 2,
+      "classes": {
+        "single_column_text": 2,
+        "long_plain_text": 2
+      },
+      "fonts": {
+        "GEIDOK+Helvetica": 2,
+        "GEIHKG+MIonic": 2,
+        "GEIOOM+MIonic-Italic": 1,
+        "GEIHCI+AvantGarde-Demi": 2,
+        "GFPEKI+NewCenturySchlbk-Bold": 2,
+        "GGJONE+Times-Roman": 1,
+        "GEIJGM+Symbol": 1,
+        "GMDMKJ+GreekGsdd": 1
+      }
+    },
+    {
+      "file": "1487f8508ee01fa1_000143.pdf",
+      "pages": 1,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 1,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "GSGGPH+Times-Roman": 1,
+        "BSXHXR+FrutigerLTStd-Bold": 1,
+        "GSGGPH+NPSRawlinsonOTOld-Medium": 1,
+        "GSGGPH+NPSRawlinsonOTOld-Heavy": 1,
+        "QUEOZN+NPSRawlinsonOTOld-Book": 1,
+        "QUEOZN+NPSRawlinsonOTOld-BookItalic": 1
+      }
+    },
+    {
+      "file": "14b447aa995bb919_000342.pdf",
+      "pages": 4,
+      "classes": {
+        "sparse_or_cover_page": 3,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "CenturyGothic-Bold": 1,
+        "CenturyGothic": 4,
+        "Georgia": 2,
+        "GEOHGG+CenturySchoolbook": 3
+      }
+    },
+    {
+      "file": "1502a0fd18dceec0_000676.pdf",
+      "pages": 2,
+      "classes": {
+        "single_column_text": 1,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 1,
+        "Tahoma-Bold": 1,
+        "Tahoma": 1,
+        "ANNMBI+Helvetica": 1,
+        "ANNMCO+ComicSansMS": 1,
+        "TimesNewRomanPS-BoldItalicMT": 1,
+        "ArialMT": 2,
+        "Arial-ItalicMT": 1,
+        "ANNMKE+ComicSansMS-Bold": 1
+      }
+    },
+    {
+      "file": "15a48d55c7a98f4f_000324.pdf",
+      "pages": 10,
+      "classes": {
+        "single_column_text": 9,
+        "long_plain_text": 1,
+        "dense_vector_formula_or_chart": 3,
+        "real_table_candidate": 2,
+        "two_column_text": 1,
+        "image_heavy": 1
+      },
+      "fonts": {
+        "LOJNBD+Arial,Bold": 1,
+        "LOJMOJ+TimesNewRoman": 10,
+        "LOJNFB+TimesNewRoman,Bold": 10,
+        "LOJNMA+SymbolMT": 7,
+        "LOJMOI+TimesNewRoman": 3,
+        "LOJPEJ+Arial": 4,
+        "LOKAJP+TimesNewRoman,Italic": 2,
+        "LOKAJO+TimesNewRoman,Italic": 1,
+        "LONDEK+Arial,Italic": 1
+      }
+    },
+    {
+      "file": "18922698b2e48adf_000334.pdf",
+      "pages": 70,
+      "classes": {
+        "sparse_or_cover_page": 1,
+        "single_column_text": 67,
+        "two_column_text": 2,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "TimesNewRomanPS-BoldMT": 70,
+        "TimesNewRomanPSMT": 69,
+        "TimesNewRomanPS-ItalicMT": 32,
+        "TimesNewRomanPS-BoldItalicMT": 62
+      }
+    },
+    {
+      "file": "18f79c510099a1f9_000373.pdf",
+      "pages": 17,
+      "classes": {
+        "colored_bands_or_fills": 7,
+        "single_column_text": 17,
+        "long_plain_text": 12
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 2,
+        "TimesNewRomanPS-BoldMT": 2,
+        "MGAHNL+ArialMT": 17,
+        "MGAIBP+Arial-BoldMT": 17,
+        "MGAHPO+Arial-ItalicMT": 3,
+        "MGAIDB+Arial-BoldItalicMT": 3,
+        "Tahoma": 2,
+        "MGAIBO+Arial-BoldMT": 17,
+        "MGAHNK+ArialMT": 17,
+        "MGAHNO+Arial-ItalicMT": 3,
+        "MGAIGD+SymbolMT": 3,
+        "MGAIDA+Arial-BoldItalicMT": 1
+      }
+    },
+    {
+      "file": "19eb3f2fc0f7a315_000566.pdf",
+      "pages": 23,
+      "classes": {
+        "image_heavy": 2,
+        "single_column_text": 16,
+        "sparse_or_cover_page": 7
+      },
+      "fonts": {
+        "JJLPND+Century-Bold": 6,
+        "JJLPOF+Chaucer-DTC": 2,
+        "JJMAHN+CenturyExpanded": 23,
+        "JJMAJA+CenturyExpanded-Italic": 23
+      }
+    },
+    {
+      "file": "19fff50000cdb8af_000752.pdf",
+      "pages": 2,
+      "classes": {
+        "image_heavy": 2,
+        "colored_bands_or_fills": 1,
+        "two_column_text": 1,
+        "real_table_candidate": 1,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "BJEDEG+Arial-BoldMT": 2,
+        "BJEDFM+ArialMT": 2,
+        "BJEDHC+Arial-ItalicMT": 2,
+        "BJEFFP+TimesNewRomanPSMT": 2,
+        "BJEKNL+Arial-BoldItalicMT": 1
+      }
+    },
+    {
+      "file": "1b7b94191ff4628a_000162.pdf",
+      "pages": 14,
+      "classes": {
+        "image_heavy": 14,
+        "colored_bands_or_fills": 2,
+        "single_column_text": 13,
+        "real_table_candidate": 1
+      },
+      "fonts": {
+        "MNKSND+OfficinaSans-Bold": 14,
+        "LFAMZF+OfficinaSans-Book": 2,
+        "LFAMZF+Meridien-Medium": 13,
+        "KXQGLH+Meridien-Roman": 1,
+        "KXQGLH+OfficinaSerif-Bold": 12,
+        "KXQGLH+Helvetica": 1
+      }
+    },
+    {
+      "file": "1b93d7c624808316_000592.pdf",
+      "pages": 1,
+      "classes": {
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "BJBHCA+Garamond-Bold": 1,
+        "BJBHGI+TimesNewRoman": 1,
+        "BJBHHD+SymbolMT": 1,
+        "BJBICJ+Arial": 1,
+        "BJBIMB+Arial,Bold": 1,
+        "BJBJAA+CourierNewPSMT": 1
+      }
+    },
+    {
+      "file": "1e4a0b0010051cc2_000153.pdf",
+      "pages": 108,
+      "classes": {
+        "colored_bands_or_fills": 2,
+        "real_table_candidate": 8,
+        "sparse_or_cover_page": 8,
+        "single_column_text": 84,
+        "image_heavy": 18,
+        "two_column_text": 2,
+        "dense_vector_formula_or_chart": 1,
+        "orientation/landscape_or_rotated": 1,
+        "multi_column_3plus": 1
+      },
+      "fonts": {
+        "Americana-ExtraBold": 1,
+        "Americana-Bold": 2,
+        "Americana": 2,
+        "Galliard-Italic": 2,
+        "Palatino-Roman": 99,
+        "Times-Roman": 101,
+        "Palatino-Bold": 2,
+        "NewYork": 32,
+        "ZapfDingbats": 32,
+        "Palatino-Italic": 12,
+        "Geneva": 2,
+        "Chicago": 1,
+        "Times-Bold": 1,
+        "Symbol": 1,
+        "Helvetica": 19,
+        "Helvetica-Bold": 4,
+        "Helvetica-Oblique": 5
+      }
+    },
+    {
+      "file": "20540074e6e4c0a4_000252.pdf",
+      "pages": 11,
+      "classes": {
+        "single_column_text": 8,
+        "long_plain_text": 1,
+        "image_heavy": 2,
+        "sparse_or_cover_page": 2,
+        "real_table_candidate": 5,
+        "dense_vector_formula_or_chart": 2
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 11,
+        "TimesNewRomanPS-BoldMT": 11,
+        "TimesNewRomanPS-ItalicMT": 4,
+        "TimesNewRomanPS-BoldItalicMT": 1,
+        "ArialMT": 2
+      }
+    },
+    {
+      "file": "20e1d6e3e6e32681_000353.pdf",
+      "pages": 10,
+      "classes": {
+        "single_column_text": 9,
+        "long_plain_text": 6,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "BAKJDH+TimesNewRoman": 10,
+        "BAKJFH+TimesNewRoman,Italic": 10
+      }
+    },
+    {
+      "file": "21ba59de566867cf_000325.pdf",
+      "pages": 45,
+      "classes": {
+        "orientation/landscape_or_rotated": 1,
+        "image_heavy": 1,
+        "colored_bands_or_fills": 1,
+        "two_column_text": 31,
+        "single_column_text": 13,
+        "long_plain_text": 12,
+        "real_table_candidate": 1
+      },
+      "fonts": {
+        "LegacySans-Medium": 45,
+        "AGaramond-Semibold": 1,
+        "LegacySans-Book": 44,
+        "LegacySans-MediumItalic": 44,
+        "Aldus-Roman": 44,
+        "LegacySans-Bold": 44,
+        "Aldus-Italic": 16,
+        "Symbol": 23,
+        "Times-Roman": 1,
+        "Times-Italic": 2
+      }
+    },
+    {
+      "file": "241ba812f62f47c4_000581.pdf",
+      "pages": 25,
+      "classes": {
+        "orientation/landscape_or_rotated": 25,
+        "real_table_candidate": 25,
+        "single_column_text": 10,
+        "two_column_text": 15
+      },
+      "fonts": {
+        "Arial,Bold": 25,
+        "Arial": 25
+      }
+    },
+    {
+      "file": "243492cd02c93a94_000339.pdf",
+      "pages": 25,
+      "classes": {
+        "colored_bands_or_fills": 2,
+        "single_column_text": 22,
+        "two_column_text": 3
+      },
+      "fonts": {
+        "CourierNewPS-BoldMT": 4,
+        "CourierNewPSMT": 4,
+        "BEKBID+Courier-Bold": 19,
+        "BEKBNE+Courier": 25,
+        "BEKCHE+Courier-Oblique": 23,
+        "TimesNewRomanPSMT": 4,
+        "BEKDKA+Courier-BoldOblique": 4
+      }
+    },
+    {
+      "file": "24e9f1802a4ae129_000316.pdf",
+      "pages": 9,
+      "classes": {
+        "image_heavy": 1,
+        "single_column_text": 9,
+        "long_plain_text": 5,
+        "real_table_candidate": 3
+      },
+      "fonts": {
+        "NIHCHL+ArialMT": 1,
+        "NIHCIL+Arial-BoldMT": 1,
+        "NIHCLL+TimesNewRomanPS-BoldMT": 8,
+        "NIHCMM+TimesNewRomanPSMT": 8,
+        "NIHEBG+Arial-ItalicMT": 3,
+        "NIHEBH+TimesNewRomanPS-ItalicMT": 3,
+        "Arial-ItalicMT-Identity-H": 3,
+        "SymbolMT-Identity-H": 3,
+        "TimesNewRomanPS-ItalicMT-Identity-H": 3
+      }
+    },
+    {
+      "file": "2593460dbf04da62_000348.pdf",
+      "pages": 48,
+      "classes": {
+        "image_heavy": 1,
+        "single_column_text": 39,
+        "sparse_or_cover_page": 6,
+        "long_plain_text": 16,
+        "colored_bands_or_fills": 2,
+        "two_column_text": 2
+      },
+      "fonts": {
+        "TimesNewRoman": 47,
+        "TimesNewRoman,Bold": 27,
+        "Arial": 13,
+        "Symbol": 6,
+        "TimesNewRoman,BoldItalic": 8,
+        "TimesNewRoman,Italic": 13
+      }
+    },
+    {
+      "file": "28c32f76b3fc81d4_000352.pdf",
+      "pages": 9,
+      "classes": {
+        "single_column_text": 8,
+        "long_plain_text": 1,
+        "image_heavy": 5,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "TimesNewRomanPS-BoldMT": 9,
+        "TimesNewRomanPSMT": 9,
+        "ArialMT": 3,
+        "TimesNewRomanPS-ItalicMT": 7,
+        "TimesNewRomanPS-BoldItalicMT": 8,
+        "FOADOO+ArialUnicodeMS": 1,
+        "FOAEKL+SymbolMT": 1
+      }
+    },
+    {
+      "file": "2d6b5053716f4037_000595.pdf",
+      "pages": 226,
+      "classes": {
+        "sparse_or_cover_page": 5,
+        "single_column_text": 206,
+        "two_column_text": 12,
+        "real_table_candidate": 84,
+        "dense_vector_formula_or_chart": 81,
+        "orientation/landscape_or_rotated": 4,
+        "image_heavy": 1
+      },
+      "fonts": {
+        "CEGBAL+TimesNewRoman,Bold": 3,
+        "CEGBDF+TimesNewRoman": 5,
+        "CLJIOL+TimesNewRoman": 1,
+        "CLJJBF+TimesNewRoman,Bold": 1,
+        "CLJJFD+TimesNewRoman,Italic": 1,
+        "CLJJMC+WP-Phonetic": 1,
+        "CEGBMD+TimesNewRoman,Italic": 3,
+        "CEGCDC+WP-Phonetic": 1,
+        "EIEFHG+TimesNewRoman": 8,
+        "EIEFJG+TimesNewRoman,Bold": 5,
+        "EIEFMA+TimesNewRoman,Italic": 3,
+        "EIEFNP+WP-Phonetic": 3,
+        "EIEICG+TimesNewRoman,BoldItalic": 4,
+        "FFAPJP+TimesNewRoman": 13,
+        "FFAPLP+TimesNewRoman,Bold": 9,
+        "FFAPPD+TimesNewRoman,Italic": 2,
+        "FFBCKH+WP-Phonetic": 4,
+        "CEFBFO+TimesNewRoman": 1,
+        "CEFBNI+TimesNewRoman,Bold": 1,
+        "CEFCDD+WP-Phonetic": 1,
+        "FFBGMP+TimesNewRoman,BoldItalic": 2,
+        "HEIFCI+TimesNewRoman": 26,
+        "HEIFEI+TimesNewRoman,Bold": 24,
+        "HEIFHC+TimesNewRoman,Italic": 8,
+        "NFEGDD+TimesNewRoman": 1,
+        "NFEGKD+Arial": 1,
+        "NFEGPP+Arial,Bold": 1,
+        "NFEHDD+TimesNewRoman,Bold": 1,
+        "NFEHHB+TimesNewRoman,BoldItalic": 1,
+        "HEIHDA+TimesNewRoman,BoldItalic": 16,
+        "MPMKAE+TimesNewRoman": 1,
+        "MPMKDI+TimesNewRoman,Bold": 1,
+        "MPMKLM+TimesNewRoman,BoldItalic": 1,
+        "HEIKGH+WP-Phonetic": 1,
+        "HEIPEB+SymbolMT": 1,
+        "HEJADD+WP-GreekCentury": 1,
+        "NECOBN+TimesNewRoman": 1,
+        "NECOIO+TimesNewRoman,Bold": 1,
+        "NECOMM+TimesNewRoman,BoldItalic": 1,
+        "NECOPG+TimesNewRoman,Italic": 1,
+        "HEJGNK+WP-MathA": 2,
+        "JHHALA+TimesNewRoman": 28,
+        "JHHANK+TimesNewRoman,Bold": 18,
+        "JHHBAP+TimesNewRoman,Italic": 4,
+        "JHHBHO+WP-Phonetic": 19,
+        "JHHDAG+TimesNewRoman,BoldItalic": 7,
+        "NKHIEN+TimesNewRoman": 1,
+        "NKHILD+Arial": 1,
+        "NKHJAP+Arial,Bold": 1,
+        "NKHJEN+TimesNewRoman,Bold": 1,
+        "NMHGIP+TimesNewRoman": 1,
+        "NMHGOK+WP-Phonetic": 1,
+        "NMHHBO+TimesNewRoman,Italic": 1,
+        "JHHICL+WP-GreekCentury": 4,
+        "NONFLN+TimesNewRoman": 1,
+        "NONGEC+TimesNewRoman,BoldItalic": 1,
+        "NONGHF+WP-Phonetic": 1,
+        "OALGDH+TimesNewRoman": 1,
+        "OALGGB+TimesNewRoman,Bold": 1,
+        "OALGLN+TimesNewRoman,BoldItalic": 1,
+        "OALHBK+TimesNewRoman,Italic": 1,
+        "LEJJJK+TimesNewRoman": 19,
+        "LEJJOM+TimesNewRoman,Bold": 15,
+        "LEJKCA+TimesNewRoman,Italic": 2,
+        "LEJKFF+TimesNewRoman,BoldItalic": 12,
+        "LEJLNC+WP-Phonetic": 12,
+        "OOEHDE+TimesNewRoman": 1,
+        "OOEHHC+TimesNewRoman,Bold": 1,
+        "OOEHKP+WP-Phonetic": 1,
+        "OOEHPH+TimesNewRoman,Italic": 1,
+        "PGACEG+TimesNewRoman": 1,
+        "PGACKC+TimesNewRoman,Bold": 1,
+        "PGADAI+WP-Phonetic": 1,
+        "PHJJCB+TimesNewRoman": 1,
+        "PHJJGJ+TimesNewRoman,Bold": 1,
+        "POMFIG+TimesNewRoman": 1,
+        "POMFMO+TimesNewRoman,Bold": 1,
+        "POMFON+WP-Phonetic": 1,
+        "LEKFFP+WP-MathA": 1,
+        "AEJLPA+TimesNewRoman": 1,
+        "AEJNAB+TimesNewRoman,Bold": 1,
+        "ANAOBM+TimesNewRoman": 1,
+        "ANAOGO+TimesNewRoman,Bold": 1,
+        "ANAOKC+TimesNewRoman,Italic": 1,
+        "MGHOMD+TimesNewRoman": 19,
+        "MGHOON+TimesNewRoman,Bold": 18,
+        "MGHPCB+TimesNewRoman,Italic": 12,
+        "MGHPIH+TimesNewRoman,BoldItalic": 6,
+        "APGCAH+TimesNewRoman": 1,
+        "APGCIC+TimesNewRoman,Bold": 1,
+        "APGCMK+TimesNewRoman,Italic": 1,
+        "APGCPO+TimesNewRoman,BoldItalic": 1,
+        "BGFMLH+TimesNewRoman": 1,
+        "BGFNAJ+TimesNewRoman,Bold": 1,
+        "BGFNCJ+TimesNewRoman,Italic": 1,
+        "BKIFFB+TimesNewRoman": 1,
+        "BKIGAG+WP-GreekCentury": 1,
+        "BKIGCP+WP-MathA": 1,
+        "BKIGEE+WP-MathExtendedA": 1,
+        "MGIHML+WP-MathExtendedA": 1,
+        "MGIHKC+WP-MathA": 2,
+        "BMCBLA+TimesNewRoman": 1,
+        "BMCCKC+TimesNewRoman,Bold": 1,
+        "BMCDDK+TimesNewRoman,Italic": 1,
+        "NJCJNC+TimesNewRoman": 25,
+        "NJCJPM+TimesNewRoman,Bold": 17,
+        "NJCKDA+TimesNewRoman,Italic": 8,
+        "NJCLOA+WP-Phonetic": 6,
+        "NJCMNM+TimesNewRoman,BoldItalic": 12,
+        "OKBPHE+TimesNewRoman": 22,
+        "OKBPJO+TimesNewRoman,Bold": 22,
+        "OKBPMI+TimesNewRoman,Italic": 6,
+        "OKCBND+TimesNewRoman,BoldItalic": 10,
+        "OKCDFK+WP-Phonetic": 3,
+        "NNDKPL+TimesNewRoman": 1,
+        "NNDLGB+TimesNewRoman,Bold": 1,
+        "NNDLNB+TimesNewRoman,BoldItalic": 1,
+        "BODAOA+TimesNewRoman": 1,
+        "BODBAJ+WP-GreekCentury": 1,
+        "BODBEH+TimesNewRoman,BoldItalic": 1,
+        "BODBKN+TimesNewRoman,Bold": 1,
+        "OKCJAI+WP-GreekCentury": 2,
+        "ACJJKH+TimesNewRoman": 31,
+        "ACJJMH+TimesNewRoman,Bold": 25,
+        "ACJJPL+TimesNewRoman,Italic": 10,
+        "ACJKGL+TimesNewRoman,BoldItalic": 21,
+        "ACJLCK+WP-Phonetic": 10,
+        "ACJLJJ+SymbolMT": 1,
+        "ACJOGL+WP-MathA": 4,
+        "ACKAEE+Arial,Bold": 2,
+        "ACKAMI+Arial": 2,
+        "NLAOEC+TimesNewRoman": 1,
+        "NLAOLM+TimesNewRoman,Bold": 1,
+        "NLAPEK+TimesNewRoman,BoldItalic": 1,
+        "NJEHOJ+TimesNewRoman": 1,
+        "NJEINB+TimesNewRoman,Bold": 1,
+        "NJEJGJ+TimesNewRoman,BoldItalic": 1,
+        "CAKBFB+TimesNewRoman": 1,
+        "CAKBLH+TimesNewRoman,BoldItalic": 1,
+        "CAKBPE+WP-Phonetic": 1,
+        "CHGJIA+TimesNewRoman": 1,
+        "CHGJLO+TimesNewRoman,BoldItalic": 1,
+        "CHGKCP+TimesNewRoman,Bold": 1,
+        "CCGEME+TimesNewRoman": 1,
+        "CCGFIO+TimesNewRoman,Bold": 1
+      }
+    },
+    {
+      "file": "3032fca5fbdc80a0_000331.pdf",
+      "pages": 14,
+      "classes": {
+        "single_column_text": 8,
+        "long_plain_text": 2,
+        "colored_bands_or_fills": 6,
+        "dense_vector_formula_or_chart": 10,
+        "real_table_candidate": 9,
+        "two_column_text": 1,
+        "orientation/landscape_or_rotated": 3
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 14,
+        "ArialMT": 7,
+        "CourierNewPSMT": 3,
+        "LBNICC+SymbolMT": 1,
+        "TimesNewRomanPS-BoldMT": 4,
+        "Arial-BoldMT": 3
+      }
+    },
+    {
+      "file": "314dd0d4c7e56dec_000878.pdf",
+      "pages": 1,
+      "classes": {
+        "two_column_text": 1
+      },
+      "fonts": {
+        "FBDJFB+MIonic": 2,
+        "FBDIDF+GaramondThree-Bold": 2,
+        "FBDHND+Helvetica": 1,
+        "FBDIHO+Gpospec5": 1,
+        "FBDKMK+NewCenturySchlbk-Italic": 1,
+        "FBDKKN+NewCenturySchlbk-Bold": 1
+      }
+    },
+    {
+      "file": "3350fb543b97878b_000629.pdf",
+      "pages": 52,
+      "classes": {
+        "sparse_or_cover_page": 1,
+        "single_column_text": 49,
+        "long_plain_text": 30,
+        "dense_vector_formula_or_chart": 5,
+        "real_table_candidate": 5,
+        "image_heavy": 1,
+        "colored_bands_or_fills": 4,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "Helvetica-BoldOblique": 1,
+        "Helvetica-Bold": 40,
+        "Helvetica": 3,
+        "CALOIM+WPIconicSymbolsA": 1,
+        "Times-Roman": 51,
+        "Times-Italic": 32,
+        "Times-Bold": 8,
+        "CALPFK+WPTypographicSymbols": 8,
+        "Times-BoldItalic": 1
+      }
+    },
+    {
+      "file": "3443c4a45a8b57b0_000187.pdf",
+      "pages": 55,
+      "classes": {
+        "image_heavy": 55,
+        "single_column_text": 40,
+        "long_plain_text": 24,
+        "two_column_text": 8,
+        "multi_column_3plus": 2,
+        "real_table_candidate": 1,
+        "orientation/landscape_or_rotated": 1
+      },
+      "fonts": {
+        "Times-Roman": 41,
+        "Helvetica": 38,
+        "Courier-Bold": 30,
+        "Times-Bold": 39,
+        "Courier-Oblique": 6,
+        "Helvetica-Bold": 27,
+        "Times-BoldItalic": 6,
+        "Helvetica-BoldOblique": 14,
+        "Helvetica-Oblique": 7,
+        "Courier-BoldOblique": 7,
+        "Courier": 5,
+        "Times-Italic": 3
+      }
+    },
+    {
+      "file": "35c1acd5cae5a9d1_000381.pdf",
+      "pages": 5,
+      "classes": {
+        "image_heavy": 3,
+        "single_column_text": 2,
+        "real_table_candidate": 1,
+        "two_column_text": 2,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 5,
+        "ArialMT": 1,
+        "TimesNewRomanPS-BoldMT": 4,
+        "TimesNewRomanPS-BoldItalicMT": 1,
+        "TimesNewRomanPS-ItalicMT": 3
+      }
+    },
+    {
+      "file": "360c4b5831721c44_000838.pdf",
+      "pages": 5,
+      "classes": {
+        "real_table_candidate": 1,
+        "single_column_text": 3,
+        "sparse_or_cover_page": 2
+      },
+      "fonts": {
+        "Arial,Bold": 1,
+        "TimesNewRoman,Bold": 1,
+        "TimesNewRoman": 5,
+        "Arial": 2
+      }
+    },
+    {
+      "file": "3683a7c0e58dfa37_000748.pdf",
+      "pages": 4,
+      "classes": {
+        "image_heavy": 2,
+        "colored_bands_or_fills": 2,
+        "dense_vector_formula_or_chart": 2,
+        "real_table_candidate": 2,
+        "single_column_text": 2,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "KEPPFM+TimesNewRoman": 4,
+        "KEPPIM+SymbolMT": 4,
+        "KFAAFJ+Arial": 2,
+        "KFAAPI+Arial,Bold": 1,
+        "KFBEBE+TimesNewRoman,Bold": 1
+      }
+    },
+    {
+      "file": "3765b5485849ee57_000367.pdf",
+      "pages": 5,
+      "classes": {
+        "dense_vector_formula_or_chart": 4,
+        "real_table_candidate": 4,
+        "single_column_text": 4,
+        "long_plain_text": 1,
+        "colored_bands_or_fills": 3
+      },
+      "fonts": {
+        "TimesNewRomanPS-BoldMT": 5,
+        "TimesNewRomanPSMT": 5,
+        "Arial-BoldMT": 1,
+        "Arial-BoldItalicMT": 1,
+        "TimesNewRomanPS-ItalicMT": 5,
+        "ArialMT": 4,
+        "HBPABN+SymbolMT": 4,
+        "TimesNewRomanPS-BoldItalicMT": 4,
+        "CourierNewPSMT": 1,
+        "HBPBPL+Wingdings-Regular": 1
+      }
+    },
+    {
+      "file": "397c7124dfcf06d0_000839.pdf",
+      "pages": 8,
+      "classes": {
+        "single_column_text": 3,
+        "long_plain_text": 2,
+        "two_column_text": 5,
+        "image_heavy": 3
+      },
+      "fonts": {
+        "GGJLJM+HelveticaNeue-Bold": 6,
+        "GGJLKD+HelveticaNeue-Roman": 8,
+        "GGJLLC+MathematicalPi-Three": 8,
+        "GGJLMC+NewCenturySchlbk-Italic": 8,
+        "GGJLKJ+NewCenturySchlbk-Roman": 15,
+        "GGJLKO+Universal-GreekwithMathPi": 8,
+        "GGJLPN+MathematicalPi-One": 5,
+        "Symbol": 3,
+        "GGJOIP+MathematicalPi-Four": 2,
+        "GGJOJD+NewCenturySchlbk-Bold": 4,
+        "GGJOJG+Universal-NewswithCommPi": 1,
+        "GGKLGA+HelveticaNeue-BoldItalic": 1
+      }
+    },
+    {
+      "file": "3ca73e1072f8fcad_000750.pdf",
+      "pages": 2,
+      "classes": {
+        "orientation/landscape_or_rotated": 2,
+        "image_heavy": 2,
+        "dense_vector_formula_or_chart": 1
+      },
+      "fonts": {
+        "Arial-BoldMT": 2,
+        "ArialMT": 1,
+        "Arial-BoldItalicMT": 1,
+        "TimesNewRomanPS-BoldMT": 2,
+        "TimesNewRomanPS-BoldItalicMT": 1,
+        "TimesNewRomanPSMT": 1
+      }
+    },
+    {
+      "file": "3eeb6d35f1e07ee7_000886.pdf",
+      "pages": 11,
+      "classes": {
+        "image_heavy": 11,
+        "single_column_text": 10,
+        "long_plain_text": 2,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "Helvetica": 9,
+        "Times-Roman": 11,
+        "AvantGarde-Demi": 5,
+        "Helvetica-Narrow-Oblique": 3,
+        "ZapfDingbats": 1,
+        "Courier": 7,
+        "Courier-Bold": 4,
+        "Times-Italic": 5,
+        "Palatino-Italic": 2,
+        "LetterGothic": 2,
+        "AvantGarde-Book": 1,
+        "Helvetica-Bold": 2,
+        "Times-Bold": 1,
+        "Helvetica-Narrow": 1,
+        "Bookman-Demi": 2,
+        "Times-ExtraBold": 1,
+        "Helvetica-Condensed-Black": 1,
+        "LetterGothic-Bold": 1
+      }
+    },
+    {
+      "file": "3f548bb027e5e853_000672.pdf",
+      "pages": 4,
+      "classes": {
+        "image_heavy": 4,
+        "multi_column_3plus": 4
+      },
+      "fonts": {
+        "ABKPGH+Verdana-BoldItalic": 4,
+        "ABKPHJ+Verdana": 4,
+        "ABMEHA+Verdana-Bold": 4,
+        "Verdana": 1,
+        "ABNCKD+TimesNewRomanPSMT": 1
+      }
+    },
+    {
+      "file": "3fcfd899850be006_000009.pdf",
+      "pages": 4,
+      "classes": {
+        "single_column_text": 4,
+        "long_plain_text": 4
+      },
+      "fonts": {
+        "ACAAKP+LucidaSans-Bold": 4,
+        "ACAALA+LucidaSans": 4,
+        "Helvetica": 4,
+        "Helvetica-Bold": 4,
+        "Helvetica-BoldOblique": 2,
+        "Symbol": 1,
+        "Helvetica-Oblique": 1
+      }
+    },
+    {
+      "file": "3fe17da6c478f010_000885.pdf",
+      "pages": 5,
+      "classes": {
+        "colored_bands_or_fills": 1,
+        "single_column_text": 1,
+        "long_plain_text": 1,
+        "two_column_text": 4
+      },
+      "fonts": {
+        "NewCenturySchlbk-Roman": 5,
+        "NewCenturySchlbk-Italic": 5,
+        "Palatino-Italic": 3,
+        "Palatino-Bold": 1,
+        "Palatino-BoldItalic": 2,
+        "Palatino-Roman": 5,
+        "AvantGarde-BookOblique": 1,
+        "KNMBOP+TimesNewRomanPSMT": 2,
+        "KNMJMB+TimesNewRomanPS-BoldMT": 1
+      }
+    },
+    {
+      "file": "3ff5d64698f58a7a_000359.pdf",
+      "pages": 77,
+      "classes": {
+        "two_column_text": 2,
+        "sparse_or_cover_page": 33,
+        "long_plain_text": 11,
+        "dense_vector_formula_or_chart": 8,
+        "real_table_candidate": 12,
+        "single_column_text": 26,
+        "image_heavy": 6,
+        "colored_bands_or_fills": 5
+      },
+      "fonts": {
+        "KFGEOC+TimesNewRoman,Bold": 68,
+        "KFGEOO+Arial-Black": 1,
+        "KFGFAO+TimesNewRoman,BoldItalic": 18,
+        "KFGFEM+Arial,Bold": 11,
+        "KFGGLH+TimesNewRoman": 76,
+        "KFGHEE+SymbolMT": 32,
+        "KFGJDA+TimesNewRoman,Italic": 19,
+        "KFLEIA+Arial": 7,
+        "KFGGLG+TimesNewRoman": 7,
+        "KFNGFI+LucidaConsole": 1,
+        "KFNGIL+LucidaConsole": 1,
+        "KFGJCP+TimesNewRoman,Italic": 1
+      }
+    },
+    {
+      "file": "422e6d76d26f2115_000338.pdf",
+      "pages": 6,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 3,
+        "single_column_text": 3,
+        "long_plain_text": 4,
+        "multi_column_3plus": 1
+      },
+      "fonts": {
+        "YDYKHW+GillSans-Condensed": 6,
+        "DDHJZM+GillSans-Light": 6,
+        "OEUSXQ+Flood": 1,
+        "IDQIRC+GillSans": 5,
+        "TEDRPG+GillSans-Italic": 1,
+        "Arial": 6,
+        "DBBZZM+GillSans-BoldCondensed": 2,
+        "NDEHJS+GillSans": 5,
+        "IINZAN+GillSans": 1,
+        "YERVHW+GillSans-Bold": 1,
+        "IBPYRC+GillSans-Bold": 1,
+        "TCCMPG+GillSans-Condensed": 1,
+        "DEAUZM+MinionPro-Regular": 1,
+        "YCLLHW+SymbolMT": 1
+      }
+    },
+    {
+      "file": "423126b26b6323ed_000371.pdf",
+      "pages": 10,
+      "classes": {
+        "image_heavy": 6,
+        "colored_bands_or_fills": 2,
+        "two_column_text": 10
+      },
+      "fonts": {
+        "BGJHLG+FrutigerLTStd-Light": 10,
+        "BGJIAF+NPSRawlinsonOT-Book": 10,
+        "BGJIFE+NPSRawlinsonOT-Bold": 10,
+        "BGJIKD+NPSRawlinsonOT-BoldItalic": 2,
+        "TimesNewRomanPSMT": 3,
+        "Arial-BoldMT": 2,
+        "BGKOCA+NPSRawlinsonOT-BookItalic": 7,
+        "ArialMT": 2,
+        "BGMFID+NPSRawlinsonT": 1,
+        "BGOGIJ+NPSRawlinsonOTOld-BookItalic": 1,
+        "BGONPN+NPSRawlinsonOTOld-Book": 1,
+        "BGPCPB+FrutigerLTStd-Bold": 1,
+        "Arial-ItalicMT": 1
+      }
+    },
+    {
+      "file": "44c4c567e806eeea_000340.pdf",
+      "pages": 1,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 1,
+        "real_table_candidate": 1,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "HMGGHJ+TimesNewRomanPSMT": 2,
+        "BLHWBV+TimesNewRomanPS-BoldMT": 1,
+        "BLHWBV+TimesNewRomanPS-BoldItalicMT": 1,
+        "MMPFZZ+TwCenMT-CondensedExtraBold": 1,
+        "MMPFZZ+MyriadPro-Black": 1,
+        "MMPFZZ+MyriadPro-Regular": 1
+      }
+    },
+    {
+      "file": "478ea8d065d5e96c_000760.pdf",
+      "pages": 1,
+      "classes": {
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "HIUNTT+TimesNewRomanPSMT": 1,
+        "NRYNZO+TimesNewRomanPS-BoldMT": 1,
+        "PUGAJI+TimesNewRomanPS-ItalicMT": 1
+      }
+    },
+    {
+      "file": "488c842cd986370c_000590.pdf",
+      "pages": 6,
+      "classes": {
+        "image_heavy": 6,
+        "single_column_text": 4
+      },
+      "fonts": {
+        "Arial": 6,
+        "Arial,Bold": 6,
+        "BookmanOldStyle": 1,
+        "Arial,Italic": 1
+      }
+    },
+    {
+      "file": "4a437ecf25016b5c_000593.pdf",
+      "pages": 17,
+      "classes": {
+        "orientation/landscape_or_rotated": 17,
+        "real_table_candidate": 17,
+        "single_column_text": 5,
+        "two_column_text": 11,
+        "multi_column_3plus": 1
+      },
+      "fonts": {
+        "Arial,Bold": 17,
+        "Arial": 17
+      }
+    },
+    {
+      "file": "4e10a486a034cb74_000366.pdf",
+      "pages": 5,
+      "classes": {
+        "dense_vector_formula_or_chart": 3,
+        "real_table_candidate": 3,
+        "single_column_text": 4,
+        "long_plain_text": 2,
+        "colored_bands_or_fills": 2
+      },
+      "fonts": {
+        "Arial-BoldMT": 1,
+        "TimesNewRomanPS-ItalicMT": 5,
+        "TimesNewRomanPS-BoldMT": 4,
+        "TimesNewRomanPSMT": 5,
+        "Arial-BoldItalicMT": 1,
+        "EBIEKH+SymbolMT": 4,
+        "ArialMT": 4,
+        "TimesNewRomanPS-BoldItalicMT": 4,
+        "CourierNewPS-BoldItalicMT": 1,
+        "CourierNewPSMT": 1,
+        "EBIHCD+Wingdings-Regular": 1
+      }
+    },
+    {
+      "file": "4e4a2d80e91be727_000583.pdf",
+      "pages": 1,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 1,
+        "multi_column_3plus": 1
+      },
+      "fonts": {
+        "BBBAPO+Times-Roman": 1,
+        "BBBAPP+Times-Italic": 1,
+        "BBAPME+Times-Bold": 1,
+        "BBDOIA+ZapfDingbats": 1,
+        "BBAMPC+Helvetica-Compressed": 1,
+        "BBBCIL+Helvetica-Condensed-Light": 1,
+        "BBAPOE+Helvetica": 1
+      }
+    },
+    {
+      "file": "50b07b60071b8dcc_000568.pdf",
+      "pages": 7,
+      "classes": {
+        "single_column_text": 6,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "Times-Bold": 7,
+        "Times-Roman": 7,
+        "Symbol": 1,
+        "Times-Italic": 7
+      }
+    },
+    {
+      "file": "5370aa31c1baee8c_000746.pdf",
+      "pages": 33,
+      "classes": {
+        "single_column_text": 31,
+        "two_column_text": 2
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 33,
+        "CDFEPP+PalatinoLinotype-Bold": 16,
+        "CDFEJP+PalatinoLinotype-Roman": 33,
+        "CDFNIB+PalatinoLinotype-Italic": 3,
+        "CDFEPO+PalatinoLinotype-Bold": 15,
+        "CDFEHP+PalatinoLinotype-Roman": 33,
+        "CDFNIA+PalatinoLinotype-Italic": 3,
+        "ArialMT": 3
+      }
+    },
+    {
+      "file": "537b600fbc4fd62e_000826.pdf",
+      "pages": 27,
+      "classes": {
+        "orientation/landscape_or_rotated": 27,
+        "single_column_text": 22,
+        "colored_bands_or_fills": 6,
+        "real_table_candidate": 19,
+        "two_column_text": 1,
+        "dense_vector_formula_or_chart": 5,
+        "image_heavy": 4
+      },
+      "fonts": {
+        "Arial-BoldMT": 27,
+        "DDBGJA+ArialMT": 8,
+        "DKBAEG+ArialMT": 27,
+        "DDBGJM+Wingdings-Regular": 5,
+        "CourierNewPSMT": 1,
+        "DDCFFO+SymbolMT": 9,
+        "Arial-BoldItalicMT": 1
+      }
+    },
+    {
+      "file": "543b5ad9a1da0c71_000586.pdf",
+      "pages": 1,
+      "classes": {
+        "two_column_text": 1
+      },
+      "fonts": {
+        "NEMNDG+Helvetica": 1,
+        "NEMNKF+GaramondThree-Bold": 2,
+        "NENBLN+NewCenturySchlbk-Italic": 1,
+        "NEMOLD+MIonic": 2,
+        "NENAIA+NewCenturySchlbk-Bold": 1
+      }
+    },
+    {
+      "file": "563d825153fda6b5_000363.pdf",
+      "pages": 105,
+      "classes": {
+        "single_column_text": 103,
+        "sparse_or_cover_page": 2
+      },
+      "fonts": {
+        "AEMNHP+Courier": 105,
+        "AEMNPN+Courier-Bold": 34,
+        "T1": 1,
+        "AEMPNC+Courier-Oblique": 3,
+        "Helvetica-Bold": 1,
+        "Helvetica": 1
+      }
+    },
+    {
+      "file": "577609878d376a40_000571.pdf",
+      "pages": 8,
+      "classes": {
+        "two_column_text": 5,
+        "image_heavy": 2,
+        "single_column_text": 2,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "AdvP497E2": 8,
+        "AdvP497E3": 8,
+        "AdvP497E4": 1,
+        "AdvP44E6F4": 2,
+        "AdvP7DA6": 3,
+        "AdvP3D3256": 2
+      }
+    },
+    {
+      "file": "58fe21359f9caba5_000016.pdf",
+      "pages": 4,
+      "classes": {
+        "image_heavy": 1,
+        "two_column_text": 3,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "IKHCPM+Symbol": 2,
+        "IKHAKC+TimesNewRoman,Bold": 3,
+        "IKHAND+TimesNewRoman,BoldItalic": 1,
+        "IKHBGB+TimesNewRoman": 4,
+        "IKHBJC+TimesNewRoman,Italic": 4
+      }
+    },
+    {
+      "file": "5c283d48083d61c3_000372.pdf",
+      "pages": 20,
+      "classes": {
+        "image_heavy": 9,
+        "two_column_text": 15,
+        "colored_bands_or_fills": 7,
+        "multi_column_3plus": 5
+      },
+      "fonts": {
+        "BOPKBE+Times-Roman": 1,
+        "BOOBCE+TimesNewRomanBdMS": 10,
+        "BONHPD+TimesNewRomanMS": 20,
+        "BONICG+TimesNewRomanBdItMS": 14,
+        "BONICH+TimesNewRomanItMS": 20,
+        "BOPLIE+Helvetica-Bold": 9,
+        "BPCKED+Helvetica": 8,
+        "BPEIMN+TrebuchetMS-Bold": 7,
+        "BPEINP+Trebuchet-BoldItalic": 1,
+        "BPEIPA+TrebuchetMS-Italic": 1,
+        "BPGCHH+Helvetica-Oblique": 1,
+        "BPGDDB+Arial-BoldMS": 2,
+        "BPGCOM+TrebuchetMS": 6,
+        "BPGCON+ArialMS": 3,
+        "BPIJMN+Arial-ItalicMS": 1
+      }
+    },
+    {
+      "file": "5c4ccaaadf5acb5b_000155.pdf",
+      "pages": 41,
+      "classes": {
+        "image_heavy": 15,
+        "dense_vector_formula_or_chart": 11,
+        "colored_bands_or_fills": 11,
+        "single_column_text": 25,
+        "real_table_candidate": 11,
+        "long_plain_text": 7,
+        "sparse_or_cover_page": 3,
+        "orientation/landscape_or_rotated": 2
+      },
+      "fonts": {
+        "AMQEFX+JoannaMT-SemiBold": 1,
+        "LNDSDB+FranklinGothic-Book": 1,
+        "VPBVNH+JoannaMT-SemiBoldItalic": 1,
+        "ArialNarrow-Italic": 30,
+        "ArialMT": 11,
+        "Arial-BoldMT": 20,
+        "TimesNewRomanPSMT": 25,
+        "ArialNarrow": 29,
+        "ArialNarrow-Bold": 11,
+        "ArialNarrow-BoldItalic": 3,
+        "TimesNewRomanPS-BoldMT": 9,
+        "JGFMFF+SymbolMT": 6,
+        "Arial-BoldItalicMT": 3,
+        "TimesNewRomanPS-ItalicMT": 5,
+        "Arial-Black": 2,
+        "JELLNB+Garamond": 8,
+        "JELMEL+Garamond-Bold": 3,
+        "Arial-ItalicMT": 2
+      }
+    },
+    {
+      "file": "5fede028ce2ac66b_000584.pdf",
+      "pages": 87,
+      "classes": {
+        "single_column_text": 58,
+        "sparse_or_cover_page": 1,
+        "long_plain_text": 47,
+        "image_heavy": 28
+      },
+      "fonts": {
+        "BPEDFN+NewCenturySchlbk-Roman": 86,
+        "BPEDGP+Cheltenham-Bold": 1,
+        "BPEDIA+DeVinne": 1,
+        "BPEDJC+AGsddV01": 1,
+        "BPEDKE+Helvetica": 87,
+        "BPEDNH+NewCenturySchlbk-Italic": 4,
+        "BPEEBK+NewCenturySchlbk-Bold": 14
+      }
+    },
+    {
+      "file": "63980ecfaee8ef36_000582.pdf",
+      "pages": 2,
+      "classes": {
+        "image_heavy": 2,
+        "colored_bands_or_fills": 2,
+        "two_column_text": 2,
+        "dense_vector_formula_or_chart": 1,
+        "real_table_candidate": 1
+      },
+      "fonts": {
+        "NOCIVO+Univers-CondensedBold": 2,
+        "NRBDVO+Wingdings-Regular": 1,
+        "IRNEDY+CenturyExpandedBT-Italic": 2,
+        "NRBDVO+CenturyExpandedBT-Roman": 2,
+        "XOZLFU+Univers-CondensedBold": 1
+      }
+    },
+    {
+      "file": "645c314469427544_000854.pdf",
+      "pages": 12,
+      "classes": {
+        "single_column_text": 5,
+        "long_plain_text": 2,
+        "two_column_text": 7,
+        "image_heavy": 2
+      },
+      "fonts": {
+        "Times-Italic": 12,
+        "Times-Bold": 12,
+        "Symbol": 3,
+        "Times-Roman": 12,
+        "Helvetica-Narrow": 3,
+        "Helvetica-Narrow-Bold": 3,
+        "Helvetica": 1
+      }
+    },
+    {
+      "file": "677d1055b3490d27_000135.pdf",
+      "pages": 8,
+      "classes": {
+        "multi_column_3plus": 1,
+        "two_column_text": 7
+      },
+      "fonts": {
+        "NMKFLF+Times-Roman": 12,
+        "NMKFPP+Times-Bold": 8,
+        "NMKGGM+Times-Italic": 6,
+        "NMKIGN+Helvetica-Bold": 1,
+        "T10": 1,
+        "NMKKKI+Symbol": 1,
+        "NMKLPI+SymbolProportionalBT-Regular": 1,
+        "WPMathA": 1
+      }
+    },
+    {
+      "file": "6885cb45c5f01efd_000282.pdf",
+      "pages": 194,
+      "classes": {
+        "image_heavy": 189,
+        "single_column_text": 108,
+        "real_table_candidate": 39,
+        "sparse_or_cover_page": 5,
+        "two_column_text": 5,
+        "scanned_or_fullpage_image": 27,
+        "orientation/landscape_or_rotated": 42,
+        "dense_vector_formula_or_chart": 1
+      },
+      "fonts": {
+        "Times-Roman": 113,
+        "Times-ExtraBold": 13,
+        "Times-Bold": 35,
+        "NewCenturySchlbk-Roman": 12,
+        "Helvetica-Bold": 37,
+        "NewCenturySchlbk-Bold": 11,
+        "Helvetica": 75,
+        "Courier-Bold": 28,
+        "ZapfDingbats": 3,
+        "AvantGarde-Demi": 11,
+        "Bookman-Demi": 11,
+        "AvantGarde-Book": 14,
+        "Helvetica-Black": 24,
+        "Courier": 21,
+        "Palatino-Bold": 17,
+        "Helvetica-BoldOblique": 1,
+        "Palatino-Roman": 3,
+        "Times-BoldItalic": 1,
+        "Helvetica-Narrow-Bold": 7,
+        "Bookman-Light": 12,
+        "Helvetica-Condensed-Black": 9,
+        "Helvetica-Narrow": 6,
+        "Times-Italic": 1,
+        "LetterGothic-Bold": 4,
+        "Palatino-Italic": 1,
+        "Helvetica-Narrow-Oblique": 1,
+        "LetterGothic-BoldSlanted": 1
+      }
+    },
+    {
+      "file": "6a5527311829a104_000336.pdf",
+      "pages": 9,
+      "classes": {
+        "image_heavy": 9,
+        "single_column_text": 9
+      },
+      "fonts": {
+        "ArialMS": 78,
+        "Arial-ItalicMS": 68
+      }
+    },
+    {
+      "file": "6e45e8f4bef915fa_000594.pdf",
+      "pages": 4,
+      "classes": {
+        "single_column_text": 4,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "PHQGHU+TimesNewRoman,Bold": 4,
+        "PHQGHU+TimesNewRoman": 4,
+        "PHQGHU+TimesNewRoman,Italic": 2
+      }
+    },
+    {
+      "file": "6fb58a2350bc50f9_000272.pdf",
+      "pages": 14,
+      "classes": {
+        "single_column_text": 10,
+        "image_heavy": 1,
+        "dense_vector_formula_or_chart": 2,
+        "real_table_candidate": 6,
+        "colored_bands_or_fills": 4,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "BMPINH+Arial,Bold": 1,
+        "BMPIOM+Arial,Bold": 1,
+        "BMPJAM+TimesNewRoman,Bold": 14,
+        "BMPJCM+TimesNewRoman": 14,
+        "BMPJMN+SymbolMT": 10,
+        "BMPLAP+Arial": 4,
+        "BMPJAL+TimesNewRoman,Bold": 2,
+        "BMPJCL+TimesNewRoman": 1,
+        "BNAJOP+TimesNewRoman,Italic": 1
+      }
+    },
+    {
+      "file": "728f34a85f637211_000351.pdf",
+      "pages": 90,
+      "classes": {
+        "sparse_or_cover_page": 11,
+        "single_column_text": 79,
+        "long_plain_text": 4
+      },
+      "fonts": {
+        "TimesNewRoman,Italic": 84,
+        "TimesNewRoman": 90,
+        "TimesNewRoman,Bold": 83,
+        "CGTimes": 9,
+        "TimesNewRoman,BoldItalic": 6
+      }
+    },
+    {
+      "file": "72aae37ab6617508_000739.pdf",
+      "pages": 20,
+      "classes": {
+        "colored_bands_or_fills": 3,
+        "dense_vector_formula_or_chart": 3,
+        "two_column_text": 2,
+        "single_column_text": 13,
+        "long_plain_text": 2,
+        "real_table_candidate": 4,
+        "image_heavy": 7,
+        "sparse_or_cover_page": 2
+      },
+      "fonts": {
+        "EBJCGG+Palatino-Roman": 4,
+        "EBJDCB+Palatino-BoldItalic": 1,
+        "EBJCOO+Symbol": 1,
+        "EBJDKH+Palatino-Bold": 1,
+        "PNLOAJ+TimesNewRoman": 13,
+        "PNLODF+TimesNewRoman,Italic": 1,
+        "PNLOBP+TimesNewRoman,Bold": 10,
+        "PNLOGJ+Arial-BoldMT": 7,
+        "PNLOOD+Arial": 1,
+        "EBKBKJ+Helvetica": 1,
+        "EBKBIG+Times-Roman": 1,
+        "EBKBJI+Helvetica-Bold": 1
+      }
+    },
+    {
+      "file": "76c4dfb49667db90_000013.pdf",
+      "pages": 2,
+      "classes": {
+        "two_column_text": 1,
+        "single_column_text": 1,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "Helvetica-Bold": 4,
+        "OEFBAA+Melior-Bold": 2,
+        "OEFBBM+Melior": 4,
+        "OEFBGD+Melior-Italic": 2,
+        "Helvetica": 2,
+        "OEHOHL+NewCenturySchlbk-Roman": 1
+      }
+    },
+    {
+      "file": "7832f844839ed04e_000010.pdf",
+      "pages": 4,
+      "classes": {
+        "single_column_text": 3,
+        "long_plain_text": 2,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "EEPKIF+TimesNewRoman,Bold": 4,
+        "EEPKKF+TimesNewRoman": 4,
+        "EEPLBP+TimesNewRoman,Italic": 4,
+        "EEPLGH+Arial": 1,
+        "EEPLJL+TimesNewRoman,BoldItalic": 1
+      }
+    },
+    {
+      "file": "7ae3e61af663ae80_000610.pdf",
+      "pages": 13,
+      "classes": {
+        "image_heavy": 1,
+        "two_column_text": 1,
+        "single_column_text": 12,
+        "long_plain_text": 3
+      },
+      "fonts": {
+        "TimesNewRoman,Bold": 5,
+        "TimesNewRoman": 13,
+        "TimesNewRoman,Italic": 1
+      }
+    },
+    {
+      "file": "7b5ffbca92dfdbaf_000745.pdf",
+      "pages": 17,
+      "classes": {
+        "two_column_text": 2,
+        "single_column_text": 14,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "CourierNew": 17,
+        "Arial,Bold": 1,
+        "TimesNewRoman,Bold": 1,
+        "Arial": 1,
+        "CourierNew,Italic": 4
+      }
+    },
+    {
+      "file": "7e8c998142af4b25_000145.pdf",
+      "pages": 6,
+      "classes": {
+        "single_column_text": 3,
+        "long_plain_text": 1,
+        "colored_bands_or_fills": 1,
+        "two_column_text": 1,
+        "dense_vector_formula_or_chart": 1,
+        "real_table_candidate": 1,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "TimesNewRomanPS-ItalicMT": 1,
+        "TimesNewRomanPSMT": 6,
+        "TimesNewRomanPS-BoldMT": 2,
+        "TimesNewRomanPS-BoldItalicMT": 3,
+        "Arial-BoldMT": 1,
+        "ArialMT": 1
+      }
+    },
+    {
+      "file": "7f0d5dffdf7aebaf_000026.pdf",
+      "pages": 5,
+      "classes": {
+        "orientation/landscape_or_rotated": 5,
+        "dense_vector_formula_or_chart": 5,
+        "real_table_candidate": 5,
+        "two_column_text": 1,
+        "single_column_text": 3
+      },
+      "fonts": {
+        "ArialNarrow": 5,
+        "ArialNarrow-Bold": 5
+      }
+    },
+    {
+      "file": "805dd57efabed650_000853.pdf",
+      "pages": 10,
+      "classes": {
+        "single_column_text": 3,
+        "long_plain_text": 1,
+        "two_column_text": 7,
+        "dense_vector_formula_or_chart": 2,
+        "image_heavy": 1
+      },
+      "fonts": {
+        "FAMMPF+TimesNewRomanPS-ItalicMT": 10,
+        "FAMNCG+TimesNewRomanPS-BoldMT": 10,
+        "FAMNDI+TimesNewRomanPSMT": 10,
+        "Times-Roman": 10,
+        "FAMNDJ+SymbolMT": 3,
+        "FAMPBB+ArialNarrow": 4,
+        "FAMPCD+ArialNarrow-Bold": 4,
+        "FAMNEK+ArialMT": 1
+      }
+    },
+    {
+      "file": "823321cb76913c61_000147.pdf",
+      "pages": 4,
+      "classes": {
+        "image_heavy": 4,
+        "single_column_text": 3,
+        "long_plain_text": 3,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 4,
+        "ArialMT": 4,
+        "CourierNewPSMT": 4,
+        "Times-Roman": 4
+      }
+    },
+    {
+      "file": "8a79eb5f1be5fb80_000574.pdf",
+      "pages": 33,
+      "classes": {
+        "single_column_text": 30,
+        "two_column_text": 3
+      },
+      "fonts": {
+        "ISKOHN+BookmanITCLtBT,Bold": 31,
+        "OPAORV+BookmanITCLtBT": 33,
+        "PVWAWH+BookmanITCLtBT,BoldItalic": 25,
+        "QQJSSK+TimesNewRoman": 32,
+        "EXWAAI+TimesNewRoman,BoldItalic": 5,
+        "NECNOR+TimesNewRoman,Bold": 10,
+        "WDSVGQ+BookmanITCLtBT,Italic": 13
+      }
+    },
+    {
+      "file": "8b9839eb4a35aac0_000618.pdf",
+      "pages": 8,
+      "classes": {
+        "colored_bands_or_fills": 5,
+        "single_column_text": 5,
+        "long_plain_text": 1,
+        "real_table_candidate": 1,
+        "two_column_text": 3
+      },
+      "fonts": {
+        "AvalonPlain": 8,
+        "AvalonBold": 8,
+        "TimesNewRomanPSMT": 4,
+        "TimesNewRomanPS-ItalicMT": 4,
+        "TimesNewRomanPS-BoldMT": 2,
+        "Arial-Black": 1,
+        "ArialMT": 4,
+        "Arial-BoldMT": 3
+      }
+    },
+    {
+      "file": "907d3db62fb4a731_000344.pdf",
+      "pages": 1,
+      "classes": {
+        "image_heavy": 1
+      },
+      "fonts": {
+        "IGPQWX+Times-Roman": 1,
+        "ZEHRWX+Helvetica-Bold": 1,
+        "HYFQWX+Helvetica": 1
+      }
+    },
+    {
+      "file": "93913f1b286af0da_000628.pdf",
+      "pages": 17,
+      "classes": {
+        "sparse_or_cover_page": 17
+      },
+      "fonts": {
+        "ArialMT": 17
+      }
+    },
+    {
+      "file": "94627554f72327eb_000631.pdf",
+      "pages": 56,
+      "classes": {
+        "sparse_or_cover_page": 1,
+        "single_column_text": 53,
+        "long_plain_text": 33,
+        "dense_vector_formula_or_chart": 5,
+        "real_table_candidate": 5,
+        "image_heavy": 1,
+        "colored_bands_or_fills": 4,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "Helvetica-BoldOblique": 1,
+        "Helvetica-Bold": 43,
+        "Helvetica": 3,
+        "MJEJFF+WPIconicSymbolsA": 1,
+        "Times-Roman": 55,
+        "Times-Italic": 36,
+        "Times-Bold": 24,
+        "MJEKBC+WPTypographicSymbols": 8
+      }
+    },
+    {
+      "file": "95086825e3fb156e_000166.pdf",
+      "pages": 7,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 7,
+        "dense_vector_formula_or_chart": 7,
+        "real_table_candidate": 7,
+        "single_column_text": 4,
+        "two_column_text": 3
+      },
+      "fonts": {
+        "Verdana,Bold": 2,
+        "TimesNewRoman,Bold": 1,
+        "TimesNewRoman": 7,
+        "TimesNewRoman,Italic": 7,
+        "Times-Roman": 1
+      }
+    },
+    {
+      "file": "95eb64a51258d6b1_000140.pdf",
+      "pages": 2,
+      "classes": {
+        "single_column_text": 2
+      },
+      "fonts": {
+        "EJFFCD+Garamond": 2,
+        "Verdana-Bold": 2,
+        "Verdana": 2,
+        "ArialMT": 2,
+        "Arial-BoldMT": 2,
+        "Arial-BoldItalicMT": 1,
+        "Arial-ItalicMT": 2,
+        "Times-Roman": 2,
+        "EJFGNG+SymbolMT": 2,
+        "EJFHHF+Garamond-Bold": 1
+      }
+    },
+    {
+      "file": "96a80f28f8366209_000751.pdf",
+      "pages": 2,
+      "classes": {
+        "orientation/landscape_or_rotated": 2,
+        "image_heavy": 2,
+        "dense_vector_formula_or_chart": 1,
+        "single_column_text": 1,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "Arial-BoldMT": 2,
+        "ArialMT": 2,
+        "Arial-BoldItalicMT": 1,
+        "TimesNewRomanPS-BoldMT": 2,
+        "TimesNewRomanPS-BoldItalicMT": 1,
+        "TimesNewRomanPSMT": 1
+      }
+    },
+    {
+      "file": "99ec2ff852b8692a_000028.pdf",
+      "pages": 13,
+      "classes": {
+        "sparse_or_cover_page": 2,
+        "single_column_text": 10,
+        "long_plain_text": 6,
+        "two_column_text": 1,
+        "dense_vector_formula_or_chart": 1
+      },
+      "fonts": {
+        "HNBEOL+TimesNewRoman,Bold": 12,
+        "HNBFDL+TimesNewRoman": 13,
+        "HNBHHA+TimesNewRoman,Italic": 7,
+        "HNBICN+CourierNewPSMT": 4,
+        "HNBOEK+TimesNewRoman,BoldItalic": 1
+      }
+    },
+    {
+      "file": "9b24435201eefe1b_000580.pdf",
+      "pages": 9,
+      "classes": {
+        "single_column_text": 1,
+        "sparse_or_cover_page": 8
+      },
+      "fonts": {
+        "FUFOYZ+TimesNewRoman": 9,
+        "GFZVJA+TimesNewRoman,Bold": 1
+      }
+    },
+    {
+      "file": "9b2a97177dec2615_000813.pdf",
+      "pages": 3,
+      "classes": {
+        "sparse_or_cover_page": 2,
+        "single_column_text": 1,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "FDNOEL+TimesNewRoman": 3,
+        "FDNOGA+TimesNewRoman,Bold": 2,
+        "FDNOHC+TimesNewRoman,Italic": 2
+      }
+    },
+    {
+      "file": "9c23f471a7896c13_000196.pdf",
+      "pages": 2,
+      "classes": {
+        "single_column_text": 1,
+        "long_plain_text": 1,
+        "real_table_candidate": 1,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "Helvetica": 3,
+        "Helvetica-Bold": 4,
+        "KMABJL+Melior": 4,
+        "KMABPN+Melior-Italic": 2,
+        "KMABHN+Melior-Bold": 2
+      }
+    },
+    {
+      "file": "9c734e4097e74ec1_000589.pdf",
+      "pages": 31,
+      "classes": {
+        "single_column_text": 25,
+        "two_column_text": 1,
+        "sparse_or_cover_page": 5
+      },
+      "fonts": {
+        "IHAIIM+NewCenturySchlbk-Roman": 1,
+        "IHAIJN+NewCenturySchlbk-Bold": 1,
+        "IHAIPN+OldEnglishTextMT": 1,
+        "IHAJAN+SymbolMT": 1,
+        "IHAJCO+NewCenturySchlbk-Italic": 1,
+        "IGNBLM+NewCenturySchlbk-Roman": 2,
+        "BMLHMA+CenturySchoolbook": 28,
+        "BMLHPE+CenturySchoolbook-Bold": 12,
+        "Times-Roman": 11,
+        "BMLILE+CenturySchoolbook-Italic": 23
+      }
+    },
+    {
+      "file": "9d2cc79506c446c1_000314.pdf",
+      "pages": 7,
+      "classes": {
+        "two_column_text": 7
+      },
+      "fonts": {
+        "IWIZMX+Univers-CondensedBold": 7,
+        "SYLHWD+Times-Roman": 7
+      }
+    },
+    {
+      "file": "9e09e33ee5b3d380_000365.pdf",
+      "pages": 4,
+      "classes": {
+        "single_column_text": 4,
+        "long_plain_text": 4
+      },
+      "fonts": {
+        "PHEMEA+LucidaSans-Bold": 4,
+        "PHEMFA+LucidaSans": 4,
+        "Helvetica": 4,
+        "Helvetica-Bold": 4,
+        "Helvetica-BoldOblique": 2,
+        "Symbol": 1,
+        "Helvetica-Oblique": 1
+      }
+    },
+    {
+      "file": "a1321a605bf40fb5_000349.pdf",
+      "pages": 5,
+      "classes": {
+        "single_column_text": 1,
+        "sparse_or_cover_page": 2,
+        "long_plain_text": 1,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "BBRIHU+Times-Bold": 2,
+        "KGAJSR+Times-Roman": 2,
+        "TimesNewRoman": 3,
+        "TimesNewRoman,Italic": 1,
+        "TimesNewRoman,Bold": 1
+      }
+    },
+    {
+      "file": "a17891eddc4266fa_000137.pdf",
+      "pages": 4,
+      "classes": {
+        "image_heavy": 4,
+        "single_column_text": 2,
+        "orientation/landscape_or_rotated": 2
+      },
+      "fonts": {
+        "Courier-BoldOblique": 4,
+        "Helvetica": 4,
+        "Helvetica-Bold": 4,
+        "Helvetica-Oblique": 4,
+        "Helvetica-BoldOblique": 4,
+        "Times-Roman": 4,
+        "Times-Bold": 4,
+        "Times-Italic": 4,
+        "Times-BoldItalic": 4,
+        "Courier": 4,
+        "Courier-Bold": 4,
+        "Courier-Oblique": 4
+      }
+    },
+    {
+      "file": "a446eaa09efb2112_000578.pdf",
+      "pages": 75,
+      "classes": {
+        "single_column_text": 74,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "Times-Roman": 75,
+        "Times-Bold": 75,
+        "Symbol": 1,
+        "Times-Italic": 70,
+        "Helvetica-Bold": 39,
+        "Times-BoldItalic": 1
+      }
+    },
+    {
+      "file": "a5efe2256efd4284_000270.pdf",
+      "pages": 15,
+      "classes": {
+        "image_heavy": 1,
+        "two_column_text": 1,
+        "single_column_text": 13,
+        "long_plain_text": 7,
+        "dense_vector_formula_or_chart": 5,
+        "real_table_candidate": 5,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "Verdana": 15,
+        "Verdana,Bold": 15,
+        "Tahoma,Bold": 1,
+        "TimesNewRoman": 2,
+        "Verdana,Italic": 8
+      }
+    },
+    {
+      "file": "a8db2468aba38ae3_000755.pdf",
+      "pages": 18,
+      "classes": {
+        "single_column_text": 17,
+        "sparse_or_cover_page": 1,
+        "long_plain_text": 5
+      },
+      "fonts": {
+        "PCFGPO+SASMonospaceBT-Roman": 2,
+        "PCFGOM+Courier-Bold": 18,
+        "TimesNewRomanPSMT": 1,
+        "PCFKCN+Courier": 16,
+        "PCFKDP+CourierNewPSMT": 2,
+        "Times-Roman": 2
+      }
+    },
+    {
+      "file": "a92188dd5fa88ea3_000177.pdf",
+      "pages": 17,
+      "classes": {
+        "image_heavy": 1,
+        "single_column_text": 10,
+        "long_plain_text": 1,
+        "sparse_or_cover_page": 6
+      },
+      "fonts": {
+        "ENNJMO+Arial-BoldMT": 16,
+        "ENNKHJ+Arial-BoldMT": 17,
+        "ENNLBA+ArialMT": 16,
+        "ENNLBB+ArialMT": 17,
+        "TimesNewRomanPS-BoldMT": 1,
+        "ENNPJO+Arial-ItalicMT": 6,
+        "ENNPJP+Arial-ItalicMT": 7,
+        "TimesNewRomanPSMT": 1
+      }
+    },
+    {
+      "file": "ad38a1bb51c144ce_000380.pdf",
+      "pages": 1,
+      "classes": {
+        "colored_bands_or_fills": 1
+      },
+      "fonts": {
+        "XKGHEM+GoudyCatalogueBT-Regular": 1,
+        "CYELWC+Impact": 1
+      }
+    },
+    {
+      "file": "b188c5045196557d_000572.pdf",
+      "pages": 8,
+      "classes": {
+        "colored_bands_or_fills": 2,
+        "real_table_candidate": 3,
+        "single_column_text": 8,
+        "long_plain_text": 2,
+        "image_heavy": 1,
+        "dense_vector_formula_or_chart": 2
+      },
+      "fonts": {
+        "Frutiger-Cn": 8,
+        "Frutiger-BoldCn": 8,
+        "Frutiger-BlackCn": 1,
+        "BulmerMT": 8,
+        "BulmerMT,Bold": 4,
+        "BulmerMT,Italic": 5,
+        "Symbol": 2,
+        "ArialMT": 2
+      }
+    },
+    {
+      "file": "b19ae4b2c5dd66c7_000770.pdf",
+      "pages": 28,
+      "classes": {
+        "single_column_text": 26,
+        "sparse_or_cover_page": 2
+      },
+      "fonts": {
+        "Courier": 28,
+        "Courier-Bold": 1,
+        "TimesNewRoman": 11,
+        "Arial": 2
+      }
+    },
+    {
+      "file": "b2cd28c25c2c9d7b_000346.pdf",
+      "pages": 1,
+      "classes": {
+        "image_heavy": 1,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "GVDQXO+TTE15F1578t00": 1,
+        "YBFRXO+Times-BoldItalic": 1,
+        "HDNQXO+Times-Roman": 1
+      }
+    },
+    {
+      "file": "b3eba9bc82a22181_000816.pdf",
+      "pages": 3,
+      "classes": {
+        "real_table_candidate": 3,
+        "single_column_text": 3
+      },
+      "fonts": {
+        "Helvetica": 3,
+        "Helvetica-Bold": 3,
+        "T1": 3
+      }
+    },
+    {
+      "file": "b78fa1c8d1db3bfe_000370.pdf",
+      "pages": 8,
+      "classes": {
+        "single_column_text": 4,
+        "long_plain_text": 5,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "TimesNewRoman": 8,
+        "Arial": 5,
+        "CourierNewPSMT": 4,
+        "TimesNewRoman,Bold": 8,
+        "TimesNewRoman,BoldItalic": 2,
+        "TimesNewRoman,Italic": 2,
+        "DLJFBF+SymbolMT": 3
+      }
+    },
+    {
+      "file": "b7f8ffae8ccd7c58_000149.pdf",
+      "pages": 12,
+      "classes": {
+        "single_column_text": 11,
+        "image_heavy": 1,
+        "two_column_text": 1,
+        "dense_vector_formula_or_chart": 1,
+        "long_plain_text": 2
+      },
+      "fonts": {
+        "SQAMPD+Times-Bold": 12,
+        "ZNOVOP+Myriad-Bold": 9,
+        "RDHTBF+Myriad-BoldItalic": 1,
+        "YOKGAR+AGaramond-SemiboldItalic": 5,
+        "NMMFXN+Symbol": 1,
+        "GWVIDB+Myriad-Roman": 12,
+        "ZGRJJP+Garamond-LightCondensedItalic": 4,
+        "OELKLL+Myriad-Italic": 5,
+        "GRPRIB+Garamond-LightCondensed": 2
+      }
+    },
+    {
+      "file": "b8dccae7f2515322_000333.pdf",
+      "pages": 7,
+      "classes": {
+        "sparse_or_cover_page": 2,
+        "single_column_text": 4,
+        "image_heavy": 1
+      },
+      "fonts": {
+        "Times-Bold": 6,
+        "Times-Roman": 8,
+        "Times-BoldItalic": 1,
+        "Times-Italic": 1,
+        "Symbol": 2,
+        "Helvetica": 2
+      }
+    },
+    {
+      "file": "b8ecadbfcdb9f4ef_000163.pdf",
+      "pages": 7,
+      "classes": {
+        "image_heavy": 7,
+        "orientation/landscape_or_rotated": 5,
+        "colored_bands_or_fills": 5,
+        "dense_vector_formula_or_chart": 1,
+        "two_column_text": 2,
+        "single_column_text": 3,
+        "long_plain_text": 3,
+        "multi_column_3plus": 1,
+        "real_table_candidate": 1
+      },
+      "fonts": {
+        "IRKSVH+MyriadPro-Black-SC750": 1,
+        "IRKSVH+MyriadPro-Black": 6,
+        "TSXGTL+AJensonPro-Regular": 7,
+        "YSGFLB+AJensonPro-Semibold": 1,
+        "NRTRNX+Wingdings-Regular": 4,
+        "TSXGTL+AJensonPro-Bold": 1,
+        "TSXGTL+AJensonPro-It": 5,
+        "DPVODR+AJensonPro-BoldIt": 6,
+        "DPVODR+MyriadPro-Bold": 4,
+        "NRTRNX+MyriadPro-BlackCond": 1,
+        "NRTRNX+MyriadPro-Cond": 2,
+        "YSGFLB+MyriadPro-CondIt": 1,
+        "YSGFLB+AGaramondPro-Bold": 1,
+        "YSGFLB+AGaramondPro-Semibold": 1,
+        "YSGFLB+MyriadPro-Semibold": 3,
+        "IPENVH+AJensonPro-Lt": 4,
+        "IPENVH+AJensonPro-SemiboldIt": 1,
+        "IPENVH+Tahoma": 1,
+        "SRCVFN+LucidaConsole": 1,
+        "DSPEDR+Arial-Black": 1,
+        "SRCVFN+RageItalic": 1,
+        "YQAALB+MyriadPro-SemiboldIt": 1,
+        "DSPEDR+MinionPro-Regular": 1,
+        "NPSMNX+MinionPro-Bold": 1,
+        "YQAALB+MinionPro-It": 1,
+        "ISDDVH+MyriadPro-SemiboldCond": 1,
+        "ISDDVH+MyriadPro-BoldIt": 1,
+        "ISDDVH+Garamond-Book": 1,
+        "ISDDVH+CaflischScriptPro-Regular": 1,
+        "ISDDVH+MyriadPro-Light": 1
+      }
+    },
+    {
+      "file": "b93260f763d014ac_000168.pdf",
+      "pages": 25,
+      "classes": {
+        "sparse_or_cover_page": 3,
+        "image_heavy": 3,
+        "colored_bands_or_fills": 14,
+        "single_column_text": 20,
+        "two_column_text": 1,
+        "dense_vector_formula_or_chart": 3,
+        "long_plain_text": 10
+      },
+      "fonts": {
+        "Arial-ItalicMT": 1,
+        "ArialMT": 1,
+        "Times-Roman": 21,
+        "AJILFM+Helvetica-Condensed-Black": 22,
+        "DJPDPA+Helvetica-Condensed": 22,
+        "Times-Italic": 18,
+        "DKBINK+Helvetica-Condensed-Bold": 20,
+        "Times-BoldItalic": 8,
+        "Times-Bold": 10,
+        "ZapfDingbats": 6
+      }
+    },
+    {
+      "file": "bab4da21c0b4d9e5_000747.pdf",
+      "pages": 20,
+      "classes": {
+        "single_column_text": 9,
+        "long_plain_text": 3,
+        "sparse_or_cover_page": 11
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 20,
+        "TimesNewRomanPS-BoldMT": 4,
+        "TimesNewRomanPS-ItalicMT": 17,
+        "ArialMT": 3
+      }
+    },
+    {
+      "file": "bb4435c3c431f5b6_000630.pdf",
+      "pages": 50,
+      "classes": {
+        "sparse_or_cover_page": 1,
+        "single_column_text": 47,
+        "long_plain_text": 28,
+        "dense_vector_formula_or_chart": 5,
+        "real_table_candidate": 5,
+        "image_heavy": 1,
+        "colored_bands_or_fills": 4,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "Helvetica-BoldOblique": 1,
+        "Helvetica-Bold": 37,
+        "Helvetica": 3,
+        "LBEIAM+WPIconicSymbolsA": 1,
+        "Times-Roman": 49,
+        "Times-Italic": 30,
+        "Times-Bold": 7,
+        "LBEJFG+WPTypographicSymbols": 8,
+        "Times-BoldItalic": 1
+      }
+    },
+    {
+      "file": "bc44bd5e4103696b_000674.pdf",
+      "pages": 1000,
+      "classes": {
+        "single_column_text": 499,
+        "sparse_or_cover_page": 501
+      },
+      "fonts": {
+        "TimesNewRomanPS-BoldMT": 500,
+        "TimesNewRomanPSMT": 1000
+      }
+    },
+    {
+      "file": "bdd62b32cf5211cd_000142.pdf",
+      "pages": 5,
+      "classes": {
+        "image_heavy": 2,
+        "single_column_text": 2,
+        "two_column_text": 3,
+        "colored_bands_or_fills": 1
+      },
+      "fonts": {
+        "HHPKME+SandRegular": 5,
+        "Times-Roman": 5,
+        "HBMIVL+FranklinGotITC-DemiItalic": 5,
+        "JPQXEO+AGaramond-Semibold": 1,
+        "KVEUSF+AGaramond-SemiboldItalic": 1,
+        "YNRZMR+AGaramond-Regular": 5,
+        "DXMYEI+Arial-ItalicMT": 1,
+        "SWZUIV+AGaramond-Italic": 1,
+        "FIVFEU+Helvetica-Oblique": 4,
+        "YNBHXQ+FranklinGotITC-Demi": 3,
+        "KGZIQP+AGaramond-Italic": 2,
+        "TIEYUV+Helvetica": 2,
+        "MPSOYA+Helvetica-BoldOblique": 1,
+        "CQACOI+FranklinGotMdITC-Italic": 1
+      }
+    },
+    {
+      "file": "c053d8942f0f40f1_000761.pdf",
+      "pages": 25,
+      "classes": {
+        "sparse_or_cover_page": 15,
+        "single_column_text": 6,
+        "image_heavy": 4
+      },
+      "fonts": {
+        "BNVUPO+Times-Bold": 3,
+        "AFLOBQ+Times-Italic": 1,
+        "CVFADM+Times-Roman": 24,
+        "ZXBINS+TimesNewRomanPSMT": 4
+      }
+    },
+    {
+      "file": "c09898bf4ab58a9d_000280.pdf",
+      "pages": 8,
+      "classes": {
+        "image_heavy": 2,
+        "colored_bands_or_fills": 1,
+        "dense_vector_formula_or_chart": 3,
+        "real_table_candidate": 4,
+        "multi_column_3plus": 1,
+        "two_column_text": 6,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "JGJDBC+TimesNewRoman,Bold": 1,
+        "JGJDCD+TimesNewRoman,Bold": 4,
+        "JGJDEE+TimesNewRoman": 8,
+        "JGJDEG+TimesNewRoman,Italic": 5,
+        "JGJDMF+Arial": 8,
+        "VLUWUI+TimesNewRomanPS-Bold": 8,
+        "KNBDRE+TimesNewRomanPS-Bold": 8,
+        "JGJDDD+TimesNewRoman": 4,
+        "JGJEOP+SymbolMT": 6
+      }
+    },
+    {
+      "file": "c2c40f8ab1eee4ec_000208.pdf",
+      "pages": 76,
+      "classes": {
+        "image_heavy": 76,
+        "real_table_candidate": 16,
+        "two_column_text": 49,
+        "single_column_text": 22,
+        "multi_column_3plus": 5,
+        "colored_bands_or_fills": 5,
+        "dense_vector_formula_or_chart": 1,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "OXBEIE+ArialMT": 23,
+        "NKRYUG+ArialNarrow": 63,
+        "TLZIAU+MyriadPro-Cond": 75,
+        "QNVQKA+MyriadPro-BoldCond": 71,
+        "PFLKWC+MyriadPro-Regular": 75,
+        "OXBEIE+MyriadPro-SemiboldCond": 76,
+        "OXBEIE+MyriadPro-Bold": 8,
+        "NKRYUG+Arial-ItalicMT": 41,
+        "MCHSGI+Symbol": 3,
+        "NKRYUG+MyriadPro-It": 6,
+        "MCHSGI+Myriad-Roman": 9,
+        "MCHSGI+Myriad-Italic": 1,
+        "MCHSGI+ArialNarrow-Italic": 2,
+        "FGLCMW+ArialNarrow": 24,
+        "DQRQKA+Symbol": 3,
+        "DQRQKA+Myriad-Bold": 1,
+        "EJQWYY+MyriadPro-Regular": 11,
+        "DBGQKA+ArialNarrow": 19,
+        "CTWKWC+ArialMT": 1,
+        "CTWKWC+Helvetica": 1,
+        "BLMEIE+MyriadPro-Black": 1,
+        "BLMEIE+Geneva": 2,
+        "BLMEIE+Times-Italic": 1,
+        "BLMEIE+Symbol": 2,
+        "BLMEIE+TimesNewRomanPSMT": 1,
+        "ZVSSGI+TimesNewRomanPS-BoldMT": 1,
+        "YNIMSK+ArialNarrow-Bold": 1
+      }
+    },
+    {
+      "file": "c32303914b3984b7_000859.pdf",
+      "pages": 23,
+      "classes": {
+        "single_column_text": 3,
+        "orientation/landscape_or_rotated": 21,
+        "image_heavy": 21,
+        "colored_bands_or_fills": 21,
+        "two_column_text": 2,
+        "real_table_candidate": 7,
+        "dense_vector_formula_or_chart": 2
+      },
+      "fonts": {
+        "TimesNewRoman,Bold": 23,
+        "TimesNewRoman": 22,
+        "ZapfDingbats": 12,
+        "Arial,Bold": 9,
+        "ArialBlack": 1,
+        "Arial": 4
+      }
+    },
+    {
+      "file": "c6df45d7788b8473_000025.pdf",
+      "pages": 4,
+      "classes": {
+        "image_heavy": 1,
+        "two_column_text": 4
+      },
+      "fonts": {
+        "IJMPFJ+Symbol": 1,
+        "IJMMGD+TimesNewRoman,Bold": 4,
+        "IJMMKD+TimesNewRoman,BoldItalic": 1,
+        "IJMMPE+TimesNewRoman": 4,
+        "IJMNEE+TimesNewRoman,Italic": 4,
+        "IJNCLG+BookAntiqua,Italic": 1
+      }
+    },
+    {
+      "file": "c8270912281ff72e_000825.pdf",
+      "pages": 1,
+      "classes": {
+        "single_column_text": 1,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "CHHBEH+MIonic": 2,
+        "CHHCLL+AvantGarde-Demi": 2,
+        "CHHCNL+NewCenturySchlbk-Bold": 2,
+        "Helvetica": 1,
+        "CHHBGJ+MIonic-Italic": 1
+      }
+    },
+    {
+      "file": "ca1b1ebe01729454_000343.pdf",
+      "pages": 30,
+      "classes": {
+        "two_column_text": 1,
+        "single_column_text": 29
+      },
+      "fonts": {
+        "FPEEDJ+Courier": 30,
+        "FPEEDK+Courier-Bold": 3,
+        "TimesNewRoman": 14,
+        "FPEEGK+Courier-Oblique": 1
+      }
+    },
+    {
+      "file": "cb3536e7070a8a08_000341.pdf",
+      "pages": 6,
+      "classes": {
+        "colored_bands_or_fills": 6,
+        "false_table_columns_candidate": 3,
+        "multi_column_3plus": 4,
+        "two_column_text": 2,
+        "real_table_candidate": 2
+      },
+      "fonts": {
+        "AvantGarde-Book": 9,
+        "AvantGarde-Demi": 5,
+        "Times-Roman": 6,
+        "Times-BoldItalic": 4,
+        "Times-Italic": 5
+      }
+    },
+    {
+      "file": "cc47261dc72cfa43_000753.pdf",
+      "pages": 3,
+      "classes": {
+        "image_heavy": 2,
+        "colored_bands_or_fills": 2,
+        "dense_vector_formula_or_chart": 2,
+        "real_table_candidate": 2,
+        "single_column_text": 1,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "HGNCBB+TimesNewRoman": 3,
+        "HGNCFB+SymbolMT": 3,
+        "HGNDAO+Arial": 2,
+        "HGNDPL+Arial,Bold": 2
+      }
+    },
+    {
+      "file": "cddc0da7b710c500_000262.pdf",
+      "pages": 11,
+      "classes": {
+        "image_heavy": 8,
+        "colored_bands_or_fills": 4,
+        "real_table_candidate": 4,
+        "two_column_text": 4,
+        "multi_column_3plus": 2,
+        "orientation/landscape_or_rotated": 1,
+        "false_table_columns_candidate": 1,
+        "single_column_text": 4,
+        "long_plain_text": 1
+      },
+      "fonts": {
+        "StoneSans": 1,
+        "StoneSans-BoldItalic": 11,
+        "StoneSerif-Bold": 1,
+        "StoneSerif-BoldItalic": 1,
+        "StoneSans-Semibold": 10,
+        "StoneInformal-Semibold": 5,
+        "StoneInformal-SemiboldItalic": 10,
+        "StoneInformal": 10,
+        "StoneSerif-SemiboldItalic": 7,
+        "StoneSerif-Semibold": 7,
+        "Helvetica-Bold": 2,
+        "StoneInformal-Italic": 7,
+        "Palatino-BoldItalic": 1,
+        "Palatino-Italic": 1
+      }
+    },
+    {
+      "file": "d105f0e9c51f20c7_000671.pdf",
+      "pages": 19,
+      "classes": {
+        "image_heavy": 2,
+        "two_column_text": 18,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "AHHOMM+ArialMT": 1,
+        "AHHOEL+AdvP41153C": 19,
+        "Times-Roman": 19,
+        "AHHOFL+AdvP4B2E3F": 19,
+        "AHHOFM+AdvP46E831": 1,
+        "AHHOGN+AdvPi3": 1,
+        "AHHPBL+AdvP4A213B": 10,
+        "AHJNJB+AdvP4C4E51": 1
+      }
+    },
+    {
+      "file": "d2a4eb9c41a0fabd_000159.pdf",
+      "pages": 147,
+      "classes": {
+        "sparse_or_cover_page": 11,
+        "long_plain_text": 26,
+        "colored_bands_or_fills": 61,
+        "dense_vector_formula_or_chart": 57,
+        "real_table_candidate": 80,
+        "two_column_text": 6,
+        "single_column_text": 109,
+        "image_heavy": 24,
+        "orientation/landscape_or_rotated": 18
+      },
+      "fonts": {
+        "BPMMPA+TimesNewRomanPSMT": 120,
+        "BPMNAB+TimesNewRomanPS-BoldMT": 119,
+        "TimesNewRomanPS-BoldItalicMT": 118,
+        "TimesNewRomanPS-ItalicMT": 15,
+        "CACJCC+SymbolMT": 13,
+        "ArialMT": 46,
+        "Arial-BoldMT": 80,
+        "Verdana": 1,
+        "BPMMKB+TimesNewRomanPSMT": 2,
+        "BPMNAA+TimesNewRomanPS-BoldMT": 3,
+        "CourierNewPSMT": 2,
+        "Arial-ItalicMT": 27,
+        "Arial-BoldItalicMT": 27
+      }
+    },
+    {
+      "file": "d5c2ba7209357790_000141.pdf",
+      "pages": 25,
+      "classes": {
+        "sparse_or_cover_page": 9,
+        "single_column_text": 8,
+        "long_plain_text": 3,
+        "real_table_candidate": 7,
+        "two_column_text": 1,
+        "dense_vector_formula_or_chart": 6,
+        "image_heavy": 1
+      },
+      "fonts": {
+        "AJDCGG+TimesNewRoman": 25,
+        "AJDCHM+TimesNewRoman,Bold": 24,
+        "AJDCNI+TimesNewRoman,Italic": 3
+      }
+    },
+    {
+      "file": "d7d1994af83d5fce_000737.pdf",
+      "pages": 59,
+      "classes": {
+        "orientation/landscape_or_rotated": 59,
+        "image_heavy": 17,
+        "single_column_text": 32,
+        "colored_bands_or_fills": 5,
+        "two_column_text": 2,
+        "real_table_candidate": 2,
+        "dense_vector_formula_or_chart": 1
+      },
+      "fonts": {
+        "ZXIKGS+ArialMT": 59,
+        "PCDABG+Arial-BoldMT": 59,
+        "FHNKCY+Arial-BoldItalicMT": 4,
+        "DMTHKZ+ArialMT": 1,
+        "DMTHKZ+Times-Roman": 1,
+        "PCDIZU+Arial-ItalicMT": 2,
+        "FPFIKZ+Wingdings": 1
+      }
+    },
+    {
+      "file": "db2f05a82bf23320_000189.pdf",
+      "pages": 7,
+      "classes": {
+        "single_column_text": 3,
+        "long_plain_text": 3,
+        "colored_bands_or_fills": 1,
+        "dense_vector_formula_or_chart": 1,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 7,
+        "TimesNewRomanPS-BoldMT": 7,
+        "TimesNewRomanPS-ItalicMT": 5,
+        "Arial-BoldMT": 1,
+        "ArialMT": 1
+      }
+    },
+    {
+      "file": "dc1c4231853496f8_000843.pdf",
+      "pages": 4,
+      "classes": {
+        "single_column_text": 3,
+        "long_plain_text": 3
+      },
+      "fonts": {
+        "NHBPOO+TimesNewRoman,Bold": 4,
+        "NHBPLA+TimesNewRoman": 4,
+        "NHCBJO+Wingdings-Regular": 2,
+        "NHCBLO+Arial": 2
+      }
+    },
+    {
+      "file": "dc738585d318b299_000019.pdf",
+      "pages": 3,
+      "classes": {
+        "image_heavy": 1,
+        "two_column_text": 1,
+        "single_column_text": 1,
+        "sparse_or_cover_page": 1
+      },
+      "fonts": {
+        "TimesNewRomanPS-BoldMT": 3,
+        "TimesNewRomanPS-ItalicMT": 1,
+        "TimesNewRomanPSMT": 3,
+        "DIJOLJ+SymbolMT": 2,
+        "ArialMT": 2
+      }
+    },
+    {
+      "file": "df31661421b7acec_000176.pdf",
+      "pages": 9,
+      "classes": {
+        "orientation/landscape_or_rotated": 9,
+        "real_table_candidate": 9,
+        "two_column_text": 2,
+        "single_column_text": 2
+      },
+      "fonts": {
+        "Arial-BoldMT": 1,
+        "ArialMT": 9
+      }
+    },
+    {
+      "file": "dfa3b40bd8422184_000024.pdf",
+      "pages": 1,
+      "classes": {
+        "colored_bands_or_fills": 1,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "Times-Roman": 1,
+        "Helvetica-Narrow": 1,
+        "Times-Bold": 1,
+        "Times-Italic": 1,
+        "Helvetica-Bold": 1,
+        "Helvetica": 1
+      }
+    },
+    {
+      "file": "e03fb6c45305fb13_000588.pdf",
+      "pages": 1,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 1,
+        "real_table_candidate": 1,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "GCIHHF+Helvetica": 1,
+        "GCIHIA+Helvetica-Bold": 1,
+        "GCMAHJ+TT123CO00": 1,
+        "GCMAIO+TT123FO00": 1,
+        "GCMAIP+TT1242O00": 1,
+        "GDACOA+TT125DO00": 1
+      }
+    },
+    {
+      "file": "e39e9715f520c201_000358.pdf",
+      "pages": 52,
+      "classes": {
+        "colored_bands_or_fills": 1,
+        "single_column_text": 42,
+        "sparse_or_cover_page": 8,
+        "long_plain_text": 19,
+        "dense_vector_formula_or_chart": 9,
+        "real_table_candidate": 9,
+        "image_heavy": 1
+      },
+      "fonts": {
+        "TimesNewRoman,Bold": 34,
+        "Arial,Bold": 1,
+        "TimesNewRoman": 49,
+        "Arial": 2,
+        "TimesNewRoman,Italic": 6,
+        "Symbol": 5
+      }
+    },
+    {
+      "file": "e635a6241b0645cd_000146.pdf",
+      "pages": 1,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 1,
+        "dense_vector_formula_or_chart": 1,
+        "two_column_text": 1
+      },
+      "fonts": {
+        "NTYJCG+Univers-Condensed": 1,
+        "LDEXAK+Univers-CondensedBold": 1,
+        "LDEXAK+Univers-CondensedOblique": 1
+      }
+    },
+    {
+      "file": "e949c0c707495317_000763.pdf",
+      "pages": 5,
+      "classes": {
+        "sparse_or_cover_page": 2,
+        "dense_vector_formula_or_chart": 3,
+        "real_table_candidate": 3,
+        "two_column_text": 1,
+        "single_column_text": 2
+      },
+      "fonts": {
+        "TimesNewRoman,Bold": 5,
+        "TimesNewRoman": 5,
+        "TimesNewRoman,BoldItalic": 2,
+        "TimesNewRoman,Italic": 2
+      }
+    },
+    {
+      "file": "eca0f217f9fdbc5f_000015.pdf",
+      "pages": 2,
+      "classes": {
+        "two_column_text": 2
+      },
+      "fonts": {
+        "IEBFDB+Helvetica-Bold": 4,
+        "IEBFJA+Melior": 4,
+        "IEBFOF+Melior-Italic": 2,
+        "IEBFAB+Helvetica": 2,
+        "IEBFGF+Melior-Bold": 2,
+        "IEBNEB+Symbol": 1
+      }
+    },
+    {
+      "file": "ed65a432e4091cf9_000018.pdf",
+      "pages": 9,
+      "classes": {
+        "colored_bands_or_fills": 2,
+        "real_table_candidate": 9,
+        "single_column_text": 4,
+        "two_column_text": 5
+      },
+      "fonts": {
+        "TimesNewRoman,Bold": 9,
+        "Arial": 20,
+        "TimesNewRoman": 9,
+        "Courier": 9,
+        "Helvetica": 9,
+        "ZapfDingbats": 9,
+        "Symbol": 1,
+        "Helvetica-Bold": 1
+      }
+    },
+    {
+      "file": "f075afba278eaa8a_000269.pdf",
+      "pages": 2,
+      "classes": {
+        "image_heavy": 2,
+        "two_column_text": 1,
+        "single_column_text": 1
+      },
+      "fonts": {
+        "EEKFEY+MyriadPro-Cond": 2,
+        "EEKFEY+MyriadPro-BoldCond": 2,
+        "EEKFEY+MyriadPro-Regular": 2,
+        "DRAZQA+MyriadPro-SemiboldCond": 2,
+        "DRAZQA+ArialNarrow": 1,
+        "DRAZQA+Arial-ItalicMT": 1
+      }
+    },
+    {
+      "file": "f1fd2c0745fa1338_000834.pdf",
+      "pages": 5,
+      "classes": {
+        "single_column_text": 3,
+        "colored_bands_or_fills": 1,
+        "dense_vector_formula_or_chart": 1,
+        "real_table_candidate": 1,
+        "sparse_or_cover_page": 2
+      },
+      "fonts": {
+        "TimesNewRoman": 3,
+        "TimesNewRoman,Bold": 3,
+        "TimesNewRoman,BoldItalic": 1,
+        "IKNJNI+DeVinne": 2,
+        "IKNKAP+Cheltenham-Bold": 1,
+        "IKNKDL+DeVinne-Italic": 1,
+        "IKNKIP+Times-Roman": 2,
+        "IKNKKM+NewCenturySchlbk-Bold": 2,
+        "IKNKOG+Helvetica": 2,
+        "IKNLCE+Symbol": 1,
+        "IKNLIC+BGsddV01": 1
+      }
+    },
+    {
+      "file": "f32895aa7fb102d2_000807.pdf",
+      "pages": 58,
+      "classes": {
+        "sparse_or_cover_page": 9,
+        "single_column_text": 38,
+        "image_heavy": 6,
+        "two_column_text": 5,
+        "dense_vector_formula_or_chart": 3
+      },
+      "fonts": {
+        "PLJOWH+Helvetica-Black": 2,
+        "Helvetica": 2,
+        "DWCTCE+TimesNewRoman,Bold": 5,
+        "KJKNWF+TimesNewRoman": 5,
+        "AJXBGZ+TimesNewRoman,Bold": 2,
+        "SWEMNP+TimesNewRoman": 2,
+        "VDLHEW+TimesNewRoman,Italic": 1,
+        "BDCGNF+Times-Bold": 14,
+        "BDCGOA+Times-Roman": 14,
+        "BDCHAK+Times-BoldItalic": 5,
+        "BDCIAP+WP.MathAb094": 1,
+        "BDCIBK+WP.MathA094": 2,
+        "BDCKCO+Times-Italic": 3,
+        "LFBGAY+TimesNewRoman,Bold": 5,
+        "BGZJWR+TimesNewRoman": 5,
+        "QCGDIG+TimesNewRoman,BoldItalic": 1,
+        "MXGDYQ+TimesNewRoman,Italic": 2,
+        "NDRXPA+TimesNewRoman,Bold": 19,
+        "BZRANE+TimesNewRoman": 19,
+        "WFSFYW+TimesNewRoman,Italic": 2,
+        "VUBOPD+TimesNewRoman,BoldItalic": 2,
+        "KPMFTV+TimesNewRoman,Bold": 8,
+        "JMLZEP+TimesNewRoman": 8,
+        "FRUNWI+TimesNewRoman,BoldItalic": 3,
+        "SIKSWU+TimesNewRoman,Italic": 3,
+        "UBOJKN+TimesNewRoman,Bold": 3,
+        "WIGMPF+TimesNewRoman": 3,
+        "NFQIET+TimesNewRoman,Italic": 3
+      }
+    },
+    {
+      "file": "f3cae3ca271d1950_000444.pdf",
+      "pages": 19,
+      "classes": {
+        "image_heavy": 19,
+        "scanned_or_fullpage_image": 1,
+        "single_column_text": 12,
+        "long_plain_text": 2,
+        "two_column_text": 5
+      },
+      "fonts": {
+        "NewCenturySchlbk-Roman": 18,
+        "Times-Bold": 18,
+        "Helvetica": 15,
+        "Courier": 18,
+        "Bookman-Light": 15,
+        "Times-Italic": 6,
+        "Helvetica-Condensed-BlackObl": 1,
+        "Courier-BoldOblique": 13,
+        "AvantGarde-Book": 9,
+        "Helvetica-Bold": 8,
+        "Helvetica-BlackOblique": 7,
+        "Helvetica-Black": 7,
+        "Bookman-Demi": 5,
+        "ZapfDingbats": 1,
+        "LetterGothic-Bold": 5,
+        "Times-Roman": 9,
+        "LetterGothic": 1,
+        "Courier-Bold": 6,
+        "Palatino-BoldItalic": 4,
+        "NewCenturySchlbk-Bold": 3,
+        "AvantGarde-Demi": 3,
+        "Helvetica-Condensed-Black": 1,
+        "Palatino-Roman": 1
+      }
+    },
+    {
+      "file": "f4d66338663f5b17_000817.pdf",
+      "pages": 2,
+      "classes": {
+        "colored_bands_or_fills": 2,
+        "dense_vector_formula_or_chart": 1,
+        "real_table_candidate": 1,
+        "single_column_text": 2
+      },
+      "fonts": {
+        "ArialMT": 2,
+        "Arial-BoldMT": 2,
+        "Arial-Black": 2,
+        "Arial-ItalicMT": 2
+      }
+    },
+    {
+      "file": "f51fc895ceac979f_000762.pdf",
+      "pages": 112,
+      "classes": {
+        "colored_bands_or_fills": 7,
+        "dense_vector_formula_or_chart": 9,
+        "sparse_or_cover_page": 31,
+        "single_column_text": 47,
+        "long_plain_text": 23,
+        "image_heavy": 17,
+        "real_table_candidate": 19,
+        "two_column_text": 6
+      },
+      "fonts": {
+        "TimesNewRomanPSMT": 112,
+        "TimesNewRomanPS-BoldItalicMT": 2,
+        "TimesNewRomanPS-ItalicMT": 23,
+        "TimesNewRomanPS-BoldMT": 85,
+        "ADKBEN+SymbolMT": 9,
+        "Arial-BoldMT": 17,
+        "ArialMT": 24,
+        "Arial-BoldItalicMT": 1,
+        "BMOHDA+ComicSansMS": 2,
+        "NGMMKJ+BookmanOldStyle-BoldItalic": 1,
+        "NHABHJ+ArialUnicodeMS": 1,
+        "NHAMHB+SymbolMT": 1,
+        "CAIMPB+SymbolMT": 5,
+        "CAKEGD+ArialUnicodeMS": 2,
+        "CAKELE+Wingdings-Regular": 1,
+        "CAKFFG+Garamond": 2,
+        "CDFOLJ+SymbolMT": 6
+      }
+    },
+    {
+      "file": "f61c756ffdefc16b_000379.pdf",
+      "pages": 3,
+      "classes": {
+        "image_heavy": 1,
+        "colored_bands_or_fills": 1,
+        "single_column_text": 1,
+        "two_column_text": 2
+      },
+      "fonts": {
+        "HGAJKA+Verdana-Bold": 3,
+        "TimesNewRomanPSMT": 3,
+        "HGAIHD+Verdana": 3,
+        "HGAIGD+Verdana": 3,
+        "HGAJJP+Verdana-Bold": 3,
+        "HGAJPB+SymbolMT": 3,
+        "ArialMT": 3,
+        "HGALLK+Verdana-BoldItalic": 1,
+        "HGALNM+Verdana-Italic": 1,
+        "HGALLJ+Verdana-BoldItalic": 1,
+        "HGALNL+Verdana-Italic": 1
+      }
+    },
+    {
+      "file": "feefc12219a2d95a_000585.pdf",
+      "pages": 6,
+      "classes": {
+        "single_column_text": 4,
+        "long_plain_text": 2,
+        "colored_bands_or_fills": 1,
+        "sparse_or_cover_page": 2
+      },
+      "fonts": {
+        "ZTQOSV+TimesNewRoman,Bold": 6,
+        "TMOJLL+TimesNewRoman": 6,
+        "LSHNAQ+TimesNewRoman,BoldItalic": 2,
+        "TKGDKF+TimesNewRoman,Italic": 4,
+        "BSCTRL+Wingdings": 1
+      }
+    }
+  ]
+}

@@ -4,7 +4,14 @@ import pymupdf
 from pdfexact.extract.images import extraire_images
 from pdfexact.extract.layout_map import PageLayoutMap, quantifier_bbox
 from pdfexact.extract.links import appliquer_liens
-from pdfexact.extract.ocr import _corriger_elements_ocr, _dedoublonner_elements_ocr, _touche_zone_ignoree
+from pdfexact.extract.ocr import (
+    _corriger_elements_ocr,
+    _dedoublonner_elements_ocr,
+    _normaliser_marqueur_colonne_droite,
+    _reconstruire_lignes_depuis_mots_colonnes,
+    _semble_formule,
+    _touche_zone_ignoree,
+)
 from pdfexact.extract.text import extraire_texte
 from pdfexact.extract.fonts import collecter_polices
 from pdfexact.extract.vector import (
@@ -14,7 +21,7 @@ from pdfexact.extract.vector import (
     regrouper,
 )
 from pdfexact.fallback.rasterize import page_a_des_degrades, rasteriser_region
-from pdfexact.geometry import BBox, pt_vers_emu
+from pdfexact.geometry import BBox, pt_vers_emu, se_chevauchent
 from pdfexact.ir import ShapeEl
 
 
@@ -92,6 +99,18 @@ def test_une_bbox_plate_recoit_une_epaisseur(pdf_vectoriel):
     for forme in _formes(pdf_vectoriel):
         assert forme.bbox.largeur > 0
         assert forme.bbox.hauteur > 0
+
+
+def test_un_mini_trait_horizontal_tres_epais_devient_vertical():
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.draw_line((305, 370), (306, 370), width=560)
+
+    formes = extraire_vectoriel(page)
+
+    assert len(formes) == 1
+    assert formes[0].bbox.hauteur >= pt_vers_emu(550)
+    assert formes[0].bbox.largeur <= pt_vers_emu(2)
 
 
 # --- clusters -------------------------------------------------------------
@@ -292,6 +311,76 @@ def test_les_lignes_ocr_incluses_sur_la_meme_ligne_sont_dedoublonnees():
     assert corriges == [("This is the complete OCR line that should be kept", 0.90, grand)]
 
 
+def test_locr_recouvrant_un_tableau_protege_est_filtre():
+    zone_tableau = BBox(100, 100, 500, 420)
+    ligne_ocr_debordante = BBox(80, 112, 520, 132)
+
+    assert _touche_zone_ignoree(ligne_ocr_debordante, [zone_tableau])
+
+
+def test_locr_ligne_fusionnee_est_reconstruite_par_colonne_native():
+    colonnes = [
+        BBox(pt_vers_emu(50), pt_vers_emu(80), pt_vers_emu(190), pt_vers_emu(240)),
+        BBox(pt_vers_emu(220), pt_vers_emu(80), pt_vers_emu(360), pt_vers_emu(240)),
+        BBox(pt_vers_emu(390), pt_vers_emu(80), pt_vers_emu(530), pt_vers_emu(240)),
+    ]
+    mots = [
+        ("Left", 0.9, BBox(pt_vers_emu(55), pt_vers_emu(100), pt_vers_emu(82), pt_vers_emu(112))),
+        ("one", 0.9, BBox(pt_vers_emu(88), pt_vers_emu(100), pt_vers_emu(112), pt_vers_emu(112))),
+        ("Middle", 0.9, BBox(pt_vers_emu(225), pt_vers_emu(100), pt_vers_emu(270), pt_vers_emu(112))),
+        ("two", 0.9, BBox(pt_vers_emu(276), pt_vers_emu(100), pt_vers_emu(300), pt_vers_emu(112))),
+        ("Right", 0.9, BBox(pt_vers_emu(395), pt_vers_emu(100), pt_vers_emu(430), pt_vers_emu(112))),
+        ("three", 0.9, BBox(pt_vers_emu(436), pt_vers_emu(100), pt_vers_emu(480), pt_vers_emu(112))),
+        ("Next", 0.9, BBox(pt_vers_emu(55), pt_vers_emu(124), pt_vers_emu(90), pt_vers_emu(136))),
+        ("line", 0.9, BBox(pt_vers_emu(96), pt_vers_emu(124), pt_vers_emu(122), pt_vers_emu(136))),
+    ]
+
+    lignes = _reconstruire_lignes_depuis_mots_colonnes(mots, colonnes)
+    textes = [ligne.texte for ligne in lignes]
+
+    assert "Left one" in textes
+    assert "Middle two" in textes
+    assert "Right three" in textes
+    assert "Next line" in textes
+    assert next(ligne for ligne in lignes if ligne.texte == "Left one").bbox.x1 <= colonnes[0].x1
+    assert next(ligne for ligne in lignes if ligne.texte == "Middle two").bbox.x0 >= colonnes[1].x0
+
+
+def test_locr_ligne_fusionnee_respecte_cadres_lecture_decoupes():
+    cadres = [
+        BBox(pt_vers_emu(50), pt_vers_emu(80), pt_vers_emu(190), pt_vers_emu(140)),
+        BBox(pt_vers_emu(50), pt_vers_emu(220), pt_vers_emu(300), pt_vers_emu(300)),
+        BBox(pt_vers_emu(220), pt_vers_emu(80), pt_vers_emu(360), pt_vers_emu(300)),
+    ]
+    mots = [
+        ("Top", 0.9, BBox(pt_vers_emu(55), pt_vers_emu(100), pt_vers_emu(82), pt_vers_emu(112))),
+        ("left", 0.9, BBox(pt_vers_emu(88), pt_vers_emu(100), pt_vers_emu(116), pt_vers_emu(112))),
+        ("Hidden", 0.9, BBox(pt_vers_emu(55), pt_vers_emu(175), pt_vers_emu(100), pt_vers_emu(187))),
+        ("gap", 0.9, BBox(pt_vers_emu(106), pt_vers_emu(175), pt_vers_emu(128), pt_vers_emu(187))),
+        ("Bottom", 0.9, BBox(pt_vers_emu(55), pt_vers_emu(240), pt_vers_emu(104), pt_vers_emu(252))),
+        ("left", 0.9, BBox(pt_vers_emu(110), pt_vers_emu(240), pt_vers_emu(138), pt_vers_emu(252))),
+        ("Right", 0.9, BBox(pt_vers_emu(225), pt_vers_emu(175), pt_vers_emu(260), pt_vers_emu(187))),
+        ("ok", 0.9, BBox(pt_vers_emu(266), pt_vers_emu(175), pt_vers_emu(286), pt_vers_emu(187))),
+    ]
+
+    lignes = _reconstruire_lignes_depuis_mots_colonnes(mots, cadres)
+    textes = [ligne.texte for ligne in lignes]
+
+    assert "Top left" in textes
+    assert "Bottom left" in textes
+    assert "Right ok" in textes
+    assert "Hidden gap" not in textes
+
+
+def test_locr_ne_reconstruit_pas_sans_colonnes_natives():
+    mots = [
+        ("mot", 0.9, BBox(pt_vers_emu(20 + index * 16), 0, pt_vers_emu(30 + index * 16), 10))
+        for index in range(6)
+    ]
+
+    assert _reconstruire_lignes_depuis_mots_colonnes(mots, []) == []
+
+
 # --- carte géométrique ----------------------------------------------------
 
 
@@ -421,6 +510,170 @@ def test_la_carte_contraint_une_ligne_ocr_longue_au_cadre_natif():
     assert contraint.x1 <= pt_vers_emu(508)
 
 
+def test_la_carte_contraint_une_ligne_ocr_longue_a_sa_colonne_native():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    for index in range(8):
+        y0 = 90 + index * 22
+        carte.ajouter(
+            "native-line",
+            BBox(pt_vers_emu(55), pt_vers_emu(y0), pt_vers_emu(205), pt_vers_emu(y0 + 12)),
+            "test",
+            text=f"Left column native text line number {index}",
+        )
+        carte.ajouter(
+            "native-line",
+            BBox(pt_vers_emu(225), pt_vers_emu(y0), pt_vers_emu(375), pt_vers_emu(y0 + 12)),
+            "test",
+            text=f"Middle column native text line number {index}",
+        )
+        carte.ajouter(
+            "native-line",
+            BBox(pt_vers_emu(395), pt_vers_emu(y0), pt_vers_emu(545), pt_vers_emu(y0 + 12)),
+            "test",
+            text=f"Right column native text line number {index}",
+        )
+    ocr = BBox(pt_vers_emu(56), pt_vers_emu(290), pt_vers_emu(548), pt_vers_emu(305))
+
+    contraint = carte.contraindre_bbox_texte(
+        ocr,
+        "This OCR line starts in the first column but was detected across the whole page",
+    )
+
+    assert contraint.x0 <= pt_vers_emu(58)
+    assert contraint.x1 <= pt_vers_emu(210)
+
+
+def test_la_carte_decoupe_les_cadres_lecture_autour_des_visuels():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    for index in range(8):
+        y0 = 90 + index * 32
+        carte.ajouter(
+            "native-line",
+            BBox(pt_vers_emu(55), pt_vers_emu(y0), pt_vers_emu(205), pt_vers_emu(y0 + 12)),
+            "test",
+            text=f"Left column native text line number {index}",
+        )
+        carte.ajouter(
+            "native-line",
+            BBox(pt_vers_emu(225), pt_vers_emu(y0), pt_vers_emu(545), pt_vers_emu(y0 + 12)),
+            "test",
+            text=f"Right column native text line number {index}",
+        )
+
+    image = BBox(pt_vers_emu(55), pt_vers_emu(150), pt_vers_emu(205), pt_vers_emu(220))
+    carte.ajouter("image", image, "test-image")
+
+    cadres = carte.cadres_lecture_natifs()
+    cadres_gauche = [
+        cadre
+        for cadre in cadres
+        if cadre.x0 <= pt_vers_emu(60) and cadre.x1 >= pt_vers_emu(190)
+    ]
+
+    assert len(cadres_gauche) == 2
+    assert all(not se_chevauchent(cadre, image) for cadre in cadres_gauche)
+
+    ocr = BBox(pt_vers_emu(56), pt_vers_emu(230), pt_vers_emu(548), pt_vers_emu(245))
+    contraint = carte.contraindre_bbox_texte(
+        ocr,
+        "This OCR line starts below an image and must stay inside the left reading frame",
+    )
+
+    assert contraint.x1 <= pt_vers_emu(210)
+
+
+def test_la_carte_utilise_les_cadres_lecture_taxonomiques():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    carte.ajouter_cadre_lecture(
+        BBox(pt_vers_emu(55), pt_vers_emu(80), pt_vers_emu(205), pt_vers_emu(720))
+    )
+    carte.ajouter_cadre_lecture(
+        BBox(pt_vers_emu(225), pt_vers_emu(80), pt_vers_emu(545), pt_vers_emu(720))
+    )
+
+    colonnes = carte.cadres_colonnes_natives()
+
+    assert len(colonnes) == 2
+
+    ocr = BBox(pt_vers_emu(56), pt_vers_emu(150), pt_vers_emu(548), pt_vers_emu(164))
+    contraint = carte.contraindre_bbox_texte(
+        ocr,
+        "This OCR line starts in a taxonomy frame but spans across the page",
+    )
+
+    assert contraint.x1 <= pt_vers_emu(210)
+
+
+def test_la_carte_decoupe_les_cadres_taxonomiques_autour_des_visuels():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    carte.ajouter_cadre_lecture(
+        BBox(pt_vers_emu(55), pt_vers_emu(80), pt_vers_emu(205), pt_vers_emu(720))
+    )
+    carte.ajouter_cadre_lecture(
+        BBox(pt_vers_emu(225), pt_vers_emu(80), pt_vers_emu(545), pt_vers_emu(720))
+    )
+    image = BBox(pt_vers_emu(55), pt_vers_emu(150), pt_vers_emu(205), pt_vers_emu(220))
+    carte.ajouter("image", image, "test-image")
+
+    cadres = carte.cadres_lecture_natifs()
+    cadres_gauche = [
+        cadre
+        for cadre in cadres
+        if cadre.x0 <= pt_vers_emu(60) and cadre.x1 >= pt_vers_emu(190)
+    ]
+
+    assert len(cadres_gauche) == 2
+    assert all(not se_chevauchent(cadre, image) for cadre in cadres_gauche)
+
+    ocr = BBox(pt_vers_emu(56), pt_vers_emu(230), pt_vers_emu(548), pt_vers_emu(245))
+    contraint = carte.contraindre_bbox_texte(
+        ocr,
+        "This OCR line starts below an image and must stay inside the left taxonomy frame",
+    )
+
+    assert contraint.x1 <= pt_vers_emu(210)
+
+
+def test_la_carte_garde_le_texte_lateral_a_cote_dune_image():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(612), hauteur_emu=pt_vers_emu(792))
+    carte.ajouter_cadre_lecture(
+        BBox(pt_vers_emu(52), pt_vers_emu(55), pt_vers_emu(558), pt_vers_emu(723))
+    )
+    image = BBox(pt_vers_emu(351), pt_vers_emu(140), pt_vers_emu(567), pt_vers_emu(315))
+    carte.ajouter("image", image, "test-image")
+
+    cadres = carte.cadres_lecture_natifs()
+
+    assert any(
+        cadre.x0 <= pt_vers_emu(54)
+        and cadre.x1 >= pt_vers_emu(309)
+        and cadre.y0 <= pt_vers_emu(145)
+        and cadre.y1 >= pt_vers_emu(302)
+        for cadre in cadres
+    )
+    assert all(not se_chevauchent(cadre, image) for cadre in cadres)
+
+
+def test_la_carte_ne_borne_pas_une_page_monocolonne_comme_multicolonne():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    for index in range(8):
+        y0 = 90 + index * 22
+        carte.ajouter(
+            "native-line",
+            BBox(pt_vers_emu(55), pt_vers_emu(y0), pt_vers_emu(545), pt_vers_emu(y0 + 12)),
+            "test",
+            text=f"Single wide native text line number {index} with enough content",
+        )
+    ocr = BBox(pt_vers_emu(56), pt_vers_emu(290), pt_vers_emu(590), pt_vers_emu(305))
+
+    contraint = carte.contraindre_bbox_texte(
+        ocr,
+        "This OCR line belongs to a single wide column and should keep the global frame",
+    )
+
+    assert contraint.x1 > pt_vers_emu(545)
+
+
 def test_la_carte_detecte_une_ocr_courte_contradictoire():
     carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
     bbox = BBox(pt_vers_emu(452), pt_vers_emu(733), pt_vers_emu(580), pt_vers_emu(753))
@@ -441,8 +694,56 @@ def test_la_carte_detecte_un_texte_court_pres_dun_logo():
     assert carte.proche_petit_visuel(texte)
 
 
+def test_la_carte_preserve_un_texte_court_confirme_par_le_pdf_natif():
+    carte = PageLayoutMap(largeur_emu=pt_vers_emu(600), hauteur_emu=pt_vers_emu(800))
+    bbox = BBox(pt_vers_emu(510), pt_vers_emu(120), pt_vers_emu(526), pt_vers_emu(134))
+    carte.ajouter("native-line", bbox, "test", text="39")
+    carte.ajouter(
+        "image",
+        BBox(pt_vers_emu(490), pt_vers_emu(110), pt_vers_emu(540), pt_vers_emu(150)),
+        "test-logo",
+    )
+
+    assert carte.proche_petit_visuel(bbox)
+    assert carte.confirme_texte_natif(bbox, "39")
+
+
 def test_une_ligne_ocr_de_tableau_touche_la_zone_ignoree():
     cellule = BBox(pt_vers_emu(72), pt_vers_emu(120), pt_vers_emu(140), pt_vers_emu(132))
     tableau = BBox(pt_vers_emu(70), pt_vers_emu(90), pt_vers_emu(540), pt_vers_emu(720))
 
     assert _touche_zone_ignoree(cellule, [tableau])
+
+
+def test_un_identifiant_de_tableau_nest_pas_une_formule():
+    assert not _semble_formule("KMSC-02-35")
+    assert not _semble_formule("30.330756 -89.376202")
+    assert not _semble_formule("C11 REDUCED 20%")
+
+
+def test_une_equation_reste_une_formule():
+    assert _semble_formule("A11 + A55 = 2ω²")
+
+
+def test_numero_de_sommaire_lu_comme_tiret_est_corrige_en_colonne_droite():
+    class Page:
+        class Rect:
+            width = 600
+
+        rect = Rect()
+
+    bbox = BBox(pt_vers_emu(520), pt_vers_emu(100), pt_vers_emu(540), pt_vers_emu(112))
+
+    assert _normaliser_marqueur_colonne_droite(Page(), bbox, "--17") == "17"
+
+
+def test_un_nombre_negatif_hors_colonne_droite_nest_pas_corrige():
+    class Page:
+        class Rect:
+            width = 600
+
+        rect = Rect()
+
+    bbox = BBox(pt_vers_emu(120), pt_vers_emu(100), pt_vers_emu(140), pt_vers_emu(112))
+
+    assert _normaliser_marqueur_colonne_droite(Page(), bbox, "-17") == "-17"

@@ -14,6 +14,7 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 from functools import lru_cache
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
@@ -32,12 +33,32 @@ NOM_DOSSIER_LOCAL = "fonts"
 
 # Suffixes de fonderie accolés aux noms PostScript : ArialMT, TimesNewRomanPSMT.
 # Ils ne portent aucune information de style et empêchent la correspondance.
-_SUFFIXES_FONDERIE = ("psmt", "mt", "ps")
+_SUFFIXES_FONDERIE = ("psmt", "mt", "ps", "ms")
+_SUFFIXES_STYLE_POSTSCRIPT = (
+    ("bolditalic", "bold italic"),
+    ("boldital", "bold italic"),
+    ("bditalic", "bold italic"),
+    ("bdit", "bold italic"),
+    ("bd", "bold"),
+    ("bold", "bold"),
+    ("semibold", "bold"),
+    ("black", "bold"),
+    ("italic", "italic"),
+    ("ital", "italic"),
+    ("it", "italic"),
+)
 
 # Identifiants de la table `name` d'une police sfnt.
 _NAME_FAMILLE = 1
 _NAME_STYLE = 2
 _NAME_POSTSCRIPT = 6
+
+_WORDPERFECT_FONT_FILES = {
+    "wpce08n_": ("WP-GreekCentury", "WP Greek Century", "Regular"),
+    "wphv06na": ("WP-MathA", "WP MathA", "Regular"),
+    "wphv07na": ("WP-MathExtendedA", "WP MathExtendedA", "Regular"),
+    "wphv02n_": ("WP-Phonetic", "WP Phonetic", "Regular"),
+}
 
 # Styles équivalents, ramenés à une forme unique pour que la résolution par
 # famille + style ne dépende pas du vocabulaire du fondeur.
@@ -48,6 +69,10 @@ _STYLES_EQUIVALENTS = {
     "normal": "regular",
     "plain": "regular",
     "regular": "regular",
+    "medium": "medium",
+    "mediumit": "medium italic",
+    "mediumitalic": "medium italic",
+    "mediumitalicmt": "medium italic",
     "bold": "bold",
     "bd": "bold",
     "italic": "italic",
@@ -78,6 +103,7 @@ class ResolutionPolice:
     police: PoliceIndexee | None
     mode: str  # "exact", "famille_style", "alias", "famille", "manquante"
     alias_depuis: str | None = None
+    confiance: float = 0.0
 
 
 def normaliser_nom(nom_pdf: str) -> str:
@@ -107,6 +133,19 @@ def _cle_famille(famille: str) -> str:
     return compact
 
 
+def _retirer_suffixes_fonderie(compact: str) -> str:
+    courant = compact
+    change = True
+    while change:
+        change = False
+        for suffixe in _SUFFIXES_FONDERIE:
+            if courant.endswith(suffixe) and len(courant) > len(suffixe):
+                courant = courant[: -len(suffixe)]
+                change = True
+                break
+    return courant
+
+
 def _normaliser_style(style: str) -> str:
     compact = style.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
     for suffixe in _SUFFIXES_FONDERIE:
@@ -134,7 +173,134 @@ def _decouper_nom_postscript(nom: str) -> tuple[str, str]:
         if separateur in nom:
             famille, _, style = nom.partition(separateur)
             return famille.strip(), _normaliser_style(style)
-    return nom.strip(), "regular"
+
+    compact = _retirer_suffixes_fonderie(re.sub(r"[^a-z0-9]", "", nom.lower()))
+    for suffixe, style in _SUFFIXES_STYLE_POSTSCRIPT:
+        if compact.endswith(suffixe) and len(compact) > len(suffixe) + 2:
+            return compact[: -len(suffixe)], style
+    return compact or nom.strip(), "regular"
+
+
+_PROBE_METRIQUE = "Hamburgefonstiv 0123456789 MWil."
+_SERIF_HINTS = {
+    "serif",
+    "roman",
+    "times",
+    "garamond",
+    "caslon",
+    "bookman",
+    "palatino",
+    "baskerville",
+    "schoolbook",
+    "meridien",
+}
+_SANS_HINTS = {
+    "sans",
+    "arial",
+    "helvetica",
+    "gothic",
+    "grotesk",
+    "grotesque",
+    "frutiger",
+    "myriad",
+    "officina",
+    "verdana",
+    "tahoma",
+    "trebuchet",
+    "geneva",
+}
+_MONO_HINTS = {"mono", "courier", "typewriter", "console", "fixed", "lettergothic"}
+_SYMBOLES_HINTS = {"symbol", "ding", "wingding", "math", "phonetic", "wp"}
+
+
+def _classe_nom_police(nom: str) -> str:
+    cle = _cle_famille(nom)
+    if any(indice in cle for indice in _SYMBOLES_HINTS):
+        return "symbol"
+    if any(indice in cle for indice in _MONO_HINTS):
+        return "mono"
+    if any(indice in cle for indice in _SERIF_HINTS):
+        return "serif"
+    if any(indice in cle for indice in _SANS_HINTS):
+        return "sans"
+    return "sans"
+
+
+@lru_cache(maxsize=512)
+def _signature_metrique(chemin: Path | str) -> tuple[float, ...] | None:
+    try:
+        police = TTFont(chemin, fontNumber=0, lazy=True)
+        cmap = police.getBestCmap() or {}
+        largeurs = police["hmtx"].metrics
+        unites = float(police["head"].unitsPerEm)
+    except Exception:  # noqa: BLE001
+        return None
+
+    signature = []
+    defaut = unites * 0.5
+    for caractere in _PROBE_METRIQUE:
+        glyphe = cmap.get(ord(caractere))
+        signature.append((largeurs[glyphe][0] if glyphe in largeurs else defaut) / unites)
+    return tuple(signature)
+
+
+def _distance_signature(signature: tuple[float, ...] | None, classe: str) -> float:
+    if signature is None:
+        return 0.18
+    moyenne = sum(signature) / max(len(signature), 1)
+    if classe == "mono":
+        dispersion = sum(abs(v - moyenne) for v in signature) / len(signature)
+        return min(0.35, dispersion)
+    cible = 0.49 if classe == "serif" else 0.52
+    return min(0.35, abs(moyenne - cible))
+
+
+def _style_flags(style: str) -> tuple[bool, bool]:
+    normal = _normaliser_style(style)
+    return "bold" in normal, "italic" in normal
+
+
+def _score_substitut(
+    nom: str,
+    famille: str,
+    style: str,
+    candidat: PoliceIndexee,
+) -> float:
+    classe_voulue = _classe_nom_police(famille or nom)
+    classe_candidate = _classe_nom_police(candidat.famille)
+    if classe_voulue == "symbol":
+        return 0.0
+
+    bold_voulu, italic_voulu = _style_flags(style)
+    bold_candidat, italic_candidat = _style_flags(candidat.style)
+    score = 0.42 if classe_candidate == classe_voulue else 0.18
+    score += 0.16 if bold_voulu == bold_candidat else -0.12
+    score += 0.16 if italic_voulu == italic_candidat else -0.12
+    score += 0.14 * SequenceMatcher(None, _cle_famille(famille), _cle_famille(candidat.famille)).ratio()
+    score += max(0.0, 0.12 - _distance_signature(_signature_metrique(candidat.chemin), classe_voulue))
+    if candidat.source == "dossier":
+        score += 0.03
+    return max(0.0, min(0.86, score))
+
+
+def _substitut_dynamique(
+    nom: str,
+    famille: str,
+    style: str,
+    candidats: list[PoliceIndexee] | tuple[PoliceIndexee, ...] | object,
+) -> tuple[PoliceIndexee, float] | None:
+    meilleur: tuple[PoliceIndexee, float] | None = None
+    vus: set[Path] = set()
+    for candidat in candidats:
+        if candidat.chemin in vus:
+            continue
+        vus.add(candidat.chemin)
+        score = _score_substitut(nom, famille, style, candidat)
+        if meilleur is None or score > meilleur[1]:
+            meilleur = (candidat, score)
+    if meilleur is None or meilleur[1] < 0.52:
+        return None
+    return meilleur
 
 
 @dataclass
@@ -170,34 +336,44 @@ class Bibliotheque:
         """Retrouve une police et indique si la correspondance est stricte ou substituée."""
         nom = normaliser_nom(nom_pdf).strip()
         if not nom:
-            return ResolutionPolice(nom_pdf, None, "manquante")
+            return ResolutionPolice(nom_pdf, None, "manquante", confiance=0.0)
 
         direct = self.par_nom.get(nom.lower())
         if direct is not None:
-            return ResolutionPolice(nom, direct, "exact")
+            return ResolutionPolice(nom, direct, "exact", confiance=1.0)
 
         famille, style = _decouper_nom_postscript(nom)
         par_style = self.par_famille_style.get((famille.lower(), style))
         if par_style is not None:
-            return ResolutionPolice(nom, par_style, "famille_style")
+            return ResolutionPolice(nom, par_style, "famille_style", confiance=0.98)
 
         # Équivalence métrique : la famille nommée par le PDF n'est pas installée, mais un
         # clone de mêmes chasses l'est. La mise en page reste juste, le dessin diffère peu.
         familles, _styles = _table_alias()
-        cible = familles.get(_cle_famille(famille))
+        cible = familles.get(_cle_famille(nom)) or familles.get(_cle_famille(famille))
         if cible is not None:
             par_alias = self.par_famille_style.get((cible.lower(), style))
             if par_alias is not None:
-                return ResolutionPolice(nom, par_alias, "alias", alias_depuis=famille)
+                return ResolutionPolice(nom, par_alias, "alias", alias_depuis=famille, confiance=0.92)
+            if style in {"medium", "medium italic"}:
+                style_famille = "italic" if style.endswith("italic") else "regular"
+                par_alias = self.par_famille_style.get((f"{cible} Medium".lower(), style_famille))
+                if par_alias is not None:
+                    return ResolutionPolice(nom, par_alias, "alias", alias_depuis=famille, confiance=0.88)
             par_alias = self.par_famille_style.get((cible.lower(), "regular"))
             if par_alias is not None:
-                return ResolutionPolice(nom, par_alias, "alias", alias_depuis=famille)
+                return ResolutionPolice(nom, par_alias, "alias", alias_depuis=famille, confiance=0.84)
 
         par_famille = self.par_famille_style.get((famille.lower(), "regular"))
         if par_famille is not None:
-            return ResolutionPolice(nom, par_famille, "famille")
+            return ResolutionPolice(nom, par_famille, "famille", confiance=0.76)
 
-        return ResolutionPolice(nom, None, "manquante")
+        dynamique = _substitut_dynamique(nom, famille, style, self.par_famille_style.values())
+        if dynamique is not None:
+            police, confiance = dynamique
+            return ResolutionPolice(nom, police, "dynamique", alias_depuis=famille, confiance=confiance)
+
+        return ResolutionPolice(nom, None, "manquante", confiance=0.0)
 
 
 def _lire_noms_sfnt(chemin: Path) -> tuple[str, str, str] | None:
@@ -226,6 +402,10 @@ def _lire_noms_sfnt(chemin: Path) -> tuple[str, str, str] | None:
     return nom_postscript, famille or nom_postscript, style or "Regular"
 
 
+def _alias_wordperfect_depuis_fichier(chemin: Path) -> tuple[str, str, str] | None:
+    return _WORDPERFECT_FONT_FILES.get(chemin.stem.lower())
+
+
 def _indexer_dossier(dossier: Path):
     """Indexe récursivement les polices d'un dossier, en les ouvrant une à une."""
     if not dossier.is_dir():
@@ -234,7 +414,7 @@ def _indexer_dossier(dossier: Path):
     for chemin in sorted(dossier.rglob("*")):
         if not chemin.is_file() or chemin.suffix.lower() not in EXTENSIONS_INDEXABLES:
             continue
-        noms = _lire_noms_sfnt(chemin)
+        noms = _alias_wordperfect_depuis_fichier(chemin) or _lire_noms_sfnt(chemin)
         if noms is None:
             continue
         nom_postscript, famille, style = noms
@@ -275,7 +455,10 @@ def _indexer_systeme():
         chemin = Path(fichier)
         if chemin.suffix.lower() not in EXTENSIONS_INDEXABLES:
             continue
-        if not nom_postscript or nom_postscript == "(null)":
+        alias_wordperfect = _alias_wordperfect_depuis_fichier(chemin)
+        if alias_wordperfect is not None:
+            nom_postscript, famille, style = alias_wordperfect
+        elif not nom_postscript or nom_postscript == "(null)":
             continue
 
         # fontconfig renvoie les variantes localisées séparées par des virgules.

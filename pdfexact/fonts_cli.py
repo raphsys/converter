@@ -7,8 +7,27 @@ from pathlib import Path
 
 import pymupdf
 
-from pdfexact.cli import analyser_pages
+from pdfexact.font_fetcher import telecharger_polices_manquantes
 from pdfexact.fontlib import construire, dossiers_par_defaut, normaliser_nom
+
+
+def analyser_pages(expression: str) -> list[int]:
+    indices: list[int] = []
+    for morceau in expression.split(","):
+        morceau = morceau.strip()
+        if not morceau:
+            continue
+        if "-" in morceau:
+            debut, _, fin = morceau.partition("-")
+            premier, dernier = int(debut), int(fin)
+            if premier > dernier:
+                raise ValueError(f"intervalle inversé : {morceau}")
+            indices.extend(range(premier - 1, dernier))
+        else:
+            indices.append(int(morceau) - 1)
+    if any(index < 0 for index in indices):
+        raise ValueError("les pages se numérotent à partir de 1")
+    return indices
 
 
 def _polices_pdf(chemins: list[Path], pages=None) -> Counter[str]:
@@ -130,6 +149,58 @@ def commande_copy_system(arguments) -> int:
     return 0
 
 
+def commande_fetch(arguments) -> int:
+    pages = analyser_pages(arguments.pages) if arguments.pages else None
+    chemins = [Path(p) for p in arguments.pdf]
+    for chemin in chemins:
+        if not chemin.exists():
+            print(f"PDF introuvable : {chemin}", file=sys.stderr)
+            return 2
+
+    bibliotheque = construire(
+        dossiers=_dossiers_polices(arguments),
+        inclure_systeme=not arguments.no_system,
+    )
+    compteur = _polices_pdf(chemins, pages=pages)
+    manquantes = [
+        nom for nom in sorted(compteur) if bibliotheque.resoudre_detail(nom).police is None
+    ]
+    if not manquantes:
+        print("Aucune police manquante.")
+        return 0
+
+    rapport = telecharger_polices_manquantes(
+        manquantes,
+        destination=Path(arguments.output),
+        timeout=arguments.timeout,
+    )
+    for item in rapport.telechargees:
+        print(f"téléchargée: {item.demandee} -> {item.fichier} [{item.source}]")
+    for nom in rapport.introuvables:
+        print(f"introuvable: {nom}")
+    for nom, erreur in rapport.erreurs.items():
+        print(f"échec: {nom}: {erreur}", file=sys.stderr)
+
+    return 0 if rapport.telechargees else 1
+
+
+def commande_download(arguments) -> int:
+    destination = Path(arguments.font_dir)
+    rapport = telecharger_polices_manquantes(
+        sorted({normaliser_nom(nom) for nom in arguments.font}),
+        destination=destination,
+        timeout=arguments.timeout,
+    )
+    for item in rapport.telechargees:
+        print(f"téléchargée: {item.demandee} -> {item.fichier} [{item.source}]")
+    for nom in rapport.introuvables:
+        print(f"introuvable: {nom}")
+    for nom, erreur in rapport.erreurs.items():
+        print(f"échec: {nom}: {erreur}", file=sys.stderr)
+
+    return 0 if rapport.telechargees else 1
+
+
 def _analyseur() -> argparse.ArgumentParser:
     analyseur = argparse.ArgumentParser(
         prog="pdfexact-fonts",
@@ -160,6 +231,27 @@ def _analyseur() -> argparse.ArgumentParser:
         help="copie aussi les polices livrées avec pdfexact",
     )
     copie.set_defaults(fonction=commande_copy_system)
+
+    fetch = sous_commandes.add_parser(
+        "fetch",
+        help="télécharge les polices libres manquantes depuis les sources autorisées",
+    )
+    fetch.add_argument("pdf", nargs="+", help="PDF à analyser")
+    fetch.add_argument("--pages", help="sélection de pages, par exemple 1-5,8")
+    fetch.add_argument("--font-dir", action="append", default=[], help="dossier de polices")
+    fetch.add_argument("--output", default="fonts/local", help="dossier cible")
+    fetch.add_argument("--no-system", action="store_true", help="ignore les polices système")
+    fetch.add_argument("--timeout", type=int, default=30, help="timeout réseau en secondes")
+    fetch.set_defaults(fonction=commande_fetch)
+
+    download = sous_commandes.add_parser(
+        "download",
+        help="alias: télécharge directement une liste de noms de polices",
+    )
+    download.add_argument("font", nargs="+", help="noms PostScript à télécharger")
+    download.add_argument("--font-dir", default="fonts/local", help="dossier cible")
+    download.add_argument("--timeout", type=int, default=30, help="timeout réseau en secondes")
+    download.set_defaults(fonction=commande_download)
 
     return analyseur
 

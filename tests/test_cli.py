@@ -86,6 +86,56 @@ def test_le_layout_word_native_est_accepte(pdf_texte, tmp_path):
     assert code == 0
 
 
+def test_word_native_rapidocr_reste_page_exacte(pdf_texte, tmp_path):
+    sortie = tmp_path / "word_native.docx"
+
+    code = main(
+        [
+            str(pdf_texte),
+            str(sortie),
+            "--text-mode",
+            "rapidocr",
+            "--ocr-layout",
+            "word-native",
+            "--ocr-granularity",
+            "line",
+        ]
+    )
+
+    assert code == 0
+    with zipfile.ZipFile(sortie) as z:
+        document_xml = z.read("word/document.xml").decode()
+    assert "<w:p>" in document_xml
+    assert "<wp:anchor" in document_xml
+    assert '<w:pgMar w:top="0"' in document_xml
+
+
+def test_word_native_ecrit_le_diagnostic_de_contrat(pdf_texte, tmp_path):
+    sortie = tmp_path / "word_native.docx"
+    rapport = tmp_path / "rapport.json"
+
+    code = main(
+        [
+            str(pdf_texte),
+            str(sortie),
+            "--text-mode",
+            "rapidocr",
+            "--ocr-layout",
+            "word-native",
+            "--ocr-granularity",
+            "line",
+            "--report",
+            str(rapport),
+        ]
+    )
+
+    assert code == 0
+    donnees = json.loads(rapport.read_text(encoding="utf-8"))
+    assert donnees["diagnostic_word_native"]["conforme"] is True
+    assert donnees["diagnostic_word_native"]["frames"] == 0
+    assert donnees["diagnostic_word_native"]["textboxes"] >= 1
+
+
 def test_le_profil_visual_exact_force_le_pipeline_fidele(pdf_texte, tmp_path, monkeypatch):
     appels = {}
 
@@ -113,6 +163,57 @@ def test_le_profil_visual_exact_force_le_pipeline_fidele(pdf_texte, tmp_path, mo
     assert appels["text_mode"] == "rapidocr"
     assert appels["ocr_layout"] == "hybrid"
     assert appels["ocr_granularity"] == "line"
+
+
+def test_cli_transmet_la_comprehension_ia_intrabloc(pdf_texte, tmp_path, monkeypatch):
+    appels = {}
+
+    def faux_convertir(_source, _destination, **kwargs):
+        appels.update(kwargs)
+        return Rapport(pages_totales=1)
+
+    monkeypatch.setattr(cli, "convertir", faux_convertir)
+
+    code = main(
+        [
+            str(pdf_texte),
+            str(tmp_path / "s.docx"),
+            "--text-understanding-ai",
+            "--text-understanding-url",
+            "http://127.0.0.1:8765/understand",
+            "--text-understanding-timeout",
+            "1.5",
+        ]
+    )
+
+    assert code == 0
+    assert appels["text_understanding_ai"] is True
+    assert appels["text_understanding_url"] == "http://127.0.0.1:8765/understand"
+    assert appels["text_understanding_timeout"] == 1.5
+
+
+def test_cli_transmet_laudit_final(pdf_texte, tmp_path, monkeypatch):
+    appels = {}
+
+    def faux_convertir(_source, _destination, **kwargs):
+        appels.update(kwargs)
+        return Rapport(pages_totales=1)
+
+    monkeypatch.setattr(cli, "convertir", faux_convertir)
+
+    code = main(
+        [
+            str(pdf_texte),
+            str(tmp_path / "s.docx"),
+            "--final-audit",
+            "--final-audit-dpi",
+            "96",
+        ]
+    )
+
+    assert code == 0
+    assert appels["final_audit"] is True
+    assert appels["final_audit_dpi"] == 96
 
 
 def test_lanalyse_des_pages_accepte_les_intervalles():

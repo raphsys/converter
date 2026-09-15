@@ -19,6 +19,7 @@ TYPES_RELATIONS = {
     "font": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
     "fontTable": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
     "styles": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+    "settings": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
 }
 
 _CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -31,6 +32,7 @@ _CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Default Extension="odttf" ContentType="application/vnd.openxmlformats-officedocument.obfuscatedFont"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
 </Types>"""
 
@@ -51,6 +53,19 @@ _STYLES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>
 </w:style>
 </w:styles>"""
+
+_SETTINGS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:zoom w:percent="100"/>
+<w:defaultTabStop w:val="720"/>
+<w:compat>
+<w:compatSetting w:name="compatibilityMode"
+ w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>
+<w:doNotExpandShiftReturn/>
+<w:doNotUseHTMLParagraphAutoSpacing/>
+<w:useWord2013TrackBottomHyphenation/>
+</w:compat>
+</w:settings>"""
 
 _FONT_ATTR_PAR_STYLE = {
     (False, False): "embedRegular",
@@ -160,6 +175,7 @@ def ecrire_docx(document: Document, chemin) -> None:
     # Déclarée en premier : une partie référencée dans [Content_Types] sans relation
     # correspondante fait échouer l'ouverture.
     relations.ajouter("styles.xml", "styles")
+    relations.ajouter("settings.xml", "settings")
     table_polices, fichiers_polices = _table_polices_xml(document, relations_polices)
     if fichiers_polices:
         relations.ajouter("fontTable.xml", "fontTable")
@@ -170,6 +186,7 @@ def ecrire_docx(document: Document, chemin) -> None:
         z.writestr("_rels/.rels", _RELS_RACINE)
         z.writestr("word/document.xml", corps)
         z.writestr("word/styles.xml", _STYLES)
+        z.writestr("word/settings.xml", _SETTINGS)
         if fichiers_polices:
             z.writestr("word/fontTable.xml", table_polices)
             z.writestr("word/_rels/fontTable.xml.rels", relations_polices.vers_xml())

@@ -50,7 +50,8 @@ def collecter_polices(doc, bibliotheque: Bibliotheque | None = None) -> dict[str
             if font_id in assets:
                 continue
 
-            trouvee = bibliotheque.resoudre(nom_base)
+            resolution = bibliotheque.resoudre_detail(nom_base)
+            trouvee = resolution.police
             assets[font_id] = FontAsset(
                 font_id=font_id,
                 famille=trouvee.famille if trouvee else _famille_de_repli(font_id),
@@ -59,6 +60,9 @@ def collecter_polices(doc, bibliotheque: Bibliotheque | None = None) -> dict[str
                 embarquee=False,
                 chemin=trouvee.chemin if trouvee else None,
                 reconnue=trouvee is not None,
+                mode_resolution=resolution.mode,
+                confiance_resolution=resolution.confiance,
+                alias_resolution=resolution.police.famille if trouvee and resolution.mode != "exact" else None,
             )
 
     return assets

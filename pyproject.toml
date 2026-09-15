@@ -21,10 +21,15 @@ dev = [
     "scikit-image>=0.22",
     "numpy>=1.26",
 ]
+layout-ai = [
+    "paddlepaddle==3.2.0",
+    "paddlex[ocr]==3.3.11",
+]
 
 [project.scripts]
 pdfexact = "pdfexact.cli:main"
 pdfexact-fonts = "pdfexact.fonts_cli:main"
+pdfexact-web = "pdfexact.web:main"
 
 [tool.setuptools.packages.find]
 include = ["pdfexact*"]

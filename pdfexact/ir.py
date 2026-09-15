@@ -35,6 +35,9 @@ class FontAsset:
     # réelles ; sans lui, on ne peut que retomber sur une approximation.
     chemin: CheminFichier | None = None
     reconnue: bool = False
+    mode_resolution: str = "manquante"
+    confiance_resolution: float = 0.0
+    alias_resolution: str | None = None
 
 
 @dataclass(frozen=True)
@@ -71,6 +74,7 @@ class Span:
     exposant: bool = False
     indice: bool = False
     surlignage: str | None = None
+    bbox: BBox | None = None
 
 
 @dataclass
@@ -82,6 +86,10 @@ class Line:
     hauteur_ligne_emu: int
     largeur_cible_emu: int
     alignement: str = "left"
+    layout_frame_id: str | None = None
+    layout_frame_role: str | None = None
+    layout_frame_strategy: str | None = None
+    layout_frame_bbox: BBox | None = None
 
 
 @dataclass
@@ -90,6 +98,10 @@ class TextBox:
 
     bbox: BBox
     lignes: list[Line]
+    layout_frame_id: str | None = None
+    layout_frame_role: str | None = None
+    layout_frame_strategy: str | None = None
+    layout_frame_bbox: BBox | None = None
 
 
 @dataclass
@@ -112,6 +124,14 @@ class FlowParagraph:
     barre: bool = False
     capitales: bool = False
     surlignage: str | None = None
+    espacement_twips: int = 0
+    spans: list[Span] = field(default_factory=list)
+    lignes: list[Line] = field(default_factory=list)
+    layout_frame_id: str | None = None
+    layout_frame_role: str | None = None
+    layout_frame_strategy: str | None = None
+    layout_frame_bbox: BBox | None = None
+    vertical_alignement: str = "top"
 
 
 @dataclass
@@ -156,6 +176,7 @@ class TableCell:
     alignement: str = "center"
     bordures: dict[str, TableBorder] = field(default_factory=dict)
     direction_texte: str | None = None
+    v_merge: str | None = None
 
 
 @dataclass
@@ -174,6 +195,7 @@ class TableEl:
     couleur: str = "000000"
     bordure_couleur: str = "000000"
     bordure_sz: int = 4
+    bordures_globales: bool = True
 
 
 @dataclass

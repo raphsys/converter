@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from pdfexact.fontlib import Bibliotheque, construire, normaliser_nom
+from pdfexact.fontlib import Bibliotheque, PoliceIndexee, construire, normaliser_nom
 
 
 def _une_police_systeme_ttf():
@@ -53,6 +53,20 @@ def test_un_dossier_est_indexe(dossier_polices):
     assert len(bibliotheque) >= 1
 
 
+def test_fichier_wordperfect_corel_resout_nom_pdf(dossier_polices, tmp_path):
+    _dossier, source = dossier_polices
+    dossier = tmp_path / "wpfonts"
+    dossier.mkdir()
+    shutil.copy(source, dossier / "Wphv06na.ttf")
+
+    bibliotheque = construire(dossiers=[dossier], inclure_systeme=False)
+    resultat = bibliotheque.resoudre_detail("WP-MathA")
+
+    assert resultat.mode == "exact"
+    assert resultat.police is not None
+    assert resultat.police.chemin.name == "Wphv06na.ttf"
+
+
 def test_une_police_du_dossier_est_resolue_par_son_nom_postscript(dossier_polices):
     dossier, _source = dossier_polices
     bibliotheque = construire(dossiers=[dossier], inclure_systeme=False)
@@ -81,10 +95,48 @@ def test_le_prefixe_de_sous_ensemble_nempeche_pas_la_resolution(dossier_polices)
     assert bibliotheque.resoudre(f"ZFDQAQ+{nom}") is not None
 
 
-def test_une_police_inconnue_retourne_none():
+def test_une_police_inconnue_utilise_un_substitut_dynamique():
     bibliotheque = construire(inclure_systeme=True)
 
-    assert bibliotheque.resoudre("PoliceQuiNExistePasDuTout-Ultra") is None
+    resultat = bibliotheque.resoudre_detail("PoliceQuiNExistePasDuTout-Regular")
+
+    assert resultat.police is not None
+    assert resultat.mode == "dynamique"
+    assert resultat.confiance >= 0.52
+
+
+def test_une_police_symbole_inconnue_ne_prend_pas_un_substitut_texte():
+    bibliotheque = construire(inclure_systeme=True)
+
+    resultat = bibliotheque.resoudre_detail("WP-PoliceSymboliqueAbsente")
+
+    assert resultat.police is None
+    assert resultat.mode == "manquante"
+
+
+def test_le_substitut_dynamique_respecte_style_et_classe(tmp_path):
+    bibliotheque = Bibliotheque()
+    sans_bold = PoliceIndexee(
+        nom_postscript="CandidateSans-Bold",
+        famille="Candidate Sans",
+        style="Bold",
+        chemin=tmp_path / "sans-bold.ttf",
+        source="dossier",
+    )
+    serif_regular = PoliceIndexee(
+        nom_postscript="CandidateSerif-Regular",
+        famille="Candidate Serif",
+        style="Regular",
+        chemin=tmp_path / "serif.ttf",
+        source="dossier",
+    )
+    bibliotheque.ajouter(sans_bold, prioritaire=True)
+    bibliotheque.ajouter(serif_regular, prioritaire=True)
+
+    resultat = bibliotheque.resoudre_detail("UnknownGothic-Bold")
+
+    assert resultat.mode == "dynamique"
+    assert resultat.police == sans_bold
 
 
 def test_la_resolution_par_famille_et_style_fonctionne():
@@ -97,6 +149,23 @@ def test_la_resolution_par_famille_et_style_fonctionne():
 
     assert resultat is not None
     assert "bold" in resultat.style.lower()
+
+
+def test_alias_resout_les_graisses_encodees_dans_la_famille(tmp_path):
+    bibliotheque = Bibliotheque()
+    police = PoliceIndexee(
+        nom_postscript="SourceSans3-MediumIt",
+        famille="Source Sans 3 Medium",
+        style="Italic",
+        chemin=tmp_path / "SourceSans3-MediumIt.ttf",
+        source="dossier",
+    )
+    bibliotheque.ajouter(police, prioritaire=True)
+
+    resultat = bibliotheque.resoudre_detail("LegacySans-MediumItalic")
+
+    assert resultat.mode == "alias"
+    assert resultat.police == police
 
 
 def test_le_dossier_a_priorite_sur_le_systeme(dossier_polices):
@@ -153,6 +222,93 @@ def test_les_familles_courantes_sont_reconnues_sans_le_systeme():
 
     for nom in ("Arial", "ArialMT", "Helvetica", "TimesNewRomanPSMT", "Courier"):
         assert bibliotheque.resoudre(nom) is not None, f"{nom} non reconnue hors système"
+
+
+def test_garamond_est_resolu_depuis_les_polices_du_projet():
+    """EB Garamond remplace Garamond quand la fonte propriétaire n'est pas fournie."""
+    from pdfexact.fontlib import DOSSIER_EMBARQUE
+
+    bibliotheque = construire(dossiers=[Path("fonts"), DOSSIER_EMBARQUE], inclure_systeme=False)
+
+    for nom, style in (
+        ("Garamond", "regular"),
+        ("Garamond-Bold", "bold"),
+        ("Garamond-Italic", "italic"),
+    ):
+        resultat = bibliotheque.resoudre_detail(nom)
+
+        assert resultat.police is not None, f"{nom} non reconnue hors système"
+        assert resultat.police.famille == "EB Garamond 12"
+        assert style in resultat.police.style.lower()
+
+
+def test_wingdings_utilise_un_alias_dingbats_libre():
+    from pdfexact.fontlib import DOSSIER_EMBARQUE
+
+    bibliotheque = construire(dossiers=[DOSSIER_EMBARQUE], inclure_systeme=False)
+
+    resultat = bibliotheque.resoudre_detail("Wingdings-Regular")
+
+    assert resultat.police is not None
+    assert resultat.mode == "alias"
+    assert resultat.police.famille == "D050000L"
+
+
+def test_myriad_et_geneva_sont_resolus_par_alias_libres():
+    from pdfexact.fontlib import DOSSIER_EMBARQUE
+
+    bibliotheque = construire(dossiers=[DOSSIER_EMBARQUE], inclure_systeme=False)
+
+    attendues = {
+        "MyriadPro-Cond": ("Liberation Sans Narrow", "Regular"),
+        "MyriadPro-BoldCond": ("Liberation Sans Narrow", "Bold"),
+        "MyriadPro-Regular": ("Source Sans Pro", "Regular"),
+        "MyriadPro-SemiboldCond": ("Liberation Sans Narrow", "Bold"),
+        "MyriadPro-Bold": ("Source Sans Pro", "Bold"),
+        "MyriadPro-It": ("Source Sans Pro", "Italic"),
+        "Myriad-Roman": ("Source Sans Pro", "Regular"),
+        "Myriad-Italic": ("Source Sans Pro", "Italic"),
+        "Myriad-Bold": ("Source Sans Pro", "Bold"),
+        "MyriadPro-Black": ("Source Sans Pro", "Bold"),
+        "Geneva": ("Liberation Sans", "Regular"),
+        "CenturyGothic": ("URW Gothic", "Book"),
+        "CenturyGothic-Bold": ("URW Gothic", "Demi"),
+        "OfficinaSans-Book": ("Source Sans Pro", "Regular"),
+        "OfficinaSans-Bold": ("Source Sans Pro", "Bold"),
+        "OfficinaSerif-Bold": ("C059", "Bold"),
+        "Meridien-Roman": ("C059", "Roman"),
+        "Meridien-Medium": ("C059", "Roman"),
+    }
+
+    for nom, (famille, style) in attendues.items():
+        resultat = bibliotheque.resoudre_detail(nom)
+        assert resultat.police is not None, f"{nom} non résolue"
+        assert resultat.mode == "alias"
+        assert resultat.police.famille == famille
+        assert style.lower() in resultat.police.style.lower()
+
+
+def test_polices_ms_concatenees_sont_resolues_par_alias_libres():
+    from pdfexact.fontlib import DOSSIER_EMBARQUE
+
+    bibliotheque = construire(dossiers=[DOSSIER_EMBARQUE], inclure_systeme=False)
+
+    attendues = {
+        "ArialMS": ("Liberation Sans", "Regular"),
+        "TimesNewRomanMS": ("Liberation Serif", "Regular"),
+        "TimesNewRomanBdMS": ("Liberation Serif", "Bold"),
+        "TimesNewRomanItMS": ("Liberation Serif", "Italic"),
+        "TimesNewRomanBdItMS": ("Liberation Serif", "Bold Italic"),
+        "TrebuchetMS": ("DejaVu Sans", "Book"),
+        "TrebuchetMS-Italic": ("DejaVu Sans", "Oblique"),
+    }
+
+    for nom, (famille, style) in attendues.items():
+        resultat = bibliotheque.resoudre_detail(nom)
+        assert resultat.police is not None, f"{nom} non resolue"
+        assert resultat.mode == "alias"
+        assert resultat.police.famille == famille
+        assert style.lower() in resultat.police.style.lower()
 
 
 def test_le_dossier_dextension_du_projet_est_charge_par_defaut(tmp_path, monkeypatch):

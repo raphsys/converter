@@ -4,10 +4,15 @@ Toute la chaîne travaille en EMU (English Metric Units) : 914400 par pouce, 127
 point. La conversion depuis les points de PyMuPDF se fait ici et nulle part ailleurs,
 pour qu'il n'existe qu'un seul endroit où se tromper d'unité.
 """
+from contextlib import contextmanager
 from dataclasses import dataclass
+from math import ceil, floor
+
+import pymupdf
 
 EMU_PER_PT = 12700
 TWIPS_PER_PT = 20
+GRILLE_DIXIEME_MM_EMU = 3600
 
 
 def pt_vers_emu(valeur: float) -> int:
@@ -20,6 +25,10 @@ def pt_vers_twips(valeur: float) -> int:
 
 def emu_vers_pt(valeur: int) -> float:
     return valeur / EMU_PER_PT
+
+
+def quantifier_coord(valeur: int, grille_emu: int = GRILLE_DIXIEME_MM_EMU) -> int:
+    return round(valeur / grille_emu) * grille_emu
 
 
 @dataclass(frozen=True)
@@ -47,6 +56,18 @@ def bbox_depuis_rect(rect) -> BBox:
         pt_vers_emu(rect.y0),
         pt_vers_emu(rect.x1),
         pt_vers_emu(rect.y1),
+    )
+
+
+def quantifier_bbox(bbox: BBox, grille_emu: int = GRILLE_DIXIEME_MM_EMU) -> BBox:
+    """Quantifie en conservant l'enveloppe : floor en haut/gauche, ceil en bas/droite."""
+    x0 = floor(bbox.x0 / grille_emu) * grille_emu
+    y0 = floor(bbox.y0 / grille_emu) * grille_emu
+    return BBox(
+        x0,
+        y0,
+        max(x0 + 1, ceil(bbox.x1 / grille_emu) * grille_emu),
+        max(y0 + 1, ceil(bbox.y1 / grille_emu) * grille_emu),
     )
 
 
@@ -97,6 +118,82 @@ class PageGeometry:
 
     def bbox_depuis_rect_affiche(self, rect) -> BBox:
         return bbox_depuis_rect(rect)
+
+
+@dataclass(frozen=True)
+class PageState:
+    """Etat PyMuPDF qui influence tous les reperes de coordonnees d'une page."""
+
+    mediabox: object | None
+    cropbox: object | None
+    rotation: int
+
+
+def etat_page(page) -> PageState:
+    """Capture l'etat de page dont PyMuPDF peut se servir pour transformer les bboxes."""
+    mediabox = _copie_rect(getattr(page, "mediabox", None))
+    cropbox = _copie_rect(getattr(page, "cropbox", None))
+    rotation = int(getattr(page, "rotation", 0) or 0)
+    return PageState(mediabox=mediabox, cropbox=cropbox, rotation=rotation)
+
+
+@contextmanager
+def preserver_etat_page(page):
+    """Restaure cropbox/rotation apres un appel PyMuPDF potentiellement mutateur.
+
+    Certaines versions de PyMuPDF modifient la cropbox en appelant `find_tables()`.
+    Sur une page tournee avec cropbox non nulle, ce changement de repere decale ensuite
+    texte, images et formes d'environ la valeur de la cropbox. Toute extraction doit donc
+    revenir a l'etat initial avant de continuer.
+    """
+    original = etat_page(page)
+    try:
+        yield
+    finally:
+        restaurer_etat_page(page, original)
+
+
+def restaurer_etat_page(page, state: PageState) -> None:
+    """Restaure au mieux l'etat capture sans masquer l'erreur de l'appelant."""
+    if state.mediabox is not None and hasattr(page, "set_mediabox"):
+        with _ignore_page_state_error():
+            if not _rects_proches(getattr(page, "mediabox", None), state.mediabox):
+                page.set_mediabox(state.mediabox)
+    if state.cropbox is not None and hasattr(page, "set_cropbox"):
+        with _ignore_page_state_error():
+            if not _rects_proches(getattr(page, "cropbox", None), state.cropbox):
+                page.set_cropbox(state.cropbox)
+    if hasattr(page, "set_rotation"):
+        with _ignore_page_state_error():
+            if int(getattr(page, "rotation", 0) or 0) != state.rotation:
+                page.set_rotation(state.rotation)
+
+
+@contextmanager
+def _ignore_page_state_error():
+    try:
+        yield
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _copie_rect(rect):
+    if rect is None:
+        return None
+    return pymupdf.Rect(rect)
+
+
+def _rects_proches(a, b, tolerance: float = 1e-5) -> bool:
+    if a is None or b is None:
+        return a is b
+    ra = pymupdf.Rect(a)
+    rb = pymupdf.Rect(b)
+    return (
+        abs(ra.x0 - rb.x0) <= tolerance
+        and abs(ra.y0 - rb.y0) <= tolerance
+        and abs(ra.x1 - rb.x1) <= tolerance
+        and abs(ra.y1 - rb.y1) <= tolerance
+    )
 
 
 def union(a: BBox, b: BBox) -> BBox:

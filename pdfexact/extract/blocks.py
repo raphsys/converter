@@ -21,6 +21,7 @@ class OcrLine:
     texte: str
     score: float | None
     bbox: BBox
+    spans: tuple = ()
 
 
 def _aire(boite: BBox) -> int:

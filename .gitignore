@@ -11,6 +11,14 @@ dist/
 # fonts/local/, ou l'audit de licences met en quarantaine le non redistribuable.
 /fonts/*
 !/fonts/LISEZ-MOI.md
+!/fonts/local/
+/fonts/local/*
+!/fonts/local/ebgaramond/
+/fonts/local/ebgaramond/*
+!/fonts/local/ebgaramond/*.otf
+!/fonts/local/licenses/
+/fonts/local/licenses/*
+!/fonts/local/licenses/EBGaramond*-Debian-copyright
 
 .fastocr/
 tests/logs_converter/

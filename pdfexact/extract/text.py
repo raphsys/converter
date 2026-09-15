@@ -10,6 +10,7 @@ dans le docx**, pas de celle du PDF : c'est avec elles que Word composera.
   baseline à `ascendante` du haut de la zone.
 - Sommet de la zone : baseline du PDF moins cette ascendante.
 """
+import re
 from functools import lru_cache
 
 from fontTools.agl import toUnicode
@@ -72,12 +73,17 @@ def _resoudre_police(nom_du_span: str, polices: dict) -> str:
 
 def _style_depuis_nom(nom: str, drapeaux: int = 0) -> tuple[bool, bool]:
     minuscule = nom.lower()
+    compact = re.sub(r"[^a-z0-9]", "", minuscule)
+    for suffixe in ("psmt", "mt", "ps", "ms"):
+        if compact.endswith(suffixe) and len(compact) > len(suffixe):
+            compact = compact[: -len(suffixe)]
+            break
     gras = bool(drapeaux & _BIT_GRAS) or any(
         mot in minuscule for mot in ("bold", "demi", "black", "heavy", "extrabold")
-    )
+    ) or compact.endswith(("bd", "bdit", "bold", "bolditalic", "semibold"))
     italique = bool(drapeaux & _BIT_ITALIQUE) or any(
         mot in minuscule for mot in ("italic", "oblique")
-    )
+    ) or compact.endswith(("it", "bdit", "italic", "bolditalic"))
     return gras, italique
 
 

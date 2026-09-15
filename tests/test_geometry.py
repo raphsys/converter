@@ -7,6 +7,8 @@ from pdfexact.geometry import (
     PageGeometry,
     bbox_depuis_rect,
     emu_vers_pt,
+    etat_page,
+    preserver_etat_page,
     pt_vers_emu,
     pt_vers_twips,
     se_chevauchent,
@@ -105,3 +107,19 @@ def test_rectangle_natif_est_converti_en_coordonnees_affichees():
     assert round(emu_vers_pt(bbox.y0)) == 72
     assert round(emu_vers_pt(bbox.x1)) == 742
     assert round(emu_vers_pt(bbox.y1)) == 147
+
+
+def test_preserve_etat_page_restaure_cropbox_rotation_et_rect():
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.set_cropbox(pymupdf.Rect(93.9, 0, 518.16, 792))
+    page.set_rotation(90)
+    original = etat_page(page)
+    rect_initial = pymupdf.Rect(page.rect)
+
+    with preserver_etat_page(page):
+        page.set_cropbox(page.mediabox)
+        page.set_rotation(0)
+
+    assert etat_page(page) == original
+    assert page.rect == rect_initial

@@ -88,11 +88,57 @@ def _boite_rendable(rect, geometrie=None) -> BBox:
     )
 
 
+def _formes_traits_larges_verticaux(dessin, geometrie=None) -> list[ShapeEl]:
+    """Certains PDF encodent une verticale comme un mini trait horizontal tres epais."""
+    width_pt = float(dessin.get("width") or 0)
+    if width_pt <= 20:
+        return []
+
+    formes: list[ShapeEl] = []
+    for item in dessin.get("items", []):
+        if item[0] != "l":
+            continue
+        p0 = item[1]
+        p1 = item[2]
+        dx = abs(float(p1.x) - float(p0.x))
+        dy = abs(float(p1.y) - float(p0.y))
+        if dx > 2.5 or dy > 0.5:
+            continue
+        cx = (float(p0.x) + float(p1.x)) / 2
+        cy = (float(p0.y) + float(p1.y)) / 2
+        y0 = cy - width_pt / 2
+        y1 = cy + width_pt / 2
+        chemin = [
+            ("move", (_point_transforme((cx, y0), geometrie),)),
+            ("line", (_point_transforme((cx, y1), geometrie),)),
+        ]
+        points = [point for _commande, pts in chemin for point in pts]
+        x_values = [point[0] for point in points]
+        y_values = [point[1] for point in points]
+        formes.append(
+            ShapeEl(
+                bbox=BBox(min(x_values), min(y_values), max(x_values) + 1, max(y_values) + 1),
+                chemins=[chemin],
+                remplissage=None,
+                contour=_couleur_hexa(dessin.get("color")),
+                epaisseur_emu=pt_vers_emu(1.0),
+                pointilles=None,
+                alpha=float(dessin.get("fill_opacity", 1.0) or 1.0),
+            )
+        )
+    return formes
+
+
 def extraire_vectoriel(page, geometrie=None) -> list[ShapeEl]:
     """Retourne les formes vectorielles de la page, en EMU."""
     formes: list[ShapeEl] = []
 
     for dessin in page.get_drawings():
+        traits_verticaux = _formes_traits_larges_verticaux(dessin, geometrie)
+        if traits_verticaux:
+            formes.extend(traits_verticaux)
+            continue
+
         chemins = [
             commandes
             for commandes in (_chemin_depuis_item(item, geometrie) for item in dessin.get("items", []))
@@ -102,13 +148,16 @@ def extraire_vectoriel(page, geometrie=None) -> list[ShapeEl]:
             continue
 
         dashes = dessin.get("dashes")
+        width_pt = float(dessin.get("width") or 0)
+        if width_pt > 20:
+            width_pt = 1.0
         formes.append(
             ShapeEl(
                 bbox=_boite_rendable(dessin["rect"], geometrie),
                 chemins=chemins,
                 remplissage=_couleur_hexa(dessin.get("fill")),
                 contour=_couleur_hexa(dessin.get("color")),
-                epaisseur_emu=pt_vers_emu(dessin.get("width") or 0),
+                epaisseur_emu=pt_vers_emu(width_pt),
                 pointilles="dash" if dashes and dashes != "[] 0" else None,
                 alpha=float(dessin.get("fill_opacity", 1.0) or 1.0),
             )
