@@ -8,10 +8,6 @@ from pdfexact.geometry import BBox, pt_vers_emu
 from pdfexact.ir import FontRef, Line, Span, TextBox
 from pdfexact.layout import text_comprehension as comprehension
 from pdfexact.layout.paragraph_planner import planifier_paragraphe
-from pdfexact.render.text_runs import prepare_runs, render_runs
-from pdfexact.render.word_native_rewriter import _flow_runs
-from pdfexact.render.drawing import _runs_paragraphe
-from pdfexact.render.bbox_debug import _native_paragraph_runs
 
 
 @pytest.fixture(autouse=True)
@@ -88,35 +84,8 @@ def test_script_annotation_never_invents_russian_language():
     assert element.language == "uk"
 
 
-@pytest.mark.parametrize("native", [False, True])
-@pytest.mark.parametrize("texts,expected", [
-    (("中文段落", "继续说明。"), "no_space"),
-    (("日本語の", "文章です。"), "no_space"),
-    (("中文段落 ", " 继续说明。"), "space"),
-    (("한국어 문장", "다음 부분"), "space"),
-    (("Русский текст", "продолжается"), "space"),
-])
-def test_planning_and_consumers_preserve_cjk_joins_and_exact_runs(native, texts, expected):
-    element = block(texts)
-    original = deepcopy(element)
-    plan = planifier_paragraphe(element)
-    assert plan.joins == (expected,)
-    instructions = prepare_runs(element, element.lignes, plan, native=native)
-    assert [item.span.texte for item in instructions if item.span is not None] == list(texts)
-    commands = [item.command for item in instructions if item.span is None]
-    assert commands == (["space"] if expected == "space" and not texts[0][-1].isspace() and not texts[1][0].isspace() else [])
-    assert element == original
-    if expected == "no_space":
-        assert 'xml:space="preserve"> </w:t>' not in render_runs(instructions)
-        assert 'xml:space="preserve"> </w:t>' not in _flow_runs(element, None)
 
 
-@pytest.mark.parametrize("native", [False, True])
-def test_preservation_policy_wins_over_no_space(native):
-    element = block(["中文段落", "继续说明。"])
-    plan = planifier_paragraphe(element)
-    instructions = prepare_runs(element, element.lignes, plan, native=native, preserve=True)
-    assert [item.command for item in instructions if item.span is None] == ["break"]
 
 
 def test_explicit_hard_break_cannot_be_overridden_by_provider():
@@ -160,12 +129,3 @@ def test_provider_receives_verbatim_unicode_and_whitespace():
     assert seen == [("  中文  ", "次の行")]
 
 
-@pytest.mark.parametrize("consumer", [_flow_runs, _runs_paragraphe, _native_paragraph_runs])
-@pytest.mark.parametrize("texts", [("中文段落", "继续说明。"), (" 中文段落  ", " 继续说明。 ")])
-def test_legacy_consumers_preserve_source_runs_without_added_cjk_spaces(consumer, texts):
-    element = block(texts)
-    original = deepcopy(element)
-    xml = consumer(element, None) if consumer is _flow_runs else consumer(element)
-    root = ET.fromstring('<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + xml + '</root>')
-    assert [node.text for node in root.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')] == list(texts)
-    assert element == original

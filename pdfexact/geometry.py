@@ -120,29 +120,16 @@ def bbox_depuis_rect(rect) -> BBox:
     )
 
 
-MINCE_CELLULES_GRILLE = 4
-
-
-def _quantifier_axe(debut: int, fin: int, grille_emu: int) -> tuple[int, int]:
-    etendue = fin - debut
-    if etendue > MINCE_CELLULES_GRILLE * grille_emu:
-        # Enveloppe : un cadre epais ne doit jamais rogner son contenu.
-        debut_q = floor(debut / grille_emu) * grille_emu
-        return debut_q, max(debut_q + 1, ceil(fin / grille_emu) * grille_emu)
-    # Objet mince (filet, trait) : floor/ceil ajouterait une cellule selon la
-    # phase de sa position, soit jusqu'a +40 % d'epaisseur. On quantifie la
-    # dimension elle-meme autour du centre : deux traits egaux restent egaux.
-    taille = max(grille_emu, round(etendue / grille_emu) * grille_emu)
-    debut_q = round(((debut + fin) / 2 - taille / 2) / grille_emu) * grille_emu
-    return debut_q, debut_q + taille
-
-
 def quantifier_bbox(bbox: BBox, grille_emu: int = GRILLE_DIXIEME_MM_EMU) -> BBox:
-    """Quantifie sur la grille : enveloppe pour les objets epais, epaisseur
-    conservee pour les objets minces."""
-    x0, x1 = _quantifier_axe(bbox.x0, bbox.x1, grille_emu)
-    y0, y1 = _quantifier_axe(bbox.y0, bbox.y1, grille_emu)
-    return BBox(x0, y0, x1, y1)
+    """Quantifie en conservant l'enveloppe : floor en haut/gauche, ceil en bas/droite."""
+    x0 = floor(bbox.x0 / grille_emu) * grille_emu
+    y0 = floor(bbox.y0 / grille_emu) * grille_emu
+    return BBox(
+        x0,
+        y0,
+        max(x0 + 1, ceil(bbox.x1 / grille_emu) * grille_emu),
+        max(y0 + 1, ceil(bbox.y1 / grille_emu) * grille_emu),
+    )
 
 
 @dataclass(frozen=True)

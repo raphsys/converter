@@ -30,11 +30,6 @@ local-comprehension = [
     "tokenizers==0.23.1",
 ]
 
-[project.scripts]
-pdfexact = "pdfexact.cli:main"
-pdfexact-fonts = "pdfexact.fonts_cli:main"
-pdfexact-web = "pdfexact.web:main"
-
 [tool.setuptools.packages.find]
 include = ["pdfexact*"]
 

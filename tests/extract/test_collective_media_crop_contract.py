@@ -232,22 +232,3 @@ def test_native_text_and_stable_canonical_scene_identity_survive_segmentation():
     assert source.source_id in scene.registry.elements
 
 
-def test_real_native_extraction_to_plan_collectively_proves_twenty_four_tiles():
-    from pdfexact.extract.images import extraire_images
-    from pdfexact.render.render_plan import build_render_plan
-
-    media = {}
-    with pymupdf.open() as pdf:
-        native = pdf.new_page(width=200, height=300)
-        native.insert_image(native.rect, stream=_png(_pixels((68, 114), "RGB")))
-        sources = extraire_images(native, pdf, media)
-        assert len(sources) == 1
-        page = Page(0, pt_vers_emu(200), pt_vers_emu(300), sources)
-        _securiser_elements_visuels_page(page, media)
-        assert len(page.elements) == 24 and len(page.discarded_elements) == 1
-        proof = next(event["proof"] for event in page.source_transformations if event["reason_code"] == "source-media-segmentation")
-        assert verify_media_crop_partition(page.discarded_elements[0], page.elements, media, proof) == []
-        document = Document([page], media=media)
-        plan = build_render_plan(document)
-        assert plan.validate(document) == []
-        assert plan.validate() == []

@@ -25,7 +25,6 @@ from pdfexact.analysis.semantic import (
     regrouper_listes,
     starts_list_marker,
 )
-from pdfexact.render.render_plan import build_page_render_plan
 from pdfexact.geometry import BBox, pt_vers_emu
 from pdfexact.scene import (
     ElementKind,
@@ -134,26 +133,6 @@ def test_render_decision_is_explicit_and_validated():
     assert decision.expected_z_order == element.z_order
 
 
-def test_render_plan_covers_and_validates_every_legacy_element():
-    from pdfexact.ir import FlowParagraph, Page, Span
-
-    from pdfexact.ir import FontRef
-
-    font = FontRef("Arial", "Arial", False, False)
-    bbox = BBox(pt_vers_emu(10), pt_vers_emu(10), pt_vers_emu(120), pt_vers_emu(24))
-    paragraph = FlowParagraph(
-        bbox,
-        "Plan universel",
-        font,
-        10,
-        "000000",
-        spans=[Span("Plan universel", font, 10, "000000")],
-    )
-    page = Page(0, pt_vers_emu(300), pt_vers_emu(200), [paragraph])
-    plan = build_page_render_plan(page, [paragraph], AnalysisOptions())
-
-    assert plan.validate() == []
-    assert plan.for_element(plan.for_page(0)[0].element.element_id) is not None
 
 
 def test_orientation_sensitive_text_gets_editable_frame_and_fallback():
@@ -267,39 +246,3 @@ def test_geometry_wrappers_cover_bbox_rect_clip_and_axis_contracts():
     assert axis_overlap_ratio(BBox(0, 0, 10, 10), BBox(5, 20, 20, 30), "x") == 0.5
 
 
-def test_discarded_legacy_elements_remain_detected_with_filter_history():
-    from pdfexact.extract.document import _journaliser_elements_rejetes
-    from pdfexact.ir import Document, Page, TextBox
-    from pdfexact.render.render_plan import build_render_plan
-    from pdfexact.scene import _snapshot_value
-
-    visible = TextBox(
-        BBox(0, 0, 100, 20),
-        [],
-        source_id="visible",
-    )
-    discarded = TextBox(
-        BBox(0, 30, 100, 50),
-        [],
-        source_id="discarded",
-    )
-    page = Page(0, 200, 200, [visible, discarded])
-    reason = "historical-test-filter"
-    _journaliser_elements_rejetes(page, page.elements, [visible], reason)
-    page.elements = [visible]
-    document = Document([page])
-    scene = scene_from_legacy_document(document)
-
-    records = list(scene.all_elements())
-    assert {record.element_id for record in records} == {"visible", "discarded"}
-    record = next(record for record in records if record.element_id == "discarded")
-    assert page.discarded_elements == [discarded]
-    assert record.raw is discarded
-    assert record.attributes["source_snapshot"] == _snapshot_value(page.source_inventory["discarded"])
-    assert record.attributes["observation_only"] is True
-    assert record.attributes["discarded_by_historical_pipeline"] is True
-    assert record.verification_state.value == "detected"
-    assert {"event": "filtered", "reason_code": reason} in record.decision_history
-    assert {"event": "transformed", "reason_code": reason, "source_ids": ("discarded",), "output_ids": ()} in record.decision_history
-    assert "discarded" in scene.registry.missing_terminal_states()
-    assert "uncovered-source:discarded" in build_render_plan(document).validate(document)

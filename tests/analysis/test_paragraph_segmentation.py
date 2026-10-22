@@ -11,9 +11,6 @@ from pdfexact.layout.text_comprehension import (
     TextUnderstandingDecision,
     configurer_fournisseur_comprehension_texte,
 )
-from pdfexact.render.reflow import fusionner_flow_paragraphes, prepare_document_elements, prepare_page_elements
-from pdfexact.render.render_plan import build_document_render_plan, build_page_render_plan
-from pdfexact.render.bbox_debug import _native_paragraph_xml
 
 
 def box(x0, y0, x1, y1):
@@ -133,18 +130,6 @@ def test_line_frame_is_used_instead_of_source_first_frame():
     assert [v.layout_frame_id for v in page.elements] == ["title", "body"]
 
 
-def test_locked_paragraphs_survive_same_frame_and_repeated_reflow():
-    page = page_of([line("First paragraph.", 20), line(" ", 34, width=3),
-                    line("Second paragraph.", 48)])
-    page.elements[0].layout_frame_id = "shared-column"
-    page.elements[0].layout_frame_role = "text-column"
-    segmenter_page_textes(page)
-    ids = [v.presentation.get("paragraph_id") for v in page.elements]
-    assert len(ids) == len(set(ids)) == 2 and all(ids)
-    prepared = prepare_page_elements(page.elements)
-    again = prepare_page_elements(prepared)
-    assert len(prepared) == len(again) == 2
-    assert [v.presentation["paragraph_id"] for v in again] == ids
 
 
 @pytest.mark.parametrize("groups", [((0, 1), (1, 2)), ((0, 2),), ((2, 1, 0),), ((0, 99),)])
@@ -198,60 +183,12 @@ def test_one_failed_ai_block_does_not_skip_remaining_blocks_or_discard_their_dec
     assert texts(page) == ["First paragraph continues.", "Second paragraph", "Separate paragraph"]
 
 
-def test_continuous_legacy_fragments_remain_mergeable_but_not_distant_captions():
-    first, second = line("The paragraph continues", 20), line("on this next line.", 34)
-    near = [TextBox(v.bbox, [v], layout_frame_id="column", layout_frame_role="text-column")
-            for v in (first, second)]
-    assert len(prepare_page_elements(near)) == 1
-    far = deepcopy(near)
-    far[1].bbox = far[1].lignes[0].bbox = box(40, 200, 240, 212)
-    assert len(prepare_page_elements(far)) == 2
 
 
-def test_source_fragments_need_positive_continuity_not_only_a_common_frame():
-    first, second = line("A multiline heading", 20, bold=True), line("continued here", 34, bold=True)
-    page = page_of([first])
-    page.elements.extend(page_of([second]).elements)
-    for item in page.elements:
-        item.layout_frame_id = "heading-region"
-        item.layout_frame_role = "heading"
-    segmenter_page_textes(page)
-    assert texts(page) == ["A multiline heading continued here"]
-    assert page.elements[0].presentation["segmentation_owners"] == ["element:0", "element:1"]
-    assert len(prepare_page_elements(page.elements)) == 1
 
 
-def test_paragraph_ids_are_page_scoped_even_when_pdf_line_ids_repeat():
-    first = page_of([line("First paragraph", 20), line("and its continuation.", 34)])
-    for item in first.elements:
-        for index, row in enumerate(item.lignes):
-            row.source_id = f"line:{index}"
-    second = deepcopy(first)
-    second.index = 1
-    document = Document(pages=[first, second])
-    plan = build_document_render_plan(document)
-    ids = [item.element.element_id for items in plan.pages.values() for item in items]
-    assert len(ids) == len(set(ids)) == 2
 
 
-def test_segmented_native_paragraph_keeps_runs_styles_and_source_coordinates():
-    first = line("A sentence with ", 20)
-    styled = Span("a styled run", FontRef("ItalicBold", "Arial", True, True), 10, "A13B50",
-                  souligne=True, barre=True)
-    first.spans.append(styled)
-    second = line("and a continuation.", 34)
-    page = page_of([first, second])
-    segmenter_page_textes(page)
-    element = page.elements[0]
-    original_lines = deepcopy(element.lignes)
-    xml = _native_paragraph_xml(element)
-    assert xml.count("<w:p>") == 1
-    assert '<w:sz w:val="20"/>' in xml
-    assert '<w:color w:val="A13B50"/>' in xml
-    assert '<w:b/>' in xml and '<w:i/>' in xml
-    assert 'w:u' in xml and '<w:strike/>' in xml
-    assert element.lignes == original_lines
-    assert element.bbox == quantifier_bbox(BBox(first.bbox.x0, first.bbox.y0, second.bbox.x1, second.bbox.y1))
 
 
 @pytest.mark.parametrize("ai_merge", [False, True])
@@ -352,63 +289,6 @@ def locked_paragraph(text, y, paragraph_id, *, x=40, width=200, multiline=False)
     return element
 
 
-@pytest.mark.parametrize("via_reflow", [False, True])
-@pytest.mark.parametrize("explicit_boundary", [False, True])
-def test_mixed_page_preserves_locked_nodes_ids_styles_and_coordinates(via_reflow, explicit_boundary):
-    locked = [locked_paragraph("First independent paragraph", 20, "page:0:paragraph:0"),
-              locked_paragraph("Second independent paragraph", 34, "page:0:paragraph:1")]
-    if not explicit_boundary:
-        for element in locked:
-            element.presentation.pop("boundary_before")
-    snapshots = deepcopy(locked)
-    page = page_of([line("New unvalidated paragraph", 48), line("and its continuation", 62)])
-    page.elements[0].layout_frame_id = "shared-frame"
-    page.elements = [*locked, *page.elements]
-    original = deepcopy(page)
-    calls = []
-
-    def provider(kind, rows, role, metadata):
-        calls.append(rows)
-        return None
-
-    configurer_fournisseur_comprehension_texte(provider)
-    try:
-        if via_reflow:
-            result = prepare_document_elements(Document(pages=[page]))[0]
-            assert page == original
-        else:
-            segmenter_page_textes(page)
-            result = page.elements
-        assert len(result) == 3
-        if via_reflow:
-            for element, saved in zip(result, locked):
-                assert element is not saved
-                assert element.source_id == saved.source_id
-                assert element.source_ids == saved.source_ids
-                assert element.bbox == saved.bbox
-                assert element.lignes == saved.lignes
-                assert element.presentation == saved.presentation
-                assert element.presentation["custom"] is not saved.presentation["custom"]
-                assert all(left is not right for left, right in zip(element.lignes, saved.lignes))
-        else:
-            assert all(any(element is saved for element in result) for saved in locked)
-        assert locked == snapshots
-        ids = [element.presentation["paragraph_id"] for element in result]
-        assert len(ids) == len(set(ids))
-        assert ids[:2] == ["page:0:paragraph:0", "page:0:paragraph:1"]
-        assert ids[2] == "page:0:paragraph:2"
-        assert calls == [("New unvalidated paragraph", "and its continuation")]
-        page.elements = result
-        segmenter_page_textes(page)
-        assert page.elements == result
-        assert all(left is right for left, right in zip(page.elements, result))
-        assert len(calls) == 1
-        if via_reflow:
-            result[0].presentation["custom"]["keep"].append(3)
-            result[0].lignes[0].spans[0].texte = "Modified prepared copy"
-            assert locked == snapshots
-    finally:
-        configurer_fournisseur_comprehension_texte(None)
 
 
 @pytest.mark.parametrize("one_source", [False, True])
@@ -693,61 +573,3 @@ def test_cross_frame_source_fragments_require_proof_and_preserve_owner_constrain
     assert owners == ([["element:0", "element:1"]] if count == 1 else [["element:0"], ["element:1"]])
 
 
-@pytest.mark.parametrize("distinct_frames", [False, True])
-@pytest.mark.parametrize("path", ["segmentation-block", "segmentation-fragments", "legacy-textbox", "legacy-flow"])
-def test_fused_paragraph_container_covers_all_frames_without_changing_source(path, distinct_frames):
-    rows = [line("The project continues across several regions", 20),
-            line("while preserving its existing operational interfaces", 34, width=240)]
-    frame_boxes = ([box(40, 20, 240, 32), box(40, 34, 280, 46)] if distinct_frames
-                   else [box(35, 15, 290, 60)] * 2)
-    for index, row in enumerate(rows):
-        row.layout_frame_id = "frame-B" if distinct_frames and index else "frame-A"
-        row.layout_frame_bbox = frame_boxes[index]
-        row.layout_frame_role, row.layout_frame_strategy = "text-column", "word-text"
-        row.source_id = f"source-line:{index}"
-    elements = ([page_of(rows).elements[0]] if path == "segmentation-block"
-                else [page_of([row]).elements[0] for row in rows])
-    for index, element in enumerate(elements):
-        row = element.lignes[0]
-        for name in ("layout_frame_id", "layout_frame_bbox", "layout_frame_role", "layout_frame_strategy"):
-            setattr(element, name, getattr(row, name))
-        element.source_id = f"source-block:{index}"
-        element.source_ids = (element.source_id, *(row.source_id for row in element.lignes))
-    if path == "legacy-flow":
-        elements = [FlowParagraph(
-            bbox=element.bbox, texte="".join(span.texte for span in element.lignes[0].spans),
-            police=element.lignes[0].spans[0].police, size_pt=10, couleur="123456",
-            lignes=element.lignes, spans=element.lignes[0].spans,
-            layout_frame_id=element.layout_frame_id, layout_frame_bbox=element.layout_frame_bbox,
-            layout_frame_role=element.layout_frame_role, layout_frame_strategy=element.layout_frame_strategy,
-            source_id=element.source_id, source_ids=element.source_ids,
-        ) for element in elements]
-    source = deepcopy(elements)
-    page = Page(0, pt_vers_emu(600), pt_vers_emu(800), list(elements))
-    if path.startswith("segmentation"):
-        segmenter_page_textes(page)
-        assert len(page.elements) == 1
-        fused = page.elements[0]
-    else:
-        fused = fusionner_flow_paragraphes(elements)
-    assert elements == source
-    assert fused.lignes == rows
-    assert fused.layout_frame_role == "text-column"
-    assert fused.layout_frame_strategy == "word-text"
-    assert {row.source_id for row in rows}.issubset(fused.source_ids)
-    if distinct_frames:
-        assert fused.layout_frame_id is None
-        assert fused.layout_frame_bbox == fused.bbox
-        assert fused.layout_frame_bbox.largeur >= rows[1].bbox.largeur
-    else:
-        assert fused.layout_frame_id == "frame-A"
-        assert fused.layout_frame_bbox == frame_boxes[0]
-    plan = build_page_render_plan(page, [fused])
-    planned = plan.for_page(0)[0]
-    assert planned.element.attributes["layout_frame_bbox"] == fused.layout_frame_bbox
-    assert planned.element.attributes["geometry_locked"] is True
-    assert planned.element.bbox == fused.bbox
-    assert planned.decision.mode in {RenderMode.POSITIONED_TEXT, RenderMode.LOCKED_NATIVE_PARAGRAPH}
-    assert planned.decision.editable
-    assert plan.validate() == []
-    assert elements == source

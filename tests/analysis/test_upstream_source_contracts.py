@@ -366,30 +366,6 @@ def test_required_span_public_aliases_accept_defaults_and_preserve_zero():
     assert span.z_index == 0
 
 
-def test_document_assembly_keeps_acquired_coordinates_without_source_quantization(monkeypatch, tmp_path):
-    import pymupdf
-    from pdfexact.extract import document as extractor
-    from pdfexact.render.render_plan import build_render_plan
-
-    path = tmp_path / "source.pdf"
-    with pymupdf.open() as pdf:
-        pdf.new_page(width=200, height=200)
-        pdf.save(path)
-    box = text_box("A")
-    bbox = BBox(128651, 129159, 637413, 282321)
-    box.bbox = box.lignes[0].bbox = box.lignes[0].spans[0].bbox = bbox
-    monkeypatch.setattr(extractor, "collecter_polices", lambda *a: {})
-
-    def acquire(page, *_args, **_options):
-        page.elements.append(box)
-        capture_source_observations(page, page.elements)
-
-    monkeypatch.setattr(extractor, "_remplir_page", acquire)
-    doc = extractor.extraire(path, strict=True)
-    assert doc.pages[0].elements[0].bbox == bbox
-    assert doc.pages[0].source_inventory[box.source_id].bbox == bbox
-    assert doc.scene.registry.elements[box.source_id].bbox == bbox
-    assert build_render_plan(doc).validate(doc) == []
 
 
 def test_legacy_local_line_aliases_are_acquisition_scoped_before_scene_registration():

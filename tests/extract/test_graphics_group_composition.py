@@ -10,8 +10,6 @@ from pdfexact.extract.text import extraire_texte
 from pdfexact.extract.vector import extraire_vectoriel
 from pdfexact.geometry import PageGeometry
 from pdfexact.ir import Document, FontAsset, Page, RasterEl
-from pdfexact.render.docx_writer import construire_document_xml_compat
-from pdfexact.render.package import GestionnaireRelations
 
 
 def _png(color, alpha=255):
@@ -117,46 +115,5 @@ def test_reused_form_has_distinct_group_occurrences_and_applies_each_opacity_onc
         assert abs(actual[3] - source[3]) <= 1
 
 
-def test_mixed_native_text_group_is_not_rasterized_and_reports_limit(monkeypatch):
-    monkeypatch.setattr("pdfexact.extract.text._corriger_espacement", lambda *args: None)
-    with pymupdf.open() as pdf:
-        page = pdf.new_page(width=200, height=200)
-        page.insert_image((20, 20, 120, 120), stream=_png("red"))
-        page.insert_text((35, 60), "Editable group text", fontsize=10)
-        page.insert_image((80, 80, 180, 180), stream=_png("blue"))
-        _group(pdf, page, 0)
-        geometry = PageGeometry.depuis_page(page)
-        fonts = {"Helvetica": FontAsset("Helvetica", "Arial", None, "ttf", False)}
-        texts = extraire_texte(page, fonts, geometry)
-        media = {}
-        with pytest.warns(RuntimeWarning, match="native text"):
-            images = extraire_images(page, pdf, media, geometry)
-        assert len(images) == 2
-        assert not any(isinstance(element, RasterEl) and element.purpose == "source-graphics-group" for element in images)
-        document = Document(pages=[Page(0, 200 * 12700, 200 * 12700, [*images, *texts])], media=media)
-        root = ET.fromstring(construire_document_xml_compat(document, GestionnaireRelations()))
-        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-        assert "Editable group text" in "".join(node.text or "" for node in root.findall(".//w:t", namespace))
 
 
-@pytest.mark.parametrize("levels", (1, 2))
-def test_text_only_groups_report_each_unsupported_effect_without_rasterizing(levels, monkeypatch):
-    monkeypatch.setattr("pdfexact.extract.text._corriger_espacement", lambda *args: None)
-    with pymupdf.open() as pdf:
-        page = pdf.new_page(width=200, height=200)
-        page.insert_text((35, 60), "Editable text-only group", fontsize=10)
-        for level in range(levels):
-            _group(pdf, page, level)
-        geometry = PageGeometry.depuis_page(page)
-        fonts = {"Helvetica": FontAsset("Helvetica", "Arial", None, "ttf", False)}
-        texts = extraire_texte(page, fonts, geometry)
-        media = {}
-        with pytest.warns(RuntimeWarning, match="contains native text") as diagnostics:
-            images = extraire_images(page, pdf, media, geometry)
-        assert len(diagnostics) == levels
-        assert images == []
-        assert media == {}
-        document = Document(pages=[Page(0, 200 * 12700, 200 * 12700, texts)], media=media)
-        root = ET.fromstring(construire_document_xml_compat(document, GestionnaireRelations()))
-        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-        assert "Editable text-only group" in "".join(node.text or "" for node in root.findall(".//w:r/w:t", namespace))

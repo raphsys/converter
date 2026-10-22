@@ -180,21 +180,3 @@ def test_preserve_etat_page_restaure_cropbox_rotation_et_rect():
     assert etat_page(page) == original
     assert page.rect == rect_initial
 
-
-@pytest.mark.parametrize("y0_pt", [137.0, 137.2, 137.45, 160.1, 183.33])
-def test_un_filet_fin_garde_la_meme_epaisseur_quelle_que_soit_sa_position(y0_pt):
-    from pdfexact.geometry import GRILLE_DIXIEME_MM_EMU, quantifier_bbox
-
-    filet = quantifier_bbox(BBox(pt_vers_emu(83), pt_vers_emu(y0_pt), pt_vers_emu(229), pt_vers_emu(y0_pt + 0.72)))
-    reference = quantifier_bbox(BBox(pt_vers_emu(83), pt_vers_emu(300), pt_vers_emu(229), pt_vers_emu(300.72)))
-    assert filet.hauteur == reference.hauteur == 3 * GRILLE_DIXIEME_MM_EMU
-    centre = (pt_vers_emu(y0_pt) + pt_vers_emu(y0_pt + 0.72)) / 2
-    assert abs((filet.y0 + filet.y1) / 2 - centre) <= GRILLE_DIXIEME_MM_EMU / 2
-
-
-def test_une_boite_epaisse_conserve_son_enveloppe():
-    from pdfexact.geometry import quantifier_bbox
-
-    boite = BBox(pt_vers_emu(10.1), pt_vers_emu(20.1), pt_vers_emu(200.3), pt_vers_emu(80.3))
-    q = quantifier_bbox(boite)
-    assert q.x0 <= boite.x0 and q.y0 <= boite.y0 and q.x1 >= boite.x1 and q.y1 >= boite.y1

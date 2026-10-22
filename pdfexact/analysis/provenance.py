@@ -242,12 +242,10 @@ def source_paint_index(element: object) -> int | None:
         for value in (getattr(line, "z_index", None), *(getattr(span, "z_index", None) for span in line.spans))
         if value is not None
     ]
-    # Painted components are authoritative. A container value is an aggregate
-    # that survives splits and views, so it may describe siblings painted
-    # earlier; it only answers when no component carries a sequence.
-    if values:
-        return min(values)
-    return getattr(element, "z_index", None)
+    value = getattr(element, "z_index", None)
+    if value is not None:
+        values.append(value)
+    return min(values) if values else None
 
 
 @dataclass(frozen=True)

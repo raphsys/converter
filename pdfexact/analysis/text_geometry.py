@@ -161,21 +161,13 @@ def block_alignment(element) -> str:
     words = len(_text(element).split())
     if explicit in {"center", "right", "both", "justify"}:
         return "both" if explicit == "justify" else explicit
-    from pdfexact.analysis.line_structure import geometric_alignment, is_leader_line
-
-    # Native PDF rows carry no alignment attribute: their edges prove it.
-    geometric = geometric_alignment(lines)
-    if geometric is not None:
-        return geometric
     if role in GEOMETRIC_ROLES or role in HEADING_ROLES:
         return "left"
     # Un bloc court ou compose en grand corps est typographiquement un titre,
     # meme lorsque le PDF ne porte pas de role semantique exploitable.
     if _max_size(element) >= 16.0 or (len(lines) <= 5 and words <= 12):
         return "left"
-    # A leader row reaches the right edge through its leader, not through word
-    # spacing: it is never evidence of justified text.
-    non_final = [line for line in lines[:-1] if not is_leader_line(line)]
+    non_final = lines[:-1]
     if len(non_final) >= 2:
         bbox = getattr(element, "bbox", None)
         tolerance = pt_vers_emu(2.0)

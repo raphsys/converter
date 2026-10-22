@@ -32,12 +32,9 @@ def pipeline(monkeypatch, tmp_path):
     monkeypatch.setattr(reconstruct, "creer_fournisseur_comprehension_texte_ai", provider)
     monkeypatch.setattr(reconstruct, "extraire", extract)
     monkeypatch.setattr(reconstruct, "_normaliser_texte", lambda document: None)
-    monkeypatch.setattr(reconstruct, "_construire_plan_unique", lambda document: SimpleNamespace(pages={}))
     monkeypatch.setattr(reconstruct, "_enregistrer_catalogue", lambda *args: None)
-    monkeypatch.setattr(reconstruct, "_ecrire_bboxes_pdf", lambda *args: [])
-    monkeypatch.setattr(reconstruct, "_ecrire_docx_vierge", lambda *args: None)
-    monkeypatch.setattr(reconstruct, "_remplir_non_textes", lambda *args: None)
-    monkeypatch.setattr(reconstruct, "_remplir_textes", lambda *args: None)
+    monkeypatch.setattr(reconstruct, "annotate_pdf_bboxes", lambda *args: [])
+    monkeypatch.setattr(reconstruct, "write_bbox_docx", lambda *args: [])
     calls["argv"] = ["reconstruct_bbox_native.py", "unused.pdf", "--pdf-out", str(tmp_path / "bbox.pdf"),
                      "--docx-out", str(tmp_path / "out.docx")]
     with comprehension.contexte_comprehension_texte():

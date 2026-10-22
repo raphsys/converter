@@ -1,5 +1,4 @@
-"""Conversion de PDF natifs en DOCX visuellement fidèles."""
-from pdfexact.cli import convertir
+"""Extraction, comprehension et segmentation de PDF, avec catalogue des caracteristiques et bboxes."""
 from pdfexact.report import Rapport
 
-__all__ = ["convertir", "Rapport"]
+__all__ = ["Rapport"]

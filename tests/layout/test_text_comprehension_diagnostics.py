@@ -139,12 +139,9 @@ def test_script_provider_spans_pipeline_and_restores_caller(
     monkeypatch.setattr(reconstruct, "construire", lambda **_kwargs: None)
     monkeypatch.setattr(reconstruct, "dossiers_par_defaut", lambda: [])
     monkeypatch.setattr(reconstruct, "_normaliser_texte", normalize)
-    monkeypatch.setattr(reconstruct, "_construire_plan_unique", lambda _doc: SimpleNamespace(pages={}))
     monkeypatch.setattr(reconstruct, "_enregistrer_catalogue", lambda *_args: None)
-    monkeypatch.setattr(reconstruct, "_ecrire_bboxes_pdf", lambda *_args: [])
-    monkeypatch.setattr(reconstruct, "_ecrire_docx_vierge", lambda *_args: None)
-    monkeypatch.setattr(reconstruct, "_remplir_non_textes", lambda *_args: None)
-    monkeypatch.setattr(reconstruct, "_remplir_textes", fill)
+    monkeypatch.setattr(reconstruct, "annotate_pdf_bboxes", lambda *_args: [])
+    monkeypatch.setattr(reconstruct, "write_bbox_docx", fill)
 
     if fail_during_normalization:
         with pytest.raises(RuntimeError, match="normalization failed"):
@@ -417,34 +414,3 @@ def test_reflow_structured_row_fallback_survives_provider_failures(failure):
     assert decision.fallback_used is True
 
 
-@pytest.mark.parametrize("preserve_lines", [False, True])
-def test_structured_rows_render_as_breaks_inside_one_editable_word_paragraph(preserve_lines):
-    from xml.etree import ElementTree
-
-    from pdfexact.geometry import BBox, pt_vers_emu
-    from pdfexact.ir import FontRef, Line, Span, TextBox
-    from pdfexact.layout.paragraph_planner import planifier_paragraphe
-    from pdfexact.render.bbox_debug import _native_paragraph_xml
-
-    rows = ["Research division", "Operations group", "Customer support"]
-    font = FontRef("Test", "Arial", False, False)
-    bbox = BBox(pt_vers_emu(40), pt_vers_emu(60), pt_vers_emu(300), pt_vers_emu(96))
-    lines = [
-        Line(
-            BBox(bbox.x0, pt_vers_emu(60 + 12 * index), bbox.x1, pt_vers_emu(72 + 12 * index)),
-            [Span(text, font, 10, "000000")], pt_vers_emu(12), bbox.largeur,
-        )
-        for index, text in enumerate(rows)
-    ]
-    block = TextBox(bbox, lines, semantic_role="heading" if preserve_lines else None)
-    plan = planifier_paragraphe(block)
-    assert plan.preserve_lines is preserve_lines
-    assert plan.joins == ("preserve_break", "preserve_break")
-    namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    root = ElementTree.fromstring(
-        '<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        + _native_paragraph_xml(block) + "</root>"
-    )
-    assert len(root.findall(f".//{namespace}p")) == 1
-    assert len(root.findall(f".//{namespace}br")) == len(rows) - 1
-    assert [node.text for node in root.findall(f".//{namespace}t")] == rows

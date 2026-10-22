@@ -14,7 +14,6 @@ from pdfexact.ir import Document, FontRef, Line, Page, Span, TextBox, element_so
 from pdfexact.layout.model import LayoutRegion
 from pdfexact.layout.planner import LayoutPlanItem
 from pdfexact.layout.text_comprehension import contexte_comprehension_texte, configurer_fournisseur_comprehension_texte
-from pdfexact.render.render_plan import build_document_render_plan
 from pdfexact.scene import _snapshot_value, capture_source_observations
 
 
@@ -52,59 +51,8 @@ def native_selection(pdf_texte):
         return Document([page], polices=fonts)
 
 
-@pytest.mark.parametrize("placement", ["matched", "inferred"])
-def test_frames_do_not_mutate_selected_native_line_digests(native_selection, placement):
-    document = native_selection
-    page = document.pages[0]
-    before = {line.source_id: _digest(line) for source in page.elements for line in source.lignes}
-    inventory = _snapshot_value(page.source_inventory)
-    assert build_document_render_plan(document).validate(document) == []
-    bbox = (BBox(0, 0, page.largeur_emu, page.hauteur_emu) if placement == "matched"
-            else BBox(u(400), u(400), u(450), u(450)))
-    page.elements = _attacher_frames_texte(page.elements, [frame(bbox)])
-    assert all(source.layout_frame_id for source in page.elements)
-    assert {line.source_id: _digest(line) for source in page.elements for line in source.lignes} == before
-    assert _snapshot_value(page.source_inventory) == inventory
-    plan = build_document_render_plan(document)
-    assert plan.validate(document) == []
-    assert _snapshot_value(page.source_inventory) == inventory
-    # The producer fix must not excuse a later real change, even metadata-only.
-    page.elements[0].lignes[0].layout_frame_strategy = "mutated-after-selection"
-    assert any(error.endswith(":native-source-not-preserved") for error in plan.validate(document)) or any(
-        error.startswith("source-mutated-after-plan:") for error in plan.validate(document)
-    )
 
 
-def test_multiframe_owner_preserves_real_components_and_contiguous_order():
-    font = FontRef("source-font", "Arial", False, False)
-    lines = []
-    for index, y in enumerate((60, 80, 100)):
-        bbox = BBox(u(40), u(y), u(200), u(y + 12))
-        span = Span(f"Source row {index}", font, 12, "000000", bbox=bbox,
-                    source_id=f"span-{index}", source_kind="pdf-native", z_index=index)
-        span.opacity = 0 if index == 1 else .4
-        line = Line(bbox, [span], u(12), bbox.largeur, source_id=f"line-source-{index}",
-                    source_kind="pdf-native", z_index=index)
-        line.acquisition_note = {"unknown": None, "zero": 0}
-        lines.append(line)
-    root = TextBox(BBox(u(40), u(60), u(200), u(112)), lines,
-                   source_id="source-owner", source_kind="pdf-native", z_index=0)
-    page = Page(0, u(300), u(400), [root])
-    capture_source_observations(page, page.elements)
-    originals = deepcopy(lines)
-    inventory = _snapshot_value(page.source_inventory)
-    column = frame(BBox(u(30), u(50), u(210), u(122)))
-    heading = frame(BBox(u(35), u(78), u(205), u(94)), "heading")
-    page.elements = _attacher_frames_texte(page.elements, [column, heading])
-    assert [owner.layout_frame_role for owner in page.elements] == ["text-column", "heading", "text-column"]
-    actual = [line for owner in page.elements for line in owner.lignes]
-    assert [_snapshot_value(line) for line in actual] == [_snapshot_value(line) for line in originals]
-    assert [line.source_id for line in actual] == [line.source_id for line in originals]
-    for owner in page.elements:
-        assert owner.source_ids == (root.source_id, *element_source_ids(owner.lignes[0]))
-    assert _snapshot_value(page.source_inventory) == inventory
-    document = Document([page])
-    assert build_document_render_plan(document).validate(document) == []
 
 
 def test_unacquired_lines_can_receive_initial_frame_metadata():

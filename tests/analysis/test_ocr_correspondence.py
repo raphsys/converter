@@ -7,7 +7,6 @@ import pytest
 from pdfexact.analysis.provenance import Evidence
 from pdfexact.geometry import BBox, PageGeometry, pt_vers_emu as u
 from pdfexact.ir import Document, FontRef, Line, Page, Span, TextBox, element_source_ids
-from pdfexact.render.render_plan import SourceCoverage, build_render_plan, build_scene_render_plan
 from pdfexact.scene import (
     _snapshot_value, capture_source_observations, element_record_from_legacy,
     record_source_transformation, scene_from_legacy_document,
@@ -76,20 +75,6 @@ def verify(data, *, proof=None, outputs=None, inventory=None, events=None, sourc
     )
 
 
-def test_unique_padded_observation_has_typed_plan_coverage_without_alias_union(acquired):
-    before = _snapshot_value(acquired[0].pages[0].source_inventory)
-    data = selected(acquired)
-    doc, native, observation, inventory, proof, event = data
-    assert verify(data) == []
-    for ident in element_source_ids(observation):
-        assert verify(data, source=inventory[ident]) == []
-    plan = build_render_plan(doc)
-    assert plan.validate(doc) == []
-    for ident in element_source_ids(observation):
-        assert plan.source_coverage[ident].relationship == "observation-superseded-by-native"
-        assert plan.source_coverage[ident].target_ids == (native.source_id,)
-    assert not set(element_source_ids(observation)).intersection(element_source_ids(native))
-    assert _snapshot_value(doc.pages[0].source_inventory) == before
 
 
 @pytest.mark.parametrize("fake", [None, True, {}, {"schema": "pdfexact.ocr-native-correspondence.v1", "verified": True}])
@@ -224,14 +209,6 @@ def test_all_acquired_candidates_and_inverse_uniqueness_are_checked(acquired, du
     assert proof is None and "ambiguous-correspondence" in errors
 
 
-def test_native_source_cannot_use_observation_outcome_even_with_valid_foreign_proof(acquired):
-    data = selected(acquired)
-    assert verify(data, source=data[3][data[1].source_id])
-    plan = build_render_plan(data[0])
-    plan.source_coverage[data[1].source_id] = SourceCoverage(
-        (data[1].source_id,), "observation-superseded-by-native", "claimed observation",
-    )
-    assert any(data[1].source_id in error for error in plan.validate())
 
 
 def test_shared_builder_can_select_unique_line_without_producer_matching(acquired):
@@ -307,69 +284,12 @@ def test_observed_convex_quads_keep_both_original_geometries(acquired):
     assert data[4]["matching"]["metrics"]["quad_iou"] >= .5
 
 
-@pytest.mark.parametrize("change", ["proof", "payload", "inventory", "event", "no-binding"])
-def test_provided_plan_revalidates_correspondence_instead_of_trusting_compilation(acquired, change):
-    data = selected(acquired)
-    plan = build_render_plan(data[0])
-    assert plan.validate() == []
-    if change == "proof":
-        instruction = plan.instructions_for_page(3)[0]
-        proof = dict(instruction.element.evidence[0].details)["proof"]
-        proof["native_ref"]["node_sha256"] = {}
-    elif change == "payload":
-        plan.instructions_for_page(3)[0].element.lignes[0].spans[0].surlignage = "yellow"
-    elif change == "inventory":
-        plan.source_inventory[data[1].lignes[0].source_id].raw.quad = ((0, 0),) * 4
-    elif change == "event":
-        plan.source_inventory[data[2].source_id].decision_history.clear()
-    else:
-        for record in plan.source_inventory.values():
-            record.attributes.pop("source_page_binding", None)
-    assert any("ocr-native-correspondence" in error for error in plan.validate())
 
 
-def test_scene_only_plan_uses_acquisition_tree_not_owner_with_added_proof(acquired):
-    data = selected(acquired)
-    scene = scene_from_legacy_document(data[0])
-    plan = build_scene_render_plan(scene)
-    assert plan.validate() == []
-    assert plan.source_coverage[data[2].source_id].relationship == "observation-superseded-by-native"
-    assert plan.source_inventory[data[1].source_id].raw.evidence == []
 
 
-@pytest.mark.parametrize("change", ["highlight", "confidence", "page-binding"])
-def test_document_changes_after_plan_are_rejected_without_rebuilding(acquired, change):
-    data = selected(acquired)
-    doc = data[0]
-    plan = build_render_plan(doc)
-    assert plan.validate(doc) == []
-    if change == "highlight":
-        data[1].lignes[0].spans[0].surlignage = "yellow"
-    elif change == "confidence":
-        data[1].lignes[0].spans[0].confidence = 0.0
-    else:
-        doc.pages[0].largeur_emu += u(1)
-    assert plan.validate(doc)
-    assert plan.validate() == []
 
 
-def test_two_unique_observations_cover_all_six_nodes_without_rewriting_geometry(acquired):
-    doc, native, observation = acquired
-    second_native = source_tree("Second text", "pdf-native", BBox(u(10), u(50), u(110), u(60)))
-    second_observation = source_tree("Second text", "ocr", BBox(u(9), u(49), u(111), u(61)))
-    page = doc.pages[0]
-    capture_source_observations(page, [second_native, second_observation])
-    page.elements.append(second_native)
-    snapshot = _snapshot_value(page.source_inventory)
-    selected(acquired)
-    selected((doc, second_native, second_observation))
-    plan = build_render_plan(doc)
-    assert plan.validate(doc) == []
-    observation_ids = set(element_source_ids(observation)) | set(element_source_ids(second_observation))
-    assert len(observation_ids) == 6
-    assert all(plan.source_coverage[key].relationship == "observation-superseded-by-native" for key in observation_ids)
-    assert not observation_ids.intersection(key for output in page.elements for key in element_source_ids(output))
-    assert _snapshot_value(page.source_inventory) == snapshot
 
 
 @pytest.mark.parametrize("kind", ["native", "observation"])
@@ -400,21 +320,6 @@ def test_pure_helpers_preserve_unknown_and_zero_confidence_and_inventory(acquire
     assert inventory[observation.source_id].raw.confidence is None
 
 
-@pytest.mark.parametrize("entry", ["direct", "scene"])
-def test_acquisition_raw_cannot_hide_modified_actual_materialization(acquired, entry):
-    data = selected(acquired)
-    if entry == "direct":
-        output = deepcopy(data[1])
-        output.acquisition_raw = deepcopy(data[0].pages[0].source_inventory[data[1].source_id])
-        output.lignes[0].spans[0].surlignage = "yellow"
-        assert "native-source-not-preserved" in verify(data, outputs=[output])
-    else:
-        scene = scene_from_legacy_document(data[0])
-        owner = next(record for record in scene.all_elements() if record.element_id == data[1].source_id)
-        assert owner.acquisition_raw is not None
-        owner.raw.lignes[0].spans[0].surlignage = "yellow"
-        plan = build_scene_render_plan(scene)
-        assert any("native-source-not-preserved" in error for error in plan.validate())
 
 
 @pytest.mark.parametrize("gate", ["intersection", "area-ratio", "directed-angle", "quad-iou"])

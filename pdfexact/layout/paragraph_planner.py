@@ -127,68 +127,8 @@ def _est_composition_affichee(element, textes: tuple[str, ...]) -> bool:
     return max(tailles) >= 16.0
 
 
-_RUPTURES = frozenset({"preserve_break", "paragraph_break"})
-# A row wider than its available width is condensed to 98 % of it (2 % of
-# renderer rounding); a row narrower than 90 % of its source width is widened
-# back to 98 % of it. Rows in between keep their natural width.
-_MARGE_ARRONDI = 0.98
-_ZONE_NEUTRE_BASSE = 0.90
-_ECHELLE_MIN, _ECHELLE_MAX = 50, 200
-
-
-def _mesure_premier_mot(polices):
-    if not polices:
-        return None
-    from dataclasses import replace
-
-    def mesure(line, word):
-        spans = [span for span in line.spans if span.texte]
-        return _police_largeur(word, [replace(spans[0], texte=word)], polices) if spans else None
-
-    return mesure
-
-
-def _largeur_utile_pt(line, polices) -> float | None:
-    """Width a row needs once rendered: a leader becomes a tab, not glyphs."""
-    from pdfexact.analysis.line_structure import split_leader
-
-    parts = split_leader("".join(span.texte for span in line.spans))
-    if parts is None:
-        return _largeur_ligne_pt(line, polices)
-    spans = [span for span in line.spans if span.texte]
-    if not spans or not polices:
-        return None
-    from dataclasses import replace
-
-    label, page, _ = parts
-    return _police_largeur(f"{label}   {page}", [replace(spans[0], texte=f"{label}   {page}")], polices)
-
-
-def _echelle(mesure, largeur_pt, disponible_pt=None, *, agrandir=True) -> int:
-    """Horizontal scale of a row rendered with a substitute face.
-
-    A row is condensed only when it would not fit the width available in its
-    frame (it would wrap or leave the box); it is widened back towards its
-    source width when the substitute is clearly narrower. Matching metrics
-    are left untouched."""
-    if not mesure or largeur_pt <= 0:
-        return 100
-    disponible_pt = max(disponible_pt or largeur_pt, largeur_pt)
-    if mesure > disponible_pt:
-        return max(_ECHELLE_MIN, round(disponible_pt * _MARGE_ARRONDI / mesure * 100))
-    if agrandir and mesure < largeur_pt * _ZONE_NEUTRE_BASSE:
-        return min(_ECHELLE_MAX, round(largeur_pt * _MARGE_ARRONDI / mesure * 100))
-    return 100
-
-
-def planifier_paragraphe(element, polices=None, column_right=None) -> ParagraphLayoutPlan:
-    """Construit le plan unique consomme par tous les renderers Word.
-
-    ``column_right`` is the right edge of the text column holding the block;
-    a row stopping before it while the next word would fit was broken on
-    purpose. It defaults to the block's own edge."""
-    from pdfexact.analysis.line_structure import geometric_alignment, hard_break_reason, is_leader_line
-
+def planifier_paragraphe(element, polices=None) -> ParagraphLayoutPlan:
+    """Construit le plan unique consomme par tous les renderers Word."""
     textes = _textes(element)
     if not textes:
         return ParagraphLayoutPlan((), (), (), False, 0, ("empty",))
@@ -219,47 +159,26 @@ def planifier_paragraphe(element, polices=None, column_right=None) -> ParagraphL
         ) else join
         for previous, current, join in zip(lignes, lignes[1:], joins)
     )
-    right_edge = max(column_right or 0, element.bbox.x1)
-    mesure_mot = _mesure_premier_mot(polices)
-    joins = tuple(
-        "preserve_break" if join not in _RUPTURES and hard_break_reason(
-            previous, current, right_edge, measure=mesure_mot,
-        ) else join
-        for previous, current, join in zip(lignes, lignes[1:], joins)
-    )
-    # Ragged-left and centred rows are compositions: each break is authored.
-    display = display or geometric_alignment(lignes) in {"right", "center"}
-    dernier = len(lignes) - 1
-    figees = tuple(
-        display or len(lignes) == 1 or (
-            (index == 0 or joins[index - 1] in _RUPTURES)
-            and (index == dernier or joins[index] in _RUPTURES)
+    mesures = tuple(_largeur_ligne_pt(line, polices) for line in lignes)
+    line_width_scale = tuple(
+        max(
+            70,
+            min(
+                100,
+                round((emu_vers_pt(line.bbox.largeur) * 0.96 / mesure) * 100),
+            ),
         )
-        for index in range(len(lignes))
+        if len(textes) == 1 and mesure and mesure > emu_vers_pt(line.bbox.largeur) * 0.96
+        else 100
+        for line, mesure in zip(lignes, mesures)
     )
-    mesures = tuple(_largeur_utile_pt(line, polices) for line in lignes)
-    # A fixed row keeps its own source width, whatever the substitute font:
-    # it must neither leave its box (wider face) nor shrink (narrower face).
-    line_width_scale = [
-        _echelle(mesure, emu_vers_pt(line.bbox.largeur), emu_vers_pt(element.bbox.x1 - line.bbox.x0),
-                 agrandir=not is_leader_line(line)) if figee else 100
-        for line, mesure, figee in zip(lignes, mesures, figees)
-    ]
-    reflowed = [index for index, figee in enumerate(figees) if not figee]
-    if reflowed and all(mesures[index] for index in reflowed):
-        # Reflowed rows share one scale so the block keeps its row count.
-        source = sum(emu_vers_pt(lignes[index].bbox.largeur) for index in reflowed)
-        commune = _echelle(sum(mesures[index] for index in reflowed), source, agrandir=False)
-        for index in reflowed:
-            line_width_scale[index] = commune
-    line_width_scale = tuple(line_width_scale)
     line_spacing = tuple(
-        0 if scale != 100 else _espacement_pour_ligne(line, polices)
+        0 if scale < 100 else _espacement_pour_ligne(line, polices)
         for line, scale in zip(lignes, line_width_scale)
     )
-    if display or all(join in _RUPTURES for join in joins):
+    if display:
         estimated = len(textes)
-        evidence = ("display-composition" if display else "source-line-structure", *reflow.evidence)
+        evidence = ("display-composition", *reflow.evidence)
     else:
         largeur = max(float(getattr(element.bbox, "largeur", 0) or 0), 1.0)
         total = 0.0
