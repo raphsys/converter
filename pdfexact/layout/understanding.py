@@ -959,9 +959,5 @@ def _clusteriser(boites: list[BBox], marge_pt: float) -> list[list[BBox]]:
     return clusters
 
 
-def _detecter_colonnes(lignes: list[BBox], largeur_page: int) -> int:
-    return len(detecter_regions_colonnes(lignes, largeur_page, 0))
 
 
-def _detecter_regions_colonnes(lignes: list[BBox], largeur_page: int, hauteur_page: int = 0) -> list[BBox]:
-    return detecter_regions_colonnes(lignes, largeur_page, hauteur_page)

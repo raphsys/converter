@@ -2,11 +2,10 @@ from copy import deepcopy
 
 import pytest
 
-from pdfexact.analysis.decisions import RenderMode
 from pdfexact.analysis.text_geometry import geometry_contract_for, line_has_text, paragraph_bbox_from_lines
 from pdfexact.analysis.text_segmentation import segmenter_page_textes
 from pdfexact.geometry import BBox, pt_vers_emu, quantifier_bbox
-from pdfexact.ir import Document, FlowParagraph, FontRef, ImageEl, Line, Page, Span, TextBox
+from pdfexact.ir import FontRef, ImageEl, Line, Page, Span, TextBox
 from pdfexact.layout.text_comprehension import (
     TextUnderstandingDecision,
     configurer_fournisseur_comprehension_texte,

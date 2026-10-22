@@ -537,84 +537,18 @@ def scene_from_legacy_document(document: object) -> SceneDocument:
     return result
 
 
-def creer_element_record(**kwargs: Any) -> ElementRecord:
-    """Fabrique canonique exigeant une provenance explicite."""
-    if not kwargs.get("element_id"):
-        raise ValueError("element_id obligatoire")
-    if not kwargs.get("source_ids"):
-        raise ValueError("source_ids obligatoire")
-    if "source_kind" not in kwargs:
-        raise ValueError("source_kind obligatoire")
-    return ElementRecord(**kwargs)
 
 
-def ajouter_preuve(element: ElementRecord, preuve: Evidence) -> None:
-    element.add_evidence(preuve)
 
 
-def enregistrer_decision(element: ElementRecord, decision: object, raison: str) -> None:
-    element.render_decision = decision
-    element.decision_history.append({"decision": decision, "reason": raison})
 
 
-def _bind_state(element, state, reason=None):
-    element.verification_state = state
-    registries = getattr(element, "_registries", (getattr(element, "_registry", None),))
-    for registry in registries:
-        if registry is None:
-            continue
-        if hasattr(registry, "bind_state"):
-            registry.bind_state(element.element_id, state, reason=reason)
-        else:
-            registry.record(element.element_id, state.value, reason=reason)
 
 
-def marquer_conserve(element: ElementRecord, mode: object) -> None:
-    element.render_decision = mode
-    _bind_state(element, VerificationState.CLASSIFIED)
-    element.decision_history.append({"event": "preserved", "mode": str(mode)})
 
 
-def marquer_non_representable(element: ElementRecord, raison: str) -> None:
-    if not raison:
-        raise ValueError("raison obligatoire")
-    _bind_state(element, VerificationState.NON_REPRESENTABLE, raison)
-    element.decision_history.append({"event": "non-representable", "reason": raison})
 
 
-def valider_invariants_scene(scene: SceneDocument) -> list[str]:
-    """Valide les invariants sans exiger qu'un rendu ait déjà eu lieu."""
-    errors: list[str] = []
-    seen: set[str] = set()
-    for page in scene.pages:
-        if page.width_emu <= 0 or page.height_emu <= 0:
-            errors.append(f"invalid-page-size:{page.index}")
-        if page.coordinate_space != "page-visible-canonical":
-            errors.append(f"invalid-coordinate-space:{page.index}")
-        for element in page.elements:
-            if element.page_index != page.index:
-                errors.append(f"page-mismatch:{element.element_id}")
-            if element.element_id in seen:
-                errors.append(f"duplicate-element-id:{element.element_id}")
-            seen.add(element.element_id)
-            if not element.source_ids:
-                errors.append(f"missing-provenance:{element.element_id}")
-            if element.bbox is None:
-                if not element.attributes.get("observation_only"):
-                    errors.append(f"missing-bbox:{element.element_id}")
-                continue
-            if element.bbox.largeur < 0 or element.bbox.hauteur < 0:
-                errors.append(f"invalid-bbox:{element.element_id}")
-            if not (
-                0 <= element.bbox.x0 <= page.width_emu
-                and 0 <= element.bbox.x1 <= page.width_emu
-                and 0 <= element.bbox.y0 <= page.height_emu
-                and 0 <= element.bbox.y1 <= page.height_emu
-            ):
-                errors.append(f"bbox-outside-page:{element.element_id}")
-            if element.verification_state is None:
-                errors.append(f"missing-verification-state:{element.element_id}")
-    return errors
 
 
 def __getattr__(name):
@@ -625,45 +559,7 @@ def __getattr__(name):
     raise AttributeError(name)
 
 
-def ordonner_elements_par_peinture(scene: SceneDocument) -> list[ElementRecord]:
-    return sorted(
-        scene.all_elements(),
-        key=lambda item: (item.page_index, item.z_order, item.attributes.get("source_acquisition_index", 0)),
-    )
 
 
-def reperer_recouvrements(scene: SceneDocument) -> dict[str, list[str]]:
-    """Construit les relations d'occlusion sans décider de suppression."""
-    from pdfexact.analysis.geometry import intersection_area
-
-    result: dict[str, list[str]] = {element.element_id: [] for element in scene.all_elements()}
-    by_page: dict[int, list[ElementRecord]] = {}
-    for element in scene.all_elements():
-        by_page.setdefault(element.page_index, []).append(element)
-    for elements in by_page.values():
-        for index, left in enumerate(elements):
-            for right in elements[index + 1:]:
-                if left.bbox is None or right.bbox is None:
-                    continue
-                if intersection_area(left.bbox, right.bbox) <= 0:
-                    continue
-                result[left.element_id].append(right.element_id)
-                result[right.element_id].append(left.element_id)
-    for element_id in result:
-        result[element_id].sort()
-    return result
 
 
-def validate_scene(scene: SceneDocument) -> list[str]:
-    errors: list[str] = []
-    seen: set[str] = set()
-    for element in scene.all_elements():
-        if element.element_id in seen:
-            errors.append(f"duplicate-element-id:{element.element_id}")
-        seen.add(element.element_id)
-        if element.page_index < 0:
-            errors.append(f"negative-page:{element.element_id}")
-        if element.bbox is not None and (element.bbox.largeur < 0 or element.bbox.hauteur < 0):
-            errors.append(f"invalid-bbox:{element.element_id}")
-    errors.extend(f"unregistered:{item}" for item in scene.registry.missing_terminal_states())
-    return errors

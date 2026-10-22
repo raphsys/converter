@@ -25,50 +25,6 @@ def _image_rgba(data: bytes) -> Image.Image:
     return Image.open(BytesIO(data)).convert("RGBA")
 
 
-def preserve_alpha_and_remove_connected_white(data: bytes, extension: str) -> tuple[bytes, str]:
-    """Preserve alpha and make only a white border-connected background transparent.
-
-    A white pixel inside a logo remains white. Seuls les pixels proches du blanc et
-    connectes au bord sont retires, ce qui evite le rectangle blanc artificiel autour
-    d'un logo sans detruire son contenu.
-    """
-    try:
-        image = _image_rgba(data)
-    except Exception:  # noqa: BLE001
-        return data, extension
-    pixels = image.load()
-    width, height = image.size
-    if width < 3 or height < 3:
-        return data, extension
-
-    border = []
-    for x in range(width):
-        border.extend(((x, 0), (x, height - 1)))
-    for y in range(1, height - 1):
-        border.extend(((0, y), (width - 1, y)))
-
-    def near_white(x: int, y: int) -> bool:
-        r, g, b, a = pixels[x, y]
-        return a > 0 and r >= 247 and g >= 247 and b >= 247
-
-    white_border = sum(1 for x, y in border if near_white(x, y))
-    if white_border / max(len(border), 1) < 0.20:
-        return data, extension
-
-    pending = list(dict.fromkeys((x, y) for x, y in border if near_white(x, y)))
-    visited = set(pending)
-    while pending:
-        x, y = pending.pop()
-        r, g, b, _a = pixels[x, y]
-        pixels[x, y] = (r, g, b, 0)
-        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
-            if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in visited and near_white(nx, ny):
-                visited.add((nx, ny))
-                pending.append((nx, ny))
-
-    output = BytesIO()
-    image.save(output, format="PNG")
-    return output.getvalue(), "png"
 
 
 def _matrix_values(matrix) -> tuple[float, ...]:

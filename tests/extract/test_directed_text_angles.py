@@ -1,12 +1,7 @@
-import math
-from types import SimpleNamespace
 
-import pymupdf
 import pytest
 
-from pdfexact.extract.text import _angle_direction, extraire_texte
-from pdfexact.geometry import PageGeometry, etat_page
-from pdfexact.ir import FontAsset
+from pdfexact.extract.text import _angle_direction
 
 
 @pytest.mark.parametrize(

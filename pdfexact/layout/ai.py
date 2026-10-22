@@ -16,7 +16,7 @@ from typing import Any
 
 import pymupdf
 
-from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, pt_vers_emu
+from pdfexact.geometry import BBox, bbox_depuis_rect, pt_vers_emu
 from pdfexact.analysis.geometry import bbox_area, intersection_area
 from pdfexact.layout.model import LayoutPage
 

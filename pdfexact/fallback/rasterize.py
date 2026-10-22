@@ -19,7 +19,7 @@ from pathlib import Path
 import pymupdf
 from PIL import Image, ImageDraw
 
-from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, emu_vers_pt, pt_vers_emu, se_chevauchent
+from pdfexact.geometry import BBox, PageGeometry, emu_vers_pt, pt_vers_emu, se_chevauchent
 from pdfexact.ir import FlowParagraph, ImageEl, MediaItem, RasterEl, TextBox, clone_element_with_metadata, element_source_ids
 from pdfexact.analysis.provenance import Evidence
 
@@ -837,8 +837,6 @@ def _zones_elements_texte(elements: list) -> list[BBox]:
     return zones
 
 
-def _ligne_non_vide(ligne) -> bool:
-    return any(span.texte.strip() for span in ligne.spans)
 
 
 def _texte_inpainting_autorise(texte: str, bbox: BBox) -> bool:
@@ -1013,11 +1011,6 @@ def _segmenter_tuile_vide(tuile: BBox) -> list[tuple[Image.Image, BBox]]:
     ]
 
 
-def _regions_sur_fond_complexe(rects: list[tuple[int, int, int, int]]) -> bool:
-    if len(rects) >= 12:
-        return True
-    hauteur_totale = sum(max(0, y1 - y0) for _x0, y0, _x1, y1 in rects)
-    return hauteur_totale >= 180
 
 
 def _inpaint_regions(image: Image.Image, rects: list[tuple[int, int, int, int]]) -> Image.Image:

@@ -1,15 +1,13 @@
 from io import BytesIO
-from xml.etree import ElementTree as ET
 
 import pymupdf
 import pytest
 from PIL import Image
 
 from pdfexact.extract.images import extraire_images
-from pdfexact.extract.text import extraire_texte
 from pdfexact.extract.vector import extraire_vectoriel
 from pdfexact.geometry import PageGeometry
-from pdfexact.ir import Document, FontAsset, Page, RasterEl
+from pdfexact.ir import RasterEl
 
 
 def _png(color, alpha=255):

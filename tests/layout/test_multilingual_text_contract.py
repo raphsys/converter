@@ -1,5 +1,3 @@
-from copy import deepcopy
-from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -7,7 +5,6 @@ from pdfexact.analysis.semantic import est_frontiere_de_paragraphe, est_texte_de
 from pdfexact.geometry import BBox, pt_vers_emu
 from pdfexact.ir import FontRef, Line, Span, TextBox
 from pdfexact.layout import text_comprehension as comprehension
-from pdfexact.layout.paragraph_planner import planifier_paragraphe
 
 
 @pytest.fixture(autouse=True)

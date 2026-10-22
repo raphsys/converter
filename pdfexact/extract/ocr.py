@@ -10,7 +10,6 @@ import subprocess
 import sys
 from copy import deepcopy
 from io import StringIO
-from functools import lru_cache
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -1493,21 +1492,8 @@ def _bbox_lignes(lignes: list[OcrLine]) -> BBox:
     return boite
 
 
-def _bbox_spans_ligne(spans: list[Span]) -> BBox | None:
-    bboxes = [span.bbox for span in spans if span.texte.strip() and span.bbox is not None]
-    if not bboxes:
-        return None
-    boite = bboxes[0]
-    for bbox in bboxes[1:]:
-        boite = _fusionner_bbox(boite, bbox)
-    return boite
 
 
-def _bbox_spans_coherente_ligne(bbox_ligne: BBox, bbox_spans: BBox) -> bool:
-    centre_ligne = (bbox_ligne.y0 + bbox_ligne.y1) // 2
-    centre_spans = (bbox_spans.y0 + bbox_spans.y1) // 2
-    tolerance = max(bbox_ligne.hauteur, bbox_spans.hauteur, pt_vers_emu(4))
-    return abs(centre_ligne - centre_spans) <= tolerance
 
 
 def _corriger_elements_ocr(
@@ -2369,84 +2355,6 @@ def _textbox(
     return TextBox(bbox=bbox, lignes=[ligne])
 
 
-def _textbox_depuis_ligne_native(
-    page,
-    polices: dict,
-    ligne_source: OcrLine,
-    facteur_emu: float,
-    layout_map=None,
-    geometrie: PageGeometry | None = None,
-) -> TextBox:
-    bbox = _limiter_bbox(page, ligne_source.bbox)
-    texte = ligne_source.texte
-    if layout_map is not None:
-        bbox = layout_map.recaler_ligne_ocr(bbox, texte)
-    if ligne_source.spans:
-        spans = [
-            Span(
-                texte=span.texte,
-                police=span.police,
-                size_pt=span.size_pt,
-                couleur=span.couleur,
-                espacement_twips=span.espacement_twips,
-                lien=span.lien,
-                invisible=span.invisible,
-                souligne=span.souligne,
-                barre=span.barre,
-                capitales=span.capitales,
-                exposant=span.exposant,
-                indice=span.indice,
-                surlignage=span.surlignage,
-                bbox=span.bbox,
-            )
-            for span in ligne_source.spans
-        ]
-        taille = max((span.size_pt for span in spans if span.texte.strip()), default=10.0)
-        bbox_spans = _bbox_spans_ligne(spans)
-        if bbox_spans is not None and _bbox_spans_coherente_ligne(bbox, bbox_spans):
-            bbox = _limiter_bbox(page, bbox_spans)
-    else:
-        police, taille, couleur, decoration = _trace_style(page, polices, bbox, facteur_emu, geometrie)
-        spans = [
-            Span(
-                texte=texte,
-                police=police,
-                size_pt=taille,
-                couleur=couleur,
-                souligne=decoration.souligne,
-                barre=decoration.barre,
-                surlignage=decoration.surlignage,
-            )
-        ]
-    hauteur_ligne = max(bbox.hauteur, pt_vers_emu(taille * 1.12))
-    if ligne_source.orientation == "horizontal":
-        bbox = BBox(
-            bbox.x0,
-            bbox.y0,
-            bbox.x1,
-            min(pt_vers_emu(page.rect.height), bbox.y0 + hauteur_ligne),
-        )
-    else:
-        # RapidOCR peut fournir une bbox quadrilatere haute pour une legende
-        # verticale. Ne la reduisons pas a la hauteur d'un seul glyphe : cette
-        # emprise devient ensuite la taille du cadre Word ancre.
-        hauteur_ligne = max(bbox.hauteur, hauteur_ligne)
-    ligne = Line(
-        bbox=bbox,
-        spans=spans,
-        hauteur_ligne_emu=max(hauteur_ligne, 1),
-        largeur_cible_emu=max(bbox.largeur, 1),
-        alignement=_alignement_ligne(page, bbox, texte),
-        angle_deg=ligne_source.angle_deg,
-        orientation=ligne_source.orientation,
-        baseline_points=tuple(
-            (pt_vers_emu(x), pt_vers_emu(y)) for x, y in ligne_source.quad_points
-        ),
-        semantic_role=ligne_source.semantic_role,
-        curved=ligne_source.orientation == "curved",
-    )
-    _ajuster_largeur_ocr(ligne, polices)
-    return TextBox(bbox=bbox, lignes=[ligne])
 
 
 def extraire_rapidocr(

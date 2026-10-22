@@ -1,5 +1,4 @@
 """Derived reading frames must not change acquired native components."""
-from copy import deepcopy
 
 import pymupdf
 import pytest
@@ -10,11 +9,10 @@ from pdfexact.extract.document import _attacher_frames_texte, _extraire_texte_pd
 from pdfexact.extract.fonts import collecter_polices
 from pdfexact.extract.text import extraire_texte
 from pdfexact.geometry import BBox, PageGeometry, pt_vers_emu as u
-from pdfexact.ir import Document, FontRef, Line, Page, Span, TextBox, element_source_ids, element_text
+from pdfexact.ir import Document, FontRef, Line, Page, Span, TextBox, element_text
 from pdfexact.layout.model import LayoutRegion
 from pdfexact.layout.planner import LayoutPlanItem
 from pdfexact.layout.text_comprehension import contexte_comprehension_texte, configurer_fournisseur_comprehension_texte
-from pdfexact.scene import _snapshot_value, capture_source_observations
 
 
 def frame(bbox, kind="text-column"):

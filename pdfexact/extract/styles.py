@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pymupdf
 
 from pdfexact.extract.text import _couleur_hexa
 from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, emu_vers_pt

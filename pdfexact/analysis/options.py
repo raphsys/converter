@@ -75,26 +75,5 @@ class AnalysisOptions:
             )
 
 
-@dataclass(frozen=True)
-class PackageOptions:
-    """Options d'emballage OOXML sans decision semantique."""
-
-    embed_fonts: bool = True
-    include_scene_manifest: bool = True
-    validate_xml: bool = True
 
 
-@dataclass(frozen=True)
-class AuditOptions:
-    """Niveau de verification de sortie."""
-
-    level: str = "element"
-    dpi: int = 150
-    fail_on_missing_element: bool = True
-    fail_on_unverified_element: bool = False
-
-    def __post_init__(self) -> None:
-        if self.level not in {"basic", "zone", "element"}:
-            raise ValueError("level doit valoir basic, zone ou element")
-        if self.dpi <= 0:
-            raise ValueError("dpi doit etre positif")

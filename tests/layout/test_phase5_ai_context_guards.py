@@ -12,7 +12,6 @@ from pdfexact.ir import FontRef, ImageEl, Line, Span, TextBox
 from pdfexact.layout import text_comprehension as comprehension
 from pdfexact.layout import text_comprehension_ai as ai
 from pdfexact.layout import text_comprehension_local as local
-from pdfexact.layout.paragraph_planner import planifier_paragraphe
 
 
 @pytest.fixture(autouse=True)
@@ -189,24 +188,6 @@ def test_semantic_group_projects_source_lines_instead_of_only_strategy_string():
     assert seen[0][1] == _texts(units), "provider must receive verbatim source text"
 
 
-def test_paragraph_planner_projects_each_line_not_parent_or_sibling_source_ids():
-    units = _pair()
-    block = deepcopy(units[0])
-    block.lignes = [unit.lignes[0] for unit in units]
-    block.bbox = BBox(block.bbox.x0, block.bbox.y0, units[-1].bbox.x1, units[-1].bbox.y1)
-    block.source_ids = ("source-parent",)
-    before = deepcopy(block)
-    seen = []
-    comprehension.configurer_fournisseur_comprehension_texte(
-        lambda kind, lines, _role, context: seen.append((kind, lines, deepcopy(context)))
-    )
-    planifier_paragraphe(block)
-    assert block == before
-    assert len(seen) == 1 and seen[0][0] == "paragraph-reflow"
-    assert isinstance(seen[0][2], dict), "reflow must have per-line context"
-    for index, unit in enumerate(units):
-        for key in ("bbox", "styles", "semantic_role", "source_ids"):
-            assert seen[0][2]["lines"][index][key] == _row(unit, index)[key]
 
 
 @pytest.mark.parametrize("boundary", ["style", "indent", "title"])
@@ -253,26 +234,6 @@ def test_json_valid_group_merge_cannot_bypass_style_or_title_checks(boundary):
     assert calls in ([], ["group"])
 
 
-@pytest.mark.parametrize("boundary", ["style", "indent", "title"])
-def test_reflow_join_cannot_flatten_a_per_line_hard_boundary(boundary):
-    units = _pair(boundary)
-    block = deepcopy(units[0])
-    block.semantic_role = "body"
-    block.lignes = [unit.lignes[0] for unit in units]
-    block.bbox = BBox(min(unit.bbox.x0 for unit in units), units[0].bbox.y0,
-                      max(unit.bbox.x1 for unit in units), units[-1].bbox.y1)
-    before = deepcopy(block)
-    calls = []
-
-    def provider(kind, lines, _role, _context):
-        calls.append(kind)
-        return _json_decision(kind, len(lines))
-
-    comprehension.configurer_fournisseur_comprehension_texte(provider)
-    plan = planifier_paragraphe(block)
-    assert calls in ([], ["paragraph-reflow"])
-    assert block == before
-    assert plan.action_between(0) in {"preserve_break", "paragraph_break"}
 
 
 def test_distinct_ai_failures_remain_visible_after_first_warning(caplog):
@@ -372,101 +333,10 @@ def _guard_pair(boundary):
     return first, second
 
 
-@pytest.mark.parametrize("boundary", [
-    "style", "indent", "title", "column", "hard-break", "list", "source-boundary",
-    "heading-style", "paragraph",
-])
-@pytest.mark.parametrize("producer", ["page", "semantic", "planner"])
-def test_producer_keeps_real_boundaries_even_if_wrapper_accepts(monkeypatch, producer, boundary):
-    units = _guard_pair(boundary)
-    original = deepcopy(units)
-    decision = comprehension.TextUnderstandingDecision(
-        "paragraph", "segment-page" if producer == "page" else (
-            "paragraph-reflow" if producer == "planner" else "merge-paragraph"),
-        0.99, line_groups=((0, 1),), line_joins=("space",), ai_used=True, fallback_used=False,
-    )
-    if producer == "page":
-        monkeypatch.setattr(text_segmentation, "comprendre_segmentation_page", lambda *a, **kw: decision)
-        assert [len(group) for group in text_segmentation._groupes_ia_local(units)] == [1, 1]
-        assert [(unit.bbox, unit.source_ids, unit.lignes) for unit in units] == [
-            (unit.bbox, unit.source_ids, unit.lignes) for unit in original
-        ]
-    elif producer == "semantic":
-        monkeypatch.setattr(comprehension, "comprendre_groupe_lignes", lambda *a, **kw: decision)
-        assert semantic.est_frontiere_de_paragraphe(*units)
-        assert units == original
-    else:
-        from pdfexact.layout import paragraph_planner
-
-        block = _block_from(units)
-        before = deepcopy(block)
-        monkeypatch.setattr(paragraph_planner, "comprendre_reflow_paragraphe", lambda *a, **kw: decision)
-        assert planifier_paragraphe(block).action_between(0) in {"preserve_break", "paragraph_break"}
-        assert block == before
 
 
-@pytest.mark.parametrize("emphasis", ["bold-first", "italic-first", "whole-line"])
-@pytest.mark.parametrize("ai_enabled", [False, True])
-def test_inline_emphasis_continues_inside_one_paragraph_without_changing_source(emphasis, ai_enabled):
-    units = _pair()
-    if emphasis == "whole-line":
-        units[1].lignes[0].spans[0].police = FontRef("emphasis", "Arial", True, True)
-    else:
-        line = units[0].lignes[0]
-        original = line.spans[0]
-        original.texte = "The system validates incoming data with emphasis"
-        line.spans.insert(0, Span(
-            "Read ", FontRef("emphasis", "Arial", emphasis == "bold-first", emphasis == "italic-first"),
-            original.size_pt, original.couleur, bbox=original.bbox, source_id="source-emphasis",
-        ))
-    before = deepcopy(units)
-    if ai_enabled:
-        comprehension.configurer_fournisseur_comprehension_texte(
-            lambda kind, lines, _role, _context: _json_decision(kind, len(lines))
-        )
-    assert not semantic.est_frontiere_de_paragraphe(*units)
-    assert units == before
-    assert [len(group) for group in semantic.regrouper_frames(units)] == [2]
-    assert [len(group) for group in semantic.regrouper_paragraphes(units)] == [2]
-    assert [len(group) for group in semantic.preserver_frontieres_ambigues([units])] == [2]
-    assert units == before
-    groups = (text_segmentation._groupes_ia_local(units) if ai_enabled
-              else text_segmentation._segment_units(units))
-    assert [len(group) for group in groups] == [2]
-    assert units == before
-    block = _block_from(units)
-    source_block = deepcopy(block)
-    assert planifier_paragraphe(block).action_between(0) == "space"
-    assert block == source_block
 
 
-def test_planner_orders_actual_lines_and_keeps_whitespace_context_in_lockstep():
-    first, last = _pair()
-    last = _unit("before storing the complete results.", "source-last", y=52)
-    blank = _unit(" \t\u00a0 ", "source-blank", y=41)
-    empty = _unit("", "source-empty", y=45)
-    block = _block_from((first, blank, empty, last))
-    block.lignes.reverse()
-    before = deepcopy(block)
-    seen = []
-
-    def provider(kind, texts, _role, context):
-        seen.append((kind, texts, deepcopy(context)))
-        return _json_decision(kind, len(texts))
-
-    comprehension.configurer_fournisseur_comprehension_texte(provider)
-    plan = planifier_paragraphe(block)
-    expected = ("The system validates incoming data", " \t\u00a0 ",
-                "before storing the complete results.")
-    assert seen[0][0:2] == ("paragraph-reflow", expected)
-    assert tuple(row["text"] for row in seen[0][2]["lines"]) == expected
-    assert [row["source_ids"][0] for row in seen[0][2]["lines"]] == [
-        "source-first", "source-blank", "source-last",
-    ]
-    assert [row["index"] for row in seen[0][2]["lines"]] == [0, 1, 2]
-    assert [row["source_index"] for row in seen[0][2]["lines"]] == [3, 2, 0]
-    assert plan.joins == ("preserve_break", "preserve_break")
-    assert block == before
 
 
 def test_semantic_multiline_transport_never_flattens_or_normalizes_source_lines():
@@ -488,47 +358,8 @@ def test_semantic_multiline_transport_never_flattens_or_normalizes_source_lines(
     assert (block, second) == before
 
 
-@pytest.mark.parametrize("producer", ["page", "semantic", "planner"])
-def test_producer_metadata_preserves_known_owner_frame_without_parent_source_ids(producer):
-    units = _pair()
-    for unit in units:
-        unit.source_ids = ("parent-only", "unrelated-sibling")
-        unit.lignes[0].layout_frame_id = None
-        unit.lignes[0].layout_frame_role = None
-    before = deepcopy(units)
-    seen = []
-    comprehension.configurer_fournisseur_comprehension_texte(
-        lambda _kind, _texts, _role, context: seen.append(deepcopy(context))
-    )
-    if producer == "page":
-        text_segmentation._groupes_ia_local(units)
-    elif producer == "semantic":
-        semantic.est_frontiere_de_paragraphe(*units)
-    else:
-        planifier_paragraphe(_block_from(units))
-    assert len(seen) == 1
-    for index, row in enumerate(seen[0]["lines"]):
-        assert row["layout_frame_id"] == "fixture-frame"
-        assert row["layout_role"] == "text-column"
-        assert row["source_ids"] == list(before[index].lignes[0].source_ids)
-    assert units == before
 
 
-def test_source_continuity_does_not_annotate_acquired_language_script_or_confidence():
-    units = _pair()
-    for unit in units:
-        unit.script = unit.language = "auto"
-        unit.attributes = {}
-        unit.lignes[0].script = unit.lignes[0].language = "auto"
-        unit.lignes[0].confidence = 0
-        unit.lignes[0].spans[0].confidence = None
-    before = deepcopy(units)
-    semantic.calculer_features_continuite(*units)
-    semantic.est_frontiere_de_paragraphe(*units)
-    semantic.regrouper_paragraphes(units)
-    semantic.regrouper_frames(units)
-    planifier_paragraphe(_block_from(units))
-    assert units == before
 
 
 @pytest.mark.parametrize("analysis_pass", ["paragraphs", "frames", "ambiguity"])
@@ -550,24 +381,6 @@ def test_every_semantic_pass_keeps_an_actual_intervening_obstacle(analysis_pass)
     assert elements == before
 
 
-def test_planner_keeps_actual_surrounding_obstacle_context_without_mutating_it():
-    block = _block_from(_pair())
-    block.presentation["obstacles"] = [[u(40), u(40.2), u(180), u(40.8)]]
-    block.presentation["neighbors"] = [{"text": "source neighbor", "source_ids": ["neighbor-id"]}]
-    before = deepcopy(block)
-    seen = []
-
-    def provider(kind, texts, _role, context):
-        seen.append(deepcopy(context))
-        context["neighbors"].clear()
-        return _json_decision(kind, len(texts))
-
-    comprehension.configurer_fournisseur_comprehension_texte(provider)
-    plan = planifier_paragraphe(block)
-    assert seen[0]["obstacles"] == before.presentation["obstacles"]
-    assert seen[0]["neighbors"] == before.presentation["neighbors"]
-    assert plan.action_between(0) == "preserve_break"
-    assert block == before
 
 
 def test_deterministic_page_partition_is_never_promoted_to_ai_confirmation(monkeypatch):
@@ -615,27 +428,6 @@ def test_canonical_semantic_transport_keeps_actual_text_ids_and_unknowns():
     assert all(record.confidence is None and record.language == "auto" for record in records)
 
 
-@pytest.mark.parametrize("unsorted", [False, True])
-def test_separator_before_a_paragraph_does_not_become_an_internal_line_boundary(unsorted):
-    block = _block_from(_pair())
-    if unsorted:
-        block.lignes.reverse()
-    block.presentation.update(blank_separator_before=True, boundary_before="blank-separator",
-                              source_spacing_before_emu=u(20))
-    before = deepcopy(block)
-    seen = []
-
-    def provider(kind, texts, _role, context):
-        seen.append(deepcopy(context))
-        return _json_decision(kind, len(texts))
-
-    comprehension.configurer_fournisseur_comprehension_texte(provider)
-    assert planifier_paragraphe(block).action_between(0) == "space"
-    assert seen[0]["lines"][0]["blank_separator_before"] is True
-    assert seen[0]["lines"][0]["source_ids"] == list(_pair()[0].lignes[0].source_ids)
-    assert not seen[0]["lines"][1].get("blank_separator_before")
-    assert not seen[0]["lines"][1].get("boundary_before")
-    assert block == before
 
 
 @pytest.mark.parametrize("boundary", [

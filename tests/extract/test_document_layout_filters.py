@@ -1,21 +1,4 @@
-from pdfexact.extract.document import (
-    _cadres_lecture_depuis_plan,
-    _extraire_texte_pdf_natif_word_native,
-    _filtrer_textes_intersectant_zones,
-    _filtrer_textes_couverts,
-    _filtrer_tableaux_contredits_par_ia,
-    _filtrer_zones_lisibles_ocr,
-    _forme_bordure_page_clusterisante,
-    _page_image_pleine_sans_texte_natif,
-    _page_pdf_natif_mixe,
-    _page_pdf_natif_dominant,
-    _preparer_ocr_visible_page_image,
-    _tableau_ressemble_graphe,
-    _zones_images_lisibles_ocr,
-    _zones_visuelles_ia_a_rasteriser,
-    _zone_rasterisable,
-    _zone_touche_tableau,
-)
+from pdfexact.extract.document import _cadres_lecture_depuis_plan, _extraire_texte_pdf_natif_word_native, _filtrer_textes_intersectant_zones, _filtrer_tableaux_contredits_par_ia, _filtrer_zones_lisibles_ocr, _forme_bordure_page_clusterisante, _page_image_pleine_sans_texte_natif, _page_pdf_natif_mixe, _preparer_ocr_visible_page_image, _tableau_ressemble_graphe, _zones_images_lisibles_ocr, _zones_visuelles_ia_a_rasteriser, _zone_rasterisable, _zone_touche_tableau
 from pdfexact.geometry import BBox, pt_vers_emu
 from io import BytesIO
 
@@ -32,30 +15,6 @@ def _bbox_pt(x0, y0, x1, y1):
     return BBox(pt_vers_emu(x0), pt_vers_emu(y0), pt_vers_emu(x1), pt_vers_emu(y1))
 
 
-def test_filtre_ocr_couvert_par_zone_visuelle_native():
-    police = FontRef("Test", "Arial", False, False)
-    couvert = TextBox(
-        bbox=_bbox_pt(100, 100, 220, 120),
-        lignes=[
-            Line(
-                bbox=_bbox_pt(100, 100, 220, 120),
-                spans=[Span("Visible label", police, 12, "000000")],
-                hauteur_ligne_emu=pt_vers_emu(14),
-                largeur_cible_emu=pt_vers_emu(120),
-            )
-        ],
-    )
-    dehors = FlowParagraph(
-        bbox=_bbox_pt(260, 100, 360, 120),
-        texte="Outside paragraph",
-        police=police,
-        size_pt=12,
-        couleur="000000",
-    )
-
-    elements = _filtrer_textes_couverts([couvert, dehors], [_bbox_pt(90, 90, 230, 130)])
-
-    assert elements == [dehors]
 
 
 def test_filtre_ocr_intersectant_zone_raster_integrale():
@@ -236,14 +195,6 @@ def test_garde_fou_ir_decoupe_un_visuel_pleine_page():
     assert all(element.bbox != page for element in elements)
 
 
-def test_page_pdf_natif_dominant_declenche_seulement_sur_vrai_texte_pdf():
-    page = Page(index=0, largeur_emu=pt_vers_emu(612), hauteur_emu=pt_vers_emu(792))
-    lignes = [_bbox_pt(60, 80 + index * 14, 280, 90 + index * 14) for index in range(14)]
-
-    assert _page_pdf_natif_dominant(lignes, [], page)
-    assert not _page_pdf_natif_dominant([], [_bbox_pt(0, 0, 612, 792)], page)
-    assert not _page_pdf_natif_dominant(lignes[:4], [], page)
-    assert _page_pdf_natif_dominant(lignes[:8], [], page)
 
 
 def test_page_pdf_natif_conserve_texte_dans_zone_visuelle_sans_texte(monkeypatch):

@@ -25,9 +25,6 @@ OrientationProvider = Callable[
 _PROVIDER: OrientationProvider | None = None
 
 
-def configurer_fournisseur_orientation(provider: OrientationProvider | None) -> None:
-    global _PROVIDER
-    _PROVIDER = provider
 
 
 def normaliser_angle(angle_deg: float) -> float:

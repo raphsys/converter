@@ -305,8 +305,6 @@ def _assign_composite_groups(operations, groups):
                     covered.add(operation["seqno"])
 
 
-def _image_paint_operations(page) -> list[dict]:
-    return [operation for operation in _graphic_paint_operations(page) if operation["kind"] == "fill_image"]
 
 
 def _visible_paint_rect(operation, geometry):

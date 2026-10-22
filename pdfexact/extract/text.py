@@ -29,7 +29,7 @@ from pdfexact.geometry import BBox, PageGeometry, emu_vers_pt, pt_vers_emu, pt_v
 from pdfexact.ir import FontRef, Line, Span, TextBox, element_source_ids
 from pdfexact.scene import ensure_source_identity
 from pdfexact.extract.orientation import angle_depuis_points, classer_orientation
-from pdfexact.analysis.text_geometry import geometry_contract_for, geometry_kind, presentation_for
+from pdfexact.analysis.text_geometry import geometry_contract_for, presentation_for
 
 _BIT_ITALIQUE = 1 << 1
 _BIT_GRAS = 1 << 4

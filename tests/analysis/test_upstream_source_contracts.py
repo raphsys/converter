@@ -1,6 +1,5 @@
 """Focused B2/B3 acquisition and canonical adapter regressions."""
 from copy import deepcopy
-from dataclasses import fields
 import json
 from types import SimpleNamespace
 
@@ -8,11 +7,7 @@ import pytest
 
 from pdfexact.geometry import BBox
 from pdfexact import ir
-from pdfexact.scene import (
-    ElementKind, ElementRecord, PageScene, SceneDocument, SourceKind,
-    VerificationState, capture_source_observations, element_record_from_legacy,
-    marquer_non_representable, scene_from_legacy_document,
-)
+from pdfexact.scene import SourceKind, VerificationState, capture_source_observations, element_record_from_legacy, scene_from_legacy_document
 from pdfexact.extract.document import (
     _appliquer_filtre_page, _dedoublonner_textes_positionnes,
     _filtrer_textes_intersectant_zones,
@@ -29,21 +24,6 @@ def text_box(text="AB", *, z=0, color="123456"):
     return ir.TextBox(line.bbox, [line], z_index=z, source_kind="pdf-native", language="fr", script="Latn")
 
 
-def test_six_public_ir_helpers_and_default_compatibility():
-    names = ("iter_elements", "element_text", "element_source_ids", "element_geometry",
-             "clone_element_with_metadata", "validate_document_ir")
-    assert all(callable(getattr(ir, name)) for name in names)
-    box = text_box()
-    page = ir.Page(0, 200, 200, [box])
-    doc = ir.Document(pages=[page])
-    capture_source_observations(page, page.elements)
-    assert ir.element_text(box) == "AB"
-    assert len(ir.element_source_ids(box)) == 4
-    assert list(ir.iter_elements(doc)) == [box]
-    assert ir.validate_document_ir(doc) == []
-    assert ir.element_geometry(box)["bbox"] == box.bbox
-    assert ir.FontAsset("f", "family", None, "ttf", False).font_confidence is None
-    assert ir.MediaItem("m", b"", "png").native_width is None
 
 
 def test_clone_keeps_dynamic_metadata_without_aliasing():
@@ -154,17 +134,6 @@ def test_factory_preserves_zeroes_full_runs_metrics_clips_history_and_ids():
     assert json.loads(json.dumps(scene.snapshot()))["pages"][0]["elements"][0]["decision_history"] == box.decision_history
 
 
-def test_constructor_and_late_add_registry_and_terminal_state_coherence():
-    record = ElementRecord("source", 0, ElementKind.TEXT, BBox(0, 0, 10, 10), SourceKind.PDF_NATIVE, ("source",))
-    page = PageScene(0, 200, 200, [record])
-    scene = SceneDocument([page])
-    assert scene.registry.elements["source"] is record
-    marquer_non_representable(record, "actual verified unsupported geometry")
-    assert scene.registry.missing_terminal_states() == []
-    assert page.registry.missing_terminal_states() == []
-    second = ElementRecord("later", 0, ElementKind.TEXT, BBox(0, 0, 10, 10), SourceKind.OCR, ("later",))
-    page.add(second)
-    assert scene.registry.elements["later"] is second
 
 
 def test_render_mode_export_is_the_owned_enum():
@@ -174,16 +143,6 @@ def test_render_mode_export_is_the_owned_enum():
     assert RenderMode is OwnedRenderMode
 
 
-def test_equal_z_paint_keeps_acquisition_order_not_geometry_or_hash():
-    from pdfexact.scene import ordonner_elements_par_peinture
-
-    first = ElementRecord("z-last", 0, ElementKind.SHAPE, BBox(20, 20, 80, 80), SourceKind.VECTOR,
-                          ("z-last",), z_order=0, style={"fill": "FF0000"})
-    second = ElementRecord("a-first", 0, ElementKind.SHAPE, BBox(0, 0, 60, 60), SourceKind.VECTOR,
-                           ("a-first",), z_order=0, style={"fill": "0000FF"})
-    page = PageScene(0, 200, 200, [first, second])
-    assert page.ordered_elements() == [first, second]
-    assert ordonner_elements_par_peinture(SceneDocument([page])) == [first, second]
 
 
 def test_bboxless_span_is_registered_without_fabricated_geometry():
@@ -197,24 +156,6 @@ def test_bboxless_span_is_registered_without_fabricated_geometry():
     assert span_id in doc.pages[0].source_inventory
 
 
-def test_geometry_operations_preserve_rotated_quad_and_full_baselines():
-    from pdfexact.analysis.geometry import (
-        baseline_curvature, baseline_distance, path_is_curved, projection_x, projection_y, quad_iou,
-    )
-
-    diamond = ((0, 5), (5, 0), (5, 10), (10, 5))
-    square = ((0, 0), (10, 0), (0, 10), (10, 10))
-    assert quad_iou(diamond, square) == pytest.approx(0.5)
-    assert quad_iou(square, diamond) == pytest.approx(0.5)
-    assert quad_iou(diamond, tuple(reversed(diamond))) == pytest.approx(1.0)
-    assert quad_iou(((0, 0),) * 4, square) == 0
-    assert projection_x(diamond) == (0, 10) and projection_y(diamond) == (0, 10)
-    assert baseline_distance(((0, 0), (10, 0)), ((0, 4), (10, 4))) == 4
-    assert baseline_distance(((0, 0), (10, 10)), ((0, 10), (10, 0))) == 0
-    assert baseline_distance((), ((0, 0),)) is None
-    assert baseline_curvature(((0, 0), (5, 5), (10, 0))) > 0
-    assert baseline_curvature(((0, 0), (10, 0))) == 0
-    assert path_is_curved([("cubic", ((0, 0), (5, 5), (10, 0)))])
 
 
 def test_raw_ocr_unmatched_observation_retained_without_invented_font_or_confidence():

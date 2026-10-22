@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable
 
 
 def observation_children(element):
@@ -115,59 +114,6 @@ def _geometry_in_components(source, name):
     )
 
 
-def text_fusion_errors(elements):
-    """Conservative lossless contract for proposed paragraph aggregates."""
-    from dataclasses import fields
-    from pdfexact.ir import FlowParagraph, Line, Span, TextBox
-    from pdfexact.scene import _snapshot_value
-
-    errors = []
-    if not elements:
-        return ["empty-text-group"]
-    for element in elements:
-        if type(element) not in (TextBox, FlowParagraph) or not element.lignes:
-            errors.append("missing-exact-text-rows")
-            continue
-        if any(type(line) is not Line or not line.spans or any(type(span) is not Span for span in line.spans)
-               for line in element.lignes):
-            errors.append("invalid-text-component-type")
-        for name in _COMPONENT_GEOMETRY:
-            if not _geometry_in_components(element, name):
-                errors.append(f"unrecoverable-{name}")
-        if getattr(element, "list_marker_source", None) is not None:
-            errors.append("attached-list-marker")
-    actual_ids = [_observation_id(node) for element in elements for node in observation_nodes(element)
-                  if _observation_id(node) is not None]
-    if len(set(actual_ids)) != len(actual_ids) or len({id(item) for item in elements}) != len(elements):
-        errors.append("duplicate-text-component")
-    first = elements[0]
-    if any(getattr(item, "confidence", None) != getattr(first, "confidence", None) for item in elements[1:]):
-        if any(source_confidence_evidence(item) is None for item in elements):
-            errors.append("unidentified-confidence-source")
-    for name in _FUSION_CONTRACT:
-        if any(_snapshot_value(getattr(item, name, None)) != _snapshot_value(getattr(first, name, None))
-               for item in elements[1:]):
-            errors.append(f"incompatible-{name}")
-    # Parent style may supply fallback paint even when rows also have styles.
-    styles = ("police", "size_pt", "couleur", "souligne", "barre", "capitales", "surlignage", "espacement_twips")
-    for name in styles:
-        if any(getattr(item, name, None) != getattr(first, name, None) for item in elements[1:]):
-            errors.append(f"incompatible-{name}")
-    for name in ("attributes", "presentation"):
-        combined = {}
-        for item in elements:
-            for key, value in getattr(item, name, {}).items():
-                value = _snapshot_value(value)
-                if key in combined and combined[key] != value:
-                    errors.append(f"incompatible-{name}:{key}")
-                combined[key] = value
-    dynamic = {name for item in elements if type(item) in (TextBox, FlowParagraph)
-               for name in vars(item) if name not in {entry.name for entry in fields(item)}}
-    for name in dynamic - {"source_acquisition_index", "grouping_evidence", *_COMPONENT_GEOMETRY}:
-        if any(_snapshot_value(getattr(item, name, None)) != _snapshot_value(getattr(first, name, None))
-               for item in elements[1:]):
-            errors.append(f"incompatible-{name}")
-    return list(dict.fromkeys(errors))
 
 
 def _aggregate_contract_preserved(source, target):
@@ -234,18 +180,6 @@ def observation_is_preserved(source, outputs, *, equivalent=False):
     return (equivalent or len(matches) == 1) and any(_exact_component(source, node, equivalent=equivalent) for node in matches)
 
 
-def source_paint_index(element: object) -> int | None:
-    """Resolve paint provenance without treating sequence zero as missing."""
-    values = [
-        value
-        for line in getattr(element, "lignes", ())
-        for value in (getattr(line, "z_index", None), *(getattr(span, "z_index", None) for span in line.spans))
-        if value is not None
-    ]
-    value = getattr(element, "z_index", None)
-    if value is not None:
-        values.append(value)
-    return min(values) if values else None
 
 
 @dataclass(frozen=True)
@@ -270,12 +204,6 @@ def source_confidence_evidence(element) -> Evidence | None:
     )
 
 
-@dataclass(frozen=True)
-class DuplicateCandidate:
-    element_id: str
-    candidate_id: str
-    score: float
-    reason: str
 
 
 @dataclass
@@ -316,128 +244,28 @@ class ElementRegistry:
         return sorted(set(self.elements) - seen)
 
 
-def add_evidence(element: object, evidence: Evidence) -> None:
-    evidences = getattr(element, "evidence", None)
-    if evidences is None:
-        evidences = []
-        setattr(element, "evidence", evidences)
-    evidences.append(evidence)
 
 
 def bind_state(registry: ElementRegistry, element_id: str, state: str, reason: str | None = None) -> None:
     registry.bind_state(element_id, state, reason)
 
 
-def registre_elements(scene) -> ElementRegistry:
-    registry = scene.registry
-    for element in scene.all_elements():
-        if element.element_id not in registry.elements:
-            registry.register(element)
-    return registry
 
 
-def record_decision(element: object, decision: object, reason: str) -> None:
-    history = getattr(element, "decision_history", None)
-    if history is None:
-        history = []
-        setattr(element, "decision_history", history)
-    history.append({"decision": decision, "reason": reason})
-    if hasattr(element, "render_decision"):
-        setattr(element, "render_decision", decision)
 
 
-def mark_state(element: object, state: str, reason: str | None = None) -> None:
-    setattr(element, "verification_state", state)
-    if reason:
-        history = getattr(element, "decision_history", None)
-        if history is None:
-            history = []
-            setattr(element, "decision_history", history)
-        history.append({"state": state, "reason": reason})
 
 
-def stable_source_id(page_index: int, source_kind: str, source_index: int, token: str = "") -> str:
-    suffix = f":{token}" if token else ""
-    return f"p{page_index}:{source_kind}:{source_index}{suffix}"
 
 
-def merge_evidence(*groups: Iterable[Evidence]) -> tuple[Evidence, ...]:
-    import json
-    from pdfexact.scene import _snapshot_value
-
-    result: list[Evidence] = []
-    seen: set[tuple[str, str, str]] = set()
-    for group in groups:
-        for item in group:
-            key = (item.kind, item.source, json.dumps(_snapshot_value(item.details), sort_keys=True))
-            if key not in seen:
-                result.append(item)
-                seen.add(key)
-    return tuple(result)
 
 
-def creer_source_id(page_index: int, source_kind: str, source_index: int, token: str = "") -> str:
-    """Construit un identifiant stable pour une source d'extraction."""
-    return stable_source_id(page_index, source_kind, source_index, token)
 
 
-def lier_source_ocr_native(
-    element: object,
-    *,
-    native_id: str | None = None,
-    ocr_id: str | None = None,
-    confidence: float = 0.0,
-) -> None:
-    """Enregistre une correspondance OCR/native sans supprimer l'une des sources."""
-    ids = list(getattr(element, "source_ids", ()) or ())
-    for source_id in (native_id, ocr_id):
-        if source_id and source_id not in ids:
-            ids.append(source_id)
-    if hasattr(element, "source_ids"):
-        setattr(element, "source_ids", tuple(ids))
-    add_evidence(
-        element,
-        Evidence(
-            "ocr-native-link",
-            "provenance",
-            max(0.0, min(1.0, confidence)),
-            tuple(
-                (key, value)
-                for key, value in (("native_id", native_id), ("ocr_id", ocr_id))
-                if value
-            ),
-        ),
-    )
 
 
-def calculer_candidats_doublon(
-    element: object,
-    candidates: Iterable[object],
-    *,
-    score_fn=None,
-    minimum: float = 0.80,
-) -> list[DuplicateCandidate]:
-    """Calcule des doublons possibles et les retourne sans filtrer l'élément."""
-    results: list[DuplicateCandidate] = []
-    source_id = str(getattr(element, "element_id"))
-    for candidate in candidates:
-        candidate_id = str(getattr(candidate, "element_id"))
-        if candidate_id == source_id:
-            continue
-        score = float(score_fn(element, candidate) if score_fn else 0.0)
-        if score >= minimum:
-            results.append(DuplicateCandidate(source_id, candidate_id, score, "similar-source"))
-    return sorted(results, key=lambda item: (-item.score, item.candidate_id))
 
 
-def marquer_doublon_sans_supprimer(element: object, candidate: DuplicateCandidate) -> None:
-    entries = getattr(element, "duplicate_candidates")
-    entries.append({
-        "element_id": candidate.candidate_id,
-        "score": candidate.score,
-        "reason": candidate.reason,
-    })
-    add_evidence(element, Evidence("duplicate-candidate", "provenance", candidate.score))
 
 
 def expliquer_filtrage(element: object, reason_code: str, **details: object) -> None:
@@ -449,9 +277,3 @@ def expliquer_filtrage(element: object, reason_code: str, **details: object) -> 
     history.append({"event": "filtered", "reason_code": reason_code, **details})
 
 
-def expliquer_fallback(element: object, reason_code: str, **details: object) -> None:
-    history = getattr(element, "decision_history", None)
-    if history is None:
-        history = []
-        setattr(element, "decision_history", history)
-    history.append({"event": "fallback", "reason_code": reason_code, **details})

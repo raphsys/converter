@@ -9,7 +9,6 @@ import json
 from math import atan2, isfinite
 
 from pdfexact.analysis.geometry import intersection_area, quad_iou, resolve_text_orientation
-from pdfexact.analysis.provenance import observation_nodes
 from pdfexact.geometry import BBox, pt_vers_emu
 from pdfexact.ir import Line, Span, TextBox
 
@@ -87,12 +86,6 @@ def _digest(value):
     return sha256(encoded).hexdigest()
 
 
-def source_snapshot_matches(source, expected_sha256):
-    """Compare complete acquired data without accepting a lossy representation."""
-    try:
-        return _digest(source) == expected_sha256
-    except (AttributeError, TypeError, ValueError, OverflowError):
-        return False
 
 
 def _page_index(record):
@@ -118,22 +111,6 @@ def _validate_binding(binding):
             raise _Invalid("page-mismatch")
 
 
-def page_binding_for(page):
-    """Read independently retained acquisition geometry, never a proof's geometry."""
-    binding = getattr(page, "ocr_correspondence_page_binding", None)
-    try:
-        _validate_binding(binding)
-        geometry = binding["geometry"]
-        width = getattr(page, "largeur_emu", getattr(page, "width_emu", None))
-        height = getattr(page, "hauteur_emu", getattr(page, "height_emu", None))
-        if (binding["index"] != page.index or binding["source_pdf_id"] != page.source_pdf_id
-                or pt_vers_emu(geometry["width_pt"]) != width
-                or pt_vers_emu(geometry["height_pt"]) != height
-                or geometry.get("rotation") != page.rotation_pdf):
-            return None
-        return deepcopy(binding)
-    except (AttributeError, KeyError, TypeError, ValueError):
-        return None
 
 
 def _tree(root, line, inventory, binding, kind):
@@ -394,58 +371,3 @@ def selection_event_details(proof):
     }
 
 
-def verify_ocr_native_correspondence(source, outputs, inventory, proof, *, selection_events):
-    """Prove only a superseded raw OCR observation and unchanged native children."""
-    try:
-        if not isinstance(proof, dict) or proof.get("schema") != SCHEMA or proof.get("relationship") != RELATIONSHIP:
-            raise _Invalid("invalid-correspondence-schema")
-        _serializable(proof)
-        binding = getattr(source, "attributes", {}).get("source_page_binding")
-        _validate_binding(binding)
-        if proof.get("page") != binding or _page_index(source) != binding["index"]:
-            raise _Invalid("page-mismatch")
-        observation_ref, native_ref = proof["observation_ref"], proof["native_ref"]
-        root_id, line_id = observation_ref["root_id"], native_ref["line_id"]
-        if root_id not in inventory or line_id not in inventory:
-            raise _Invalid("unknown-source")
-        expected = _build(_raw(inventory[root_id]), _raw(inventory[line_id]), inventory, binding)
-        if _id(_raw(source)) not in expected["observation_ref"]["node_ids"]:
-            raise _Invalid("source-not-ocr-observation")
-        source_id = _id(_raw(source))
-        if (getattr(source, "element_id", source_id) != source_id
-                or _digest(_raw(source)) != expected["observation_ref"]["node_sha256"][source_id]):
-            raise _Invalid("source-snapshot-mismatch")
-        if proof != expected:
-            raise _Invalid("correspondence-proof-mismatch")
-        events = [event for event in selection_events if isinstance(event, dict)
-                  and event.get("event_id") == expected["selection_event_id"]]
-        if not events:
-            raise _Invalid("missing-selection-event")
-        details = selection_event_details(expected)
-        if (len(events) != 1 or events[0].get("event") != "transformed"
-                or events[0].get("reason_code") != "ocr-native-selection"
-                or tuple(events[0].get("source_ids", ())) != (root_id,)
-                or tuple(events[0].get("output_ids", ())) != (expected["native_ref"]["root_id"],)
-                or any(events[0].get(key) != value for key, value in details.items())):
-            raise _Invalid("invalid-selection-event")
-        all_nodes = [node for output in outputs for node in observation_nodes(output)]
-        line_matches = [node for node in all_nodes if _id(node) == line_id and isinstance(node, Line)]
-        if len(line_matches) != 1:
-            raise _Invalid("native-components-not-materialized")
-        line = line_matches[0]
-        for output in outputs:
-            if any(_id(node) == line_id for node in observation_nodes(output)) and _page_index(output) != binding["index"]:
-                raise _Invalid("page-mismatch")
-        if [_id(span) for span in line.spans] != expected["native_ref"]["span_ids"]:
-            raise _Invalid("native-components-not-materialized")
-        for ident in expected["selected_component_ids"]:
-            nodes = [node for node in all_nodes if _id(node) == ident]
-            if len(nodes) != 1:
-                raise _Invalid("native-components-not-materialized")
-            if _digest(nodes[0]) != expected["native_ref"]["node_sha256"][ident]:
-                raise _Invalid("native-source-not-preserved")
-        return []
-    except _Invalid as error:
-        return [str(error)]
-    except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
-        return ["invalid-correspondence-schema"]

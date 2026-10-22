@@ -3,10 +3,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw
 import pytest
 
-from pdfexact.extract.image_placement import (
-    _template_bbox_from_chroma,
-    preserve_alpha_and_remove_connected_white,
-)
+from pdfexact.extract.image_placement import _template_bbox_from_chroma
 
 
 def _png_logo() -> bytes:
@@ -18,13 +15,6 @@ def _png_logo() -> bytes:
     return output.getvalue()
 
 
-def test_connected_white_background_becomes_alpha_without_erasing_content():
-    data, extension = preserve_alpha_and_remove_connected_white(_png_logo(), "png")
-    image = Image.open(BytesIO(data)).convert("RGBA")
-
-    assert extension == "png"
-    assert image.getpixel((0, 0))[3] == 0
-    assert image.getpixel((50, 20))[:3] == (220, 20, 20)
 
 
 @pytest.mark.parametrize("target_size", ((320, 96), (96, 320), (80, 80), (32, 32)))

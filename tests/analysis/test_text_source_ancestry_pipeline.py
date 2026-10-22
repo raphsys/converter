@@ -4,11 +4,8 @@ from copy import deepcopy
 import pytest
 
 from pdfexact.analysis import text_segmentation as segmentation
-from pdfexact.analysis.decisions import RenderDecision, RenderMode
-from pdfexact.analysis.options import AnalysisOptions
-from pdfexact.analysis.provenance import verify_preserved_text_components
 from pdfexact.geometry import BBox, pt_vers_emu as u
-from pdfexact.ir import Document, FontRef, Line, Page, ShapeEl, Span, TextBox, element_source_ids
+from pdfexact.ir import Document, FontRef, Line, Page, Span, TextBox, element_source_ids
 from pdfexact.layout.text_comprehension import (
     configurer_fournisseur_comprehension_texte,
     contexte_comprehension_texte,

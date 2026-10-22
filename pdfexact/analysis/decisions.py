@@ -158,12 +158,8 @@ def decider_mode_universel(
     return _decision(element, RenderMode.KEEP_BOTH_AMBIGUOUS, ("unknown-kind",), confidence, False)
 
 
-def decision_is_safe_native_flow(decision: RenderDecision) -> bool:
-    return decision.mode in {RenderMode.NATIVE_FLOW, RenderMode.NATIVE_LIST, RenderMode.NATIVE_TABLE}
 
 
-def decision_requires_fallback(decision: RenderDecision) -> bool:
-    return decision.fallback_mode is not None
 
 
 def validate_decision(decision: RenderDecision) -> list[str]:

@@ -4,7 +4,6 @@ from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
 
-import pymupdf
 import pytest
 from PIL import Image
 

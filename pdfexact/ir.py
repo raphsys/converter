@@ -61,20 +61,6 @@ class FontRef:
     canonical_id: str | None = None
 
 
-@dataclass(frozen=True)
-class VisualContract:
-    """Contraintes visuelles immuables transportees jusqu'au rendu et a l'audit."""
-
-    bbox: BBox
-    quad: tuple[tuple[int, int], ...] = ()
-    baseline: tuple[tuple[int, int], ...] = ()
-    z_order: int = 0
-    orientation: str = "horizontal"
-    angle_deg: float = 0.0
-    opacity: float = 1.0
-    clipping: tuple[str, ...] = ()
-    style: tuple[tuple[str, str], ...] = ()
-    source_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -506,19 +492,6 @@ class Document:
     element_registry: object | None = None
 
 
-def iter_elements(document, *, include_discarded=True, include_observations=False):
-    """Iterate page elements without hiding discarded source observations."""
-    seen = set()
-    for page in document.pages:
-        elements = list(page.elements)
-        if include_discarded:
-            elements.extend(getattr(page, "discarded_elements", ()))
-        if include_observations:
-            elements.extend(getattr(page, "source_inventory", {}).values())
-        for element in elements:
-            if id(element) not in seen:
-                seen.add(id(element))
-                yield element
 
 
 def element_text(element):
@@ -550,12 +523,6 @@ def element_source_ids(element):
     return tuple(dict.fromkeys(str(value) for value in result if value))
 
 
-def element_geometry(element):
-    """Return geometry without reducing quads, paths or baselines to a bbox."""
-    return {name: deepcopy(getattr(element, name, None)) for name in (
-        "bbox", "quad", "polygon", "baseline_points", "baseline", "angle_deg",
-        "orientation", "chemins", "path", "clip_bbox", "clip_ids", "geometry",
-    ) if hasattr(element, name)}
 
 
 def clone_element_with_metadata(element, **changes):
@@ -568,27 +535,3 @@ def clone_element_with_metadata(element, **changes):
     return result
 
 
-def validate_document_ir(document):
-    errors = []
-    for page in document.pages:
-        if page.largeur_emu <= 0 or page.hauteur_emu <= 0:
-            errors.append(f"invalid-page-size:{page.index}")
-        if page.coordinate_space != "page-visible-canonical":
-            errors.append(f"invalid-coordinate-space:{page.index}")
-        seen = set()
-        for element in page.elements:
-            source_id = getattr(element, "source_id", None)
-            if not source_id:
-                errors.append(f"missing-source-id:{page.index}")
-            elif source_id in seen:
-                errors.append(f"duplicate-source-id:{source_id}")
-            seen.add(source_id)
-            bbox = getattr(element, "bbox", None)
-            if bbox is None or bbox.largeur < 0 or bbox.hauteur < 0:
-                errors.append(f"invalid-bbox:{source_id}")
-            if isinstance(element, RasterEl) and element.purpose not in {"shading", "source-image"}:
-                if not (element.fallback_reason or element.purpose):
-                    errors.append(f"missing-fallback-reason:{source_id}")
-                if not element.source_component_ids and not element.source_placements:
-                    errors.append(f"missing-raster-sources:{source_id}")
-    return errors

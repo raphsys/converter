@@ -583,35 +583,6 @@ def _bordure_table(page, bbox: BBox, geometrie: PageGeometry) -> tuple[str, int]
     return couleur, max(2, min(24, round(pt_vers_twips(epaisseur_pt) / 2)))
 
 
-def _col_widths(rows: list[TableRow], bbox: BBox, col_count: int) -> list[int]:
-    def normaliser(widths: list[int]) -> list[int]:
-        if not widths:
-            return []
-        total = sum(max(1, width) for width in widths)
-        if total <= 0:
-            return [max(1, bbox.largeur // max(col_count, 1)) for _ in range(col_count)]
-        normalisees = [max(1, round(width * bbox.largeur / total)) for width in widths]
-        ecart = bbox.largeur - sum(normalisees)
-        normalisees[-1] = max(1, normalisees[-1] + ecart)
-        return normalisees
-
-    widths = [max(1, bbox.largeur // max(col_count, 1)) for _ in range(col_count)]
-    meilleur: list[int] | None = None
-    meilleur_score: int | None = None
-    for row in rows:
-        simples = [cell for cell in row.cells if cell.col_span == 1]
-        if len(simples) == col_count:
-            simples = sorted(simples, key=lambda cell: cell.bbox.x0)
-            candidat = [max(1, cell.bbox.largeur) for cell in simples]
-            score = (
-                abs(sum(candidat) - bbox.largeur)
-                + abs(simples[0].bbox.x0 - bbox.x0)
-                + abs(simples[-1].bbox.x1 - bbox.x1)
-            )
-            if meilleur_score is None or score < meilleur_score:
-                meilleur = candidat
-                meilleur_score = score
-    return normaliser(meilleur or widths)
 
 
 def _positions_x_table(table) -> list[int]:

@@ -101,6 +101,8 @@ def contexte_comprehension_texte() -> Iterator[None]:
             _ANALYSE.reset(token)
 
 
+
+
 def diagnostics_comprehension_texte() -> tuple[dict, ...]:
     """Return detached observations, including the conversion provider's history."""
     state = _etat_analyse()

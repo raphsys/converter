@@ -17,7 +17,6 @@ from pdfexact.layout.text_comprehension import (
     _raison_decision_invalide,
     _signaler_diagnostic,
 )
-from pdfexact.extract.orientation import OrientationDecision, OrientationProvider
 
 
 def creer_fournisseur_comprehension_texte_ai(
@@ -118,78 +117,8 @@ def creer_fournisseur_comprehension_texte_ai(
     return provider
 
 
-def creer_fournisseur_orientation_ai(
-    *,
-    url: str | None = None,
-    timeout: float = 3.0,
-) -> OrientationProvider | None:
-    """Branche le même service sémantique pour désambiguïser les orientations."""
-    endpoint = (url or os.environ.get("PDFEXACT_TEXT_ORIENTATION_URL") or "").strip()
-    if not endpoint:
-        return None
-
-    def provider(
-        texte: str,
-        lignes: tuple[str, ...],
-        semantic_role: str | None,
-        angle_deg: float,
-        baseline_points: tuple[tuple[float, float], ...],
-    ) -> OrientationDecision | None:
-        payload = {
-            "schema": "pdfexact.text_orientation.v1",
-            "text": texte,
-            "lines": [{"i": index, "text": value} for index, value in enumerate(lignes)],
-            "semantic_role": semantic_role,
-            "angle_deg": angle_deg,
-            "baseline_points": baseline_points,
-            "orientations": [
-                "horizontal", "vertical", "oblique-up", "oblique-down", "curved",
-            ],
-        }
-        request = Request(
-            endpoint,
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=timeout) as response:
-                data = json.loads(response.read().decode("utf-8"))
-        except (OSError, URLError, TimeoutError, json.JSONDecodeError):
-            return None
-        return _orientation_depuis_json(data, angle_deg, semantic_role)
-
-    return provider
 
 
-def _orientation_depuis_json(
-    data: Any,
-    angle_deg: float,
-    semantic_role: str | None,
-) -> OrientationDecision | None:
-    if not isinstance(data, dict):
-        return None
-    kind = str(data.get("orientation") or data.get("kind") or "")
-    if kind not in {"horizontal", "vertical", "oblique-up", "oblique-down", "curved"}:
-        return None
-    try:
-        confidence = float(data.get("confidence", 0.0))
-        angle = float(data.get("angle_deg", angle_deg))
-    except (TypeError, ValueError):
-        return None
-    evidence = data.get("evidence", ())
-    if not isinstance(evidence, list):
-        evidence = []
-    return OrientationDecision(
-        kind=kind,
-        angle_deg=angle,
-        confidence=confidence,
-        semantic_role=str(data.get("semantic_role") or semantic_role or "") or None,
-        curved=kind == "curved" or bool(data.get("curved")),
-        evidence=tuple(str(item) for item in evidence) + ("ai-text-orientation",),
-        ai_used=True,
-        fallback_used=False,
-    )
 
 
 def _unique_keys(items):

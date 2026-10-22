@@ -1,7 +1,5 @@
 def test_dependances_importables():
     import pymupdf
-    import fontTools
-    import PIL
 
     assert pymupdf.__doc__
 

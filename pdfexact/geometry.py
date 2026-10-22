@@ -43,8 +43,6 @@ def emu_vers_pt(valeur: int) -> float:
     return valeur / EMU_PER_PT
 
 
-def quantifier_coord(valeur: int, grille_emu: int = GRILLE_DIXIEME_MM_EMU) -> int:
-    return round(valeur / grille_emu) * grille_emu
 
 
 @dataclass(frozen=True)

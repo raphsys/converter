@@ -6,7 +6,7 @@ devient une forme rectangulaire invisible cliquable.
 """
 import pymupdf
 
-from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, se_chevauchent
+from pdfexact.geometry import PageGeometry, se_chevauchent
 from pdfexact.ir import LinkZone
 
 

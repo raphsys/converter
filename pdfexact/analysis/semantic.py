@@ -8,9 +8,9 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from statistics import median
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from pdfexact.analysis.geometry import axis_overlap_ratio, gap, union_many
 from pdfexact.analysis.options import AnalysisOptions
@@ -23,65 +23,6 @@ from pdfexact.layout.text_comprehension import (
 )
 
 
-def text_paint_fragments(element, visuals):
-    """Split native text only at overlapping source paint barriers."""
-    from pdfexact.analysis.provenance import source_paint_index
-    from pdfexact.geometry import BBox
-    from pdfexact.ir import FlowParagraph
-    from pdfexact.layout.paragraph_planner import lignes_du_bloc
-
-    lines = list(lignes_du_bloc(element))
-    sequences = [span.z_index for line in lines for span in line.spans if span.z_index is not None]
-    if not sequences:
-        return [element]
-    barriers = sorted({
-        visual.z_index for visual in visuals
-        if getattr(visual, "z_index", None) is not None
-        and min(sequences) < visual.z_index < max(sequences)
-        and any(
-            min((span.bbox or line.bbox).x1, visual.bbox.x1) > max((span.bbox or line.bbox).x0, visual.bbox.x0)
-            and min((span.bbox or line.bbox).y1, visual.bbox.y1) > max((span.bbox or line.bbox).y0, visual.bbox.y0)
-            for line in lines for span in line.spans
-        )
-    })
-    if not barriers:
-        return [element]
-    groups = []
-    last_bucket = last_line = None
-    for line in lines:
-        for span in line.spans:
-            sequence = span.z_index if span.z_index is not None else source_paint_index(element)
-            bucket = sum(sequence > barrier for barrier in barriers)
-            if not groups or bucket != last_bucket:
-                groups.append([])
-                last_line = None
-            if last_line is not line:
-                groups[-1].append((line, []))
-                last_line = line
-            groups[-1][-1][1].append(span)
-            last_bucket = bucket
-    fragments = []
-    for group in groups:
-        selected = []
-        for line, spans in group:
-            bbox = line.bbox
-            if len(spans) != len(line.spans) and all(span.bbox is not None for span in spans):
-                bbox = BBox(min(span.bbox.x0 for span in spans), bbox.y0, max(span.bbox.x1 for span in spans), bbox.y1)
-            selected.append(replace(line, bbox=bbox, spans=spans, z_index=min(
-                (span.z_index for span in spans if span.z_index is not None), default=line.z_index,
-            )))
-        boxes = [line.bbox for line in selected]
-        changes = dict(
-            lignes=selected,
-            bbox=BBox(min(box.x0 for box in boxes), min(box.y0 for box in boxes), max(box.x1 for box in boxes), max(box.y1 for box in boxes)),
-            geometry=None, layout_frame_id=None, layout_frame_bbox=None,
-            z_index=min((line.z_index for line in selected if line.z_index is not None), default=min(sequences)),
-        )
-        if isinstance(element, FlowParagraph):
-            changes["spans"] = [span for line in selected for span in line.spans]
-            changes["texte"] = " ".join("".join(span.texte for span in line.spans) for line in selected)
-        fragments.append(replace(element, **changes))
-    return fragments
 
 
 _LIST_MARKER_RE = re.compile(
@@ -592,13 +533,8 @@ def est_continuation_de_ligne(previous, current, options: AnalysisOptions | None
     return not est_frontiere_de_paragraphe(previous, current, options)
 
 
-def continuity_features(previous: ElementRecord, current: ElementRecord) -> ContinuityFeatures:
-    return calculer_features_continuite(previous, current)
 
 
-def is_continuation(previous: ElementRecord, current: ElementRecord, *, max_vertical_gap: float = 1.8) -> bool:
-    options = AnalysisOptions(extra={"semantic_vertical_gap_factor": max_vertical_gap})
-    return est_continuation_de_ligne(previous, current, options)
 
 
 def _is_textual(element) -> bool:
@@ -840,23 +776,8 @@ def valider_groupe_semantique(group: Sequence[object], options: AnalysisOptions 
     return list(dict.fromkeys(errors))
 
 
-def group_text_elements(elements: Iterable[ElementRecord]) -> list[list[ElementRecord]]:
-    """Historical compatibility name for canonical scene elements."""
-    groups = regrouper_paragraphes(list(elements), AnalysisOptions())
-    return [
-        [item for item in group if isinstance(item, ElementRecord)]
-        for group in groups
-        if any(isinstance(item, ElementRecord) for item in group)
-    ]
 
 
-def annotate_semantic_features(elements: Iterable[ElementRecord]) -> None:
-    for element in elements:
-        normaliser_script_et_langue(element)
-        marker = detecter_marqueur_liste(element)
-        if marker:
-            element.attributes["list_marker"] = marker
-            element.role = element.role if element.role != "unknown" else "list-item"
         # Recognition and semantic confidence measure different things. Merely
         # observing text or a FlowParagraph must not manufacture either score.
 

@@ -24,7 +24,6 @@ from pdfexact.analysis.geometry import (
     center_in,
     axis_overlap_ratio,
     clip_bbox_nonempty,
-    intersection_area,
     intersection_over_min_area,
     overlap_ratio,
 )

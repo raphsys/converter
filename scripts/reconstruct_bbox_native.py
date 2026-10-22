@@ -18,6 +18,7 @@ from pdfexact.ir import Document, FlowParagraph, TextBox
 from pdfexact.layout.text_comprehension import (
     configurer_fournisseur_comprehension_texte,
     contexte_comprehension_texte,
+    diagnostics_comprehension_texte,
 )
 from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehension_texte_ai
 from pdfexact.model_paths import resolve_ai_models_root
@@ -188,6 +189,7 @@ def main() -> int:
         _enregistrer_catalogue(document, args.source_pdf, args.docx_out.with_suffix(".extraction.json"))
         records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, document)
         write_bbox_docx(document, args.docx_out)
+        diagnostics = diagnostics_comprehension_texte()
 
     by_kind: dict[str, int] = {}
     for record in records:
@@ -196,6 +198,10 @@ def main() -> int:
     print(f"pdf={args.pdf_out}")
     print(f"docx={args.docx_out}")
     print(f"catalogue={args.docx_out.with_suffix('.extraction.json')}")
+    # What the comprehension AI actually did: a fallback here means the
+    # segmentation above came from geometric heuristics, not from the model.
+    for event in diagnostics:
+        print(f"comprehension_ia: status={event.get('status')} reason={event.get('reason')}")
     return 0
 
 

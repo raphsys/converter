@@ -52,14 +52,11 @@ from pdfexact.geometry import (
     PageGeometry,
     emu_vers_pt,
     pt_vers_emu,
-    quantifier_bbox,
-    quantifier_coord,
     se_chevauchent,
     union,
 )
 from pdfexact.analysis.geometry import (
     bbox_area,
-    center_in,
     intersection_area,
     intersection_over_min_area,
     overlap_ratio,
@@ -260,29 +257,6 @@ def _page_image_pleine_sans_texte_natif(
     )
 
 
-def _page_pdf_natif_dominant(
-    lignes_natives: list[BBox],
-    zones_images_source: list[BBox],
-    page: Page,
-) -> bool:
-    """Vrai pour les pages texte PDF natives où l'OCR massif est risqué.
-
-    Les pages scannées pleines restent exclues par la présence obligatoire de lignes
-    natives et par le seuil image pleine page.
-    """
-    if len(lignes_natives) < 8:
-        return False
-    aire_page = max(page.largeur_emu * page.hauteur_emu, 1)
-    if _page_image_pleine_sans_texte_natif(zones_images_source, [], page):
-        return False
-    lignes_utiles = [
-        ligne
-        for ligne in lignes_natives
-        if ligne.largeur >= page.largeur_emu * 0.08
-        and ligne.hauteur >= pt_vers_emu(2.5)
-        and ligne.hauteur <= pt_vers_emu(32)
-    ]
-    return len(lignes_utiles) >= 8
 
 
 def _page_pdf_natif_mixe(
@@ -684,32 +658,8 @@ def _filtrer_elements_visuels_couverts(elements: list, zones: list[BBox]) -> lis
     return filtres
 
 
-def _element_texte_couvert_par_zone(element, zones: list[BBox], seuil: float = 0.22) -> bool:
-    if not isinstance(element, (TextBox, FlowParagraph)):
-        return False
-    bbox = getattr(element, "bbox", None)
-    if bbox is None:
-        return False
-    centre_x = (bbox.x0 + bbox.x1) // 2
-    centre_y = (bbox.y0 + bbox.y1) // 2
-    for zone in zones:
-        if zone.x0 <= centre_x <= zone.x1 and zone.y0 <= centre_y <= zone.y1:
-            return True
-        if _recouvrement_source(bbox, zone) >= seuil:
-            return True
-    return False
 
 
-def _filtrer_textes_couverts(elements: list, zones: list[BBox]) -> list:
-    if not zones:
-        return elements
-    filtres = []
-    for element in elements:
-        if _element_texte_couvert_par_zone(element, zones):
-            expliquer_filtrage(element, "text-covered-by-visual-zone")
-            continue
-        filtres.append(element)
-    return filtres
 
 
 def _bbox_texte_elementaires(element) -> list[BBox]:
@@ -1081,77 +1031,16 @@ def _fonds_synthetiques_texte_inverse(
     return fonds
 
 
-def _limiter_bbox_page(bbox: BBox, page: Page) -> BBox:
-    x0 = max(0, min(bbox.x0, page.largeur_emu - 1))
-    y0 = max(0, min(bbox.y0, page.hauteur_emu - 1))
-    x1 = max(x0 + 1, min(bbox.x1, page.largeur_emu))
-    y1 = max(y0 + 1, min(bbox.y1, page.hauteur_emu))
-    return BBox(x0, y0, x1, y1)
 
 
-def _qbbox(bbox: BBox, page: Page) -> BBox:
-    return _limiter_bbox_page(quantifier_bbox(bbox), page)
 
 
-def _quantifier_span(span: Span, page: Page) -> None:
-    if span.bbox is not None:
-        span.bbox = _qbbox(span.bbox, page)
 
 
-def _quantifier_ligne(ligne: Line, page: Page) -> None:
-    ligne.bbox = _qbbox(ligne.bbox, page)
-    ligne.hauteur_ligne_emu = max(1, quantifier_coord(ligne.hauteur_ligne_emu))
-    ligne.largeur_cible_emu = max(1, quantifier_coord(ligne.largeur_cible_emu))
-    for span in ligne.spans:
-        _quantifier_span(span, page)
 
 
-def _quantifier_element(element, page: Page) -> None:
-    if hasattr(element, "bbox"):
-        element.bbox = _qbbox(element.bbox, page)
-    if isinstance(element, TextBox):
-        for ligne in element.lignes:
-            _quantifier_ligne(ligne, page)
-    elif isinstance(element, FlowParagraph):
-        for ligne in element.lignes:
-            _quantifier_ligne(ligne, page)
-        element.retrait_gauche_emu = max(0, quantifier_coord(element.retrait_gauche_emu))
-        element.retrait_droite_emu = max(0, quantifier_coord(element.retrait_droite_emu))
-        element.retrait_premiere_ligne_emu = quantifier_coord(element.retrait_premiere_ligne_emu)
-        element.espace_avant_emu = max(0, quantifier_coord(element.espace_avant_emu))
-        element.espace_apres_emu = max(0, quantifier_coord(element.espace_apres_emu))
-        element.interligne_emu = max(0, quantifier_coord(element.interligne_emu))
-        for span in element.spans:
-            _quantifier_span(span, page)
-    elif isinstance(element, TableEl):
-        element.col_widths_emu = [max(1, quantifier_coord(largeur)) for largeur in element.col_widths_emu]
-        for row in element.rows:
-            row.bbox = _qbbox(row.bbox, page)
-            for cell in row.cells:
-                cell.bbox = _qbbox(cell.bbox, page)
-                for span in cell.spans:
-                    _quantifier_span(span, page)
-    elif isinstance(element, ShapeEl):
-        element.epaisseur_emu = max(0, quantifier_coord(element.epaisseur_emu))
-        element.chemins = [
-            [
-                (
-                    commande,
-                    tuple(
-                        (quantifier_coord(x), quantifier_coord(y))
-                        for x, y in points
-                    ),
-                )
-                for commande, points in chemin
-            ]
-            for chemin in element.chemins
-        ]
 
 
-def _quantifier_page(page: Page) -> None:
-    capture_source_observations(page, page.elements)
-    for element in page.elements:
-        _quantifier_element(element, page)
 
 
 def _securiser_elements_visuels_page(page: Page, media: dict) -> None:
