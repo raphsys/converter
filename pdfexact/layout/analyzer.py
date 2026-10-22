@@ -7,6 +7,7 @@ import io
 import pymupdf
 
 from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, preserver_etat_page
+from pdfexact.analysis.geometry import bbox_area
 from pdfexact.layout.model import LayoutBlock, LayoutPage
 
 
@@ -138,7 +139,7 @@ def _bbox_dessin(dessin, geometrie: PageGeometry) -> BBox:
 
 
 def _aire_totale(blocks: list[LayoutBlock]) -> float:
-    return float(sum(max(0, block.bbox.largeur) * max(0, block.bbox.hauteur) for block in blocks))
+    return float(sum(bbox_area(block.bbox) for block in blocks))
 
 
 def _col_count(table) -> int:

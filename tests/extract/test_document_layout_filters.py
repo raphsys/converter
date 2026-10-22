@@ -1,16 +1,28 @@
 from pdfexact.extract.document import (
     _cadres_lecture_depuis_plan,
+    _extraire_texte_pdf_natif_word_native,
     _filtrer_textes_intersectant_zones,
     _filtrer_textes_couverts,
     _filtrer_tableaux_contredits_par_ia,
     _filtrer_zones_lisibles_ocr,
     _forme_bordure_page_clusterisante,
+    _page_image_pleine_sans_texte_natif,
+    _page_pdf_natif_mixe,
+    _page_pdf_natif_dominant,
+    _preparer_ocr_visible_page_image,
     _tableau_ressemble_graphe,
     _zones_images_lisibles_ocr,
+    _zones_visuelles_ia_a_rasteriser,
+    _zone_rasterisable,
     _zone_touche_tableau,
 )
 from pdfexact.geometry import BBox, pt_vers_emu
-from pdfexact.ir import FlowParagraph, FontRef, Line, Page, ShapeEl, Span, TableCell, TableEl, TableRow, TextBox
+from io import BytesIO
+
+from PIL import Image
+
+from pdfexact.fallback.rasterize import bboxes_segmentees, segmenter_elements_visuels_page
+from pdfexact.ir import Document, FlowParagraph, FontRef, ImageEl, Line, MediaItem, Page, ShapeEl, Span, TableCell, TableEl, TableRow, TextBox
 from pdfexact.layout.ai import LayoutAIZone
 from pdfexact.layout.model import LayoutRegion
 from pdfexact.layout.planner import LayoutPlanItem
@@ -75,6 +87,38 @@ def test_filtre_ocr_intersectant_zone_raster_integrale():
     elements = _filtrer_textes_intersectant_zones([titre, paragraphe], [zone_raster])
 
     assert elements == [paragraphe]
+
+
+def test_filtre_zone_formule_ne_supprime_pas_tout_le_bloc_texte():
+    police = FontRef("Test", "Arial", False, False)
+    haut = Line(
+        bbox=_bbox_pt(60, 520, 320, 535),
+        spans=[Span("Sample Problem 1.02", police, 10, "000000", bbox=_bbox_pt(60, 520, 320, 535))],
+        hauteur_ligne_emu=pt_vers_emu(15),
+        largeur_cible_emu=pt_vers_emu(260),
+    )
+    formule = Line(
+        bbox=_bbox_pt(180, 625, 250, 650),
+        spans=[Span("e = Vvoids / Vgrains", police, 10, "000000", bbox=_bbox_pt(180, 625, 250, 650))],
+        hauteur_ligne_emu=pt_vers_emu(25),
+        largeur_cible_emu=pt_vers_emu(70),
+    )
+    bas = Line(
+        bbox=_bbox_pt(60, 665, 320, 720),
+        spans=[Span("Here, Vgrains is the total volume", police, 10, "000000", bbox=_bbox_pt(60, 665, 320, 720))],
+        hauteur_ligne_emu=pt_vers_emu(55),
+        largeur_cible_emu=pt_vers_emu(260),
+    )
+    bloc = TextBox(bbox=_bbox_pt(60, 520, 320, 720), lignes=[haut, formule, bas])
+
+    elements = _filtrer_textes_intersectant_zones([bloc], [_bbox_pt(175, 620, 255, 655)])
+
+    assert len(elements) == 1
+    assert isinstance(elements[0], TextBox)
+    assert [ligne.spans[0].texte for ligne in elements[0].lignes] == [
+        "Sample Problem 1.02",
+        "Here, Vgrains is the total volume",
+    ]
 
 
 def test_table_ia_devient_cadre_lecture_sans_vrai_tableau_word():
@@ -150,6 +194,181 @@ def test_grande_image_lisible_ne_bloque_pas_ocr_word_native():
     assert grande_image_texte not in zones
     assert petite_image_logo in zones
     assert table in zones
+
+
+def test_page_image_pleine_reste_detectee_meme_avec_texte_natif():
+    page = Page(index=0, largeur_emu=pt_vers_emu(310), hauteur_emu=pt_vers_emu(500))
+    pleine_page = _bbox_pt(0, 0, 310, 500)
+
+    assert _page_image_pleine_sans_texte_natif([pleine_page], [], page)
+    assert not _page_image_pleine_sans_texte_natif([pleine_page], [_bbox_pt(20, 20, 120, 35)], page)
+    lignes_natives = [_bbox_pt(20, 20 + index * 12, 120, 35 + index * 12) for index in range(8)]
+    assert not _page_image_pleine_sans_texte_natif([pleine_page], lignes_natives, page)
+    assert _page_pdf_natif_mixe(lignes_natives, [pleine_page], page)
+
+
+def test_page_image_est_decoupee_en_tuiles_contigues():
+    page = _bbox_pt(0, 0, 310, 500)
+    tuiles = bboxes_segmentees(page)
+
+    assert len(tuiles) == 24
+    assert max(zone.largeur * zone.hauteur for zone in tuiles) < page.largeur * page.hauteur
+    assert min(zone.x0 for zone in tuiles) == page.x0
+    assert max(zone.x1 for zone in tuiles) == page.x1
+    assert min(zone.y0 for zone in tuiles) == page.y0
+    assert max(zone.y1 for zone in tuiles) == page.y1
+
+
+def test_garde_fou_ir_decoupe_un_visuel_pleine_page():
+    page = _bbox_pt(0, 0, 310, 500)
+    donnees = BytesIO()
+    Image.new("RGB", (120, 180), "white").save(donnees, format="PNG")
+    media = {"source": MediaItem("source", donnees.getvalue(), "png")}
+
+    elements = segmenter_elements_visuels_page(
+        [ImageEl(page, "source")],
+        media,
+        page.largeur,
+        page.hauteur,
+    )
+
+    assert len(elements) == 24
+    assert all(element.bbox != page for element in elements)
+
+
+def test_page_pdf_natif_dominant_declenche_seulement_sur_vrai_texte_pdf():
+    page = Page(index=0, largeur_emu=pt_vers_emu(612), hauteur_emu=pt_vers_emu(792))
+    lignes = [_bbox_pt(60, 80 + index * 14, 280, 90 + index * 14) for index in range(14)]
+
+    assert _page_pdf_natif_dominant(lignes, [], page)
+    assert not _page_pdf_natif_dominant([], [_bbox_pt(0, 0, 612, 792)], page)
+    assert not _page_pdf_natif_dominant(lignes[:4], [], page)
+    assert _page_pdf_natif_dominant(lignes[:8], [], page)
+
+
+def test_page_pdf_natif_conserve_texte_dans_zone_visuelle_sans_texte(monkeypatch):
+    police = FontRef("Test", "Arial", False, False)
+    bbox = _bbox_pt(40, 120, 170, 136)
+    ligne = Line(
+        bbox=bbox,
+        spans=[Span("Checkpoint 2", police, 10, "000000", bbox=bbox)],
+        hauteur_ligne_emu=pt_vers_emu(16),
+        largeur_cible_emu=pt_vers_emu(130),
+    )
+    texte = TextBox(bbox=bbox, lignes=[ligne])
+    monkeypatch.setattr("pdfexact.extract.document.extraire_texte", lambda _page, _polices: [texte])
+
+    page_ir = Page(index=0, largeur_emu=pt_vers_emu(300), hauteur_emu=pt_vers_emu(400))
+
+    elements = _extraire_texte_pdf_natif_word_native(
+        object(),
+        {},
+        None,
+        [],
+        [_bbox_pt(20, 100, 220, 180)],
+        page_ir,
+        Document(),
+    )
+
+    assert len(elements) == 1
+    assert isinstance(elements[0], FlowParagraph)
+    assert elements[0].texte == "Checkpoint 2"
+
+
+def test_micro_zone_vectorielle_ne_part_pas_en_rasterisation():
+    page = Page(index=0, largeur_emu=pt_vers_emu(440), hauteur_emu=pt_vers_emu(680))
+
+    assert not _zone_rasterisable(BBox(0, 0, 1, 1), page)
+    assert _zone_rasterisable(_bbox_pt(40, 40, 45, 45), page)
+
+
+def test_zone_ia_composite_ne_remplace_pas_un_objet_natif_large():
+    page = Page(index=0, largeur_emu=pt_vers_emu(612), hauteur_emu=pt_vers_emu(792))
+    image_native = _bbox_pt(36, 24, 428, 452)
+    zone_composite = _bbox_pt(34, 23, 576, 466)
+    image_item = LayoutPlanItem(
+        kind="image",
+        bbox=image_native,
+        strategy="raster-image",
+        editable=False,
+        confidence=0.99,
+        region=LayoutRegion(
+            kind="image",
+            bbox=image_native,
+            confidence=0.99,
+            editable=False,
+            strategy="raster-image",
+            style_hints={"source": "pdf-image"},
+        ),
+    )
+    composite_item = LayoutPlanItem(
+        kind="image",
+        bbox=zone_composite,
+        strategy="raster-image",
+        editable=False,
+        confidence=0.91,
+        region=LayoutRegion(
+            kind="image",
+            bbox=zone_composite,
+            confidence=0.91,
+            editable=False,
+            strategy="raster-image",
+            style_hints={"source": "paddlex"},
+        ),
+    )
+
+    zones = _zones_visuelles_ia_a_rasteriser(
+        [image_item, composite_item],
+        [image_native],
+        page,
+    )
+
+    assert zones == []
+
+
+def test_zone_ia_isolee_reste_rasterisable():
+    page = Page(index=0, largeur_emu=pt_vers_emu(612), hauteur_emu=pt_vers_emu(792))
+    zone = _bbox_pt(80, 180, 520, 520)
+    item = LayoutPlanItem(
+        kind="figure-or-diagram",
+        bbox=zone,
+        strategy="raster-image",
+        editable=False,
+        confidence=0.91,
+        region=LayoutRegion(
+            kind="figure-or-diagram",
+            bbox=zone,
+            confidence=0.91,
+            editable=False,
+            strategy="raster-image",
+            style_hints={"source": "paddlex"},
+        ),
+    )
+
+    assert _zones_visuelles_ia_a_rasteriser([item], [], page) == [zone]
+
+
+def test_couche_ocr_image_pleine_est_visible_et_preservee():
+    police = FontRef("OCR", "Arial", False, False)
+    texte = TextBox(
+        bbox=_bbox_pt(20, 20, 180, 36),
+        lignes=[
+            Line(
+                bbox=_bbox_pt(20, 20, 180, 36),
+                spans=[Span("Compression du signal", police, 12, "000000", espacement_twips=-40)],
+                hauteur_ligne_emu=pt_vers_emu(16),
+                largeur_cible_emu=pt_vers_emu(160),
+            )
+        ],
+    )
+
+    lignes = _preparer_ocr_visible_page_image([texte])
+
+    assert lignes == 1
+    assert getattr(texte, "preserve_as_textbox")
+    assert not texte.lignes[0].spans[0].invisible
+    assert texte.lignes[0].spans[0].couleur == "000000"
+    assert texte.lignes[0].spans[0].espacement_twips == -40
 
 
 def test_graphe_detecte_comme_faux_tableau():

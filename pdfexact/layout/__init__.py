@@ -17,6 +17,7 @@ from pdfexact.layout.planner import (
     planifier_regions,
     zones_layout_du_plan,
     zones_ocr_du_plan,
+    zones_ocr_dur_du_plan,
     zones_protegees_du_plan,
 )
 from pdfexact.layout.understanding import (
@@ -34,6 +35,7 @@ from pdfexact.layout.text_comprehension import (
     TextUnderstandingDecision,
     comprendre_groupe_lignes,
     comprendre_ligne_texte,
+    comprendre_reflow_paragraphe,
 )
 
 __all__ = [
@@ -57,6 +59,7 @@ __all__ = [
     "planifier_regions",
     "zones_layout_du_plan",
     "zones_ocr_du_plan",
+    "zones_ocr_dur_du_plan",
     "zones_protegees_du_plan",
     "EDITABLE_STRATEGIES",
     "LAYOUT_PROTECTED_STRATEGIES",
@@ -70,4 +73,5 @@ __all__ = [
     "TextUnderstandingDecision",
     "comprendre_groupe_lignes",
     "comprendre_ligne_texte",
+    "comprendre_reflow_paragraphe",
 ]

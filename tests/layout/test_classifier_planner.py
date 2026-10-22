@@ -339,7 +339,7 @@ def test_planner_ignore_sous_zone_texte_ia_dans_zone_visuelle_ia():
     assert not any(item.strategy == "word-text" and item.bbox == texte_interne.bbox for item in plan)
 
 
-def test_planner_ne_duplique_pas_texte_natif_dans_vrai_tableau():
+def test_planner_conserve_texte_natif_word_native_dans_vrai_tableau():
     police = FontRef("OCR", "Arial", False, False)
     ligne_bbox = _bbox_pt(30, 60, 70, 72)
     span = Span("Cell", police, 9, "000000")
@@ -367,4 +367,4 @@ def test_planner_ne_duplique_pas_texte_natif_dans_vrai_tableau():
 
     assert not any(item.strategy == "word-text" and item.bbox == ligne_bbox for item in plan)
     assert filtrer_elements_selon_plan([texte_table], plan) == []
-    assert filtrer_elements_selon_plan([texte_table], plan, preserver_texte_natif=True) == []
+    assert filtrer_elements_selon_plan([texte_table], plan, preserver_texte_natif=True) == [texte_table]

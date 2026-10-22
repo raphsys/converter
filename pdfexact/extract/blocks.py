@@ -6,6 +6,7 @@ des régions de page, puis déléguer la conversion fine à l'intérieur du bloc
 from dataclasses import dataclass
 
 from pdfexact.geometry import BBox, union
+from pdfexact.analysis.geometry import bbox_area, center_in, overlap_ratio
 
 
 @dataclass(frozen=True)
@@ -22,26 +23,22 @@ class OcrLine:
     score: float | None
     bbox: BBox
     spans: tuple = ()
+    angle_deg: float = 0.0
+    orientation: str = "horizontal"
+    quad_points: tuple[tuple[float, float], ...] = ()
+    semantic_role: str | None = None
 
 
 def _aire(boite: BBox) -> int:
-    return max(0, boite.largeur) * max(0, boite.hauteur)
+    return bbox_area(boite)
 
 
 def ratio_couverture(boite: BBox, zone: BBox) -> float:
-    x0 = max(boite.x0, zone.x0)
-    y0 = max(boite.y0, zone.y0)
-    x1 = min(boite.x1, zone.x1)
-    y1 = min(boite.y1, zone.y1)
-    intersection = max(0, x1 - x0) * max(0, y1 - y0)
-    aire = _aire(boite)
-    return intersection / aire if aire else 0.0
+    return overlap_ratio(boite, zone)
 
 
 def centre_dans(boite: BBox, zone: BBox) -> bool:
-    x = (boite.x0 + boite.x1) // 2
-    y = (boite.y0 + boite.y1) // 2
-    return zone.x0 <= x <= zone.x1 and zone.y0 <= y <= zone.y1
+    return center_in(boite, zone)
 
 
 def est_dans_zone(boite: BBox, zones: list[BBox], seuil: float = 0.25) -> bool:

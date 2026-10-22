@@ -1,0 +1,12 @@
+PYTHONPATH=. .converter/bin/python scripts/reconstruct_bbox_native.py \
+  "/home/raphael/Mes_Projets/vysi/vysi_real_corpus/pdf_native/0fd83d2aa11747d4_000152.pdf" \
+  --pdf-out "results/0fd83d2aa11747d4_000152_bboxes_orchestrated.pdf" \
+  --docx-out "results/0fd83d2aa11747d4_000152_bbox_native_orchestrated.docx" \
+  --pages 1 \
+  --dpi 100 \
+  --text-mode spans \
+  --layout-ai \
+  --layout-provider paddlex \
+  --layout-model ppstructurev3/PP-DocLayout_plus-L \
+  --layout-model-root "/home/raphael/Mes_Projets/vysi/ai_models" \
+  --layout-device cpu

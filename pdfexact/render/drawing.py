@@ -5,10 +5,12 @@ la page. Marges internes nulles, habillage désactivé, aucun ajustement automat
 ne doit pouvoir décaler quoi que ce soit.
 """
 import re
+from dataclasses import replace
 from xml.sax.saxutils import escape
 
 from pdfexact.geometry import BBox, emu_vers_pt, pt_vers_emu, pt_vers_twips, quantifier_bbox, quantifier_coord
 from pdfexact.ir import FlowParagraph, Line, Span
+from pdfexact.layout.paragraph_planner import lignes_du_bloc, planifier_paragraphe
 
 _LEADER_RE = re.compile(
     r"^(?P<label>.+?)\s*(?P<leader>(?:[-._]\s*){6,})\s*(?P<page>-?\d{1,4}|[ivxlcdm]{1,8})\s*$",
@@ -62,12 +64,20 @@ def _bbox_ligne_word(ligne: Line, largeur_page_emu: int | None = None) -> BBox:
     return quantifier_bbox(BBox(ligne.bbox.x0, y0, x1, y0 + hauteur))
 
 
-def _run_xml(span, relations=None, *, autoriser_espacement_negatif: bool = False) -> str:
+def _run_xml(
+    span,
+    relations=None,
+    *,
+    autoriser_espacement_negatif: bool = False,
+    largeur_pct: int = 100,
+) -> str:
     """Un run avec sa police, son corps, sa couleur et sa correction d'espacement."""
     famille = escape(span.police.famille)
     proprietes = [
         f'<w:rFonts w:ascii="{famille}" w:hAnsi="{famille}" w:cs="{famille}"/>'
     ]
+    if span.police.famille == "TeX Gyre Heros Cn":
+        proprietes.append('<w:w w:val="75"/>')
     if span.police.gras:
         proprietes.append("<w:b/>")
     if span.police.italique:
@@ -90,6 +100,10 @@ def _run_xml(span, relations=None, *, autoriser_espacement_negatif: bool = False
     demi_points = max(round(span.size_pt * 2), 1)
     proprietes.append(f'<w:sz w:val="{demi_points}"/>')
     proprietes.append(f'<w:szCs w:val="{demi_points}"/>')
+    if largeur_pct != 100:
+        # Horizontal scale keeps a substituted row at its source width, both
+        # when the substitute face is wider and when it is narrower.
+        proprietes.append(f'<w:w w:val="{max(50, min(200, int(largeur_pct)))}"/>')
     if span.espacement_twips and (span.espacement_twips > 0 or autoriser_espacement_negatif):
         proprietes.append(f'<w:spacing w:val="{span.espacement_twips}"/>')
 
@@ -113,6 +127,70 @@ def _run_xml(span, relations=None, *, autoriser_espacement_negatif: bool = False
     return run
 
 
+def _runs_paragraphe(paragraphe: FlowParagraph, relations=None, polices=None) -> str:
+    """Construit un seul flux de runs avec les jonctions decidees semantiquement."""
+    lignes = list(lignes_du_bloc(paragraphe))
+    if not lignes:
+        return ""
+    plan = planifier_paragraphe(paragraphe, polices=polices)
+    morceaux: list[str] = []
+    texte_precedent = ""
+    for index, ligne in enumerate(lignes):
+        spans = [span for span in ligne.spans if span.texte]
+        if not spans:
+            continue
+        if index:
+            action = plan.action_between(index - 1)
+            courant = "".join(span.texte for span in spans)
+            precedent = texte_precedent
+            if action == "hyphen_join" and morceaux:
+                morceaux[-1] = re.sub(r"(?:-|¬)(</w:t></w:r>)$", r"\1", morceaux[-1])
+            elif action == "preserve_break":
+                morceaux.append('<w:r><w:br/></w:r>')
+            elif action == "paragraph_break":
+                morceaux.append('<w:r><w:br/><w:br/></w:r>')
+            elif (action != "no_space" and precedent and courant and not precedent[-1].isspace()
+                  and not courant[0].isspace() and courant[0] not in ".,;:!?)]}%"):
+                morceaux.append('<w:r><w:t xml:space="preserve"> </w:t></w:r>')
+            if action in {"preserve_break", "paragraph_break"} and (
+                ligne.bbox.x0 - paragraphe.bbox.x0 > pt_vers_emu(3)
+            ):
+                morceaux.append("<w:r><w:tab/></w:r>")
+        if index == 0 and ligne.bbox.x0 - paragraphe.bbox.x0 > pt_vers_emu(3):
+            morceaux.append("<w:r><w:tab/></w:r>")
+        morceaux.extend(
+            _run_xml(
+                replace(
+                    span,
+                    espacement_twips=(
+                        0
+                        if (
+                            index < len(plan.line_width_scale_percent)
+                            and plan.line_width_scale_percent[index] < 100
+                        )
+                        else int(span.espacement_twips or 0)
+                        + (
+                            plan.line_spacing_twips[index]
+                            if index < len(plan.line_spacing_twips)
+                            else 0
+                        )
+                    ),
+                ),
+                relations,
+                autoriser_espacement_negatif=True,
+                largeur_pct=(
+                    plan.line_width_scale_percent[index]
+                    if index < len(plan.line_width_scale_percent)
+                    else 100
+                ),
+            )
+            for span in spans
+            if span.texte
+        )
+        texte_precedent = "".join(span.texte for span in spans)
+    return "".join(morceaux)
+
+
 def _couleur_sombre(couleur: str | None) -> bool:
     if not couleur:
         return False
@@ -126,6 +204,14 @@ def _couleur_sombre(couleur: str | None) -> bool:
     except ValueError:
         return False
     return (0.299 * r + 0.587 * g + 0.114 * b) < 96
+
+
+def _rotation_ooxml(element) -> int:
+    """Convertit l'angle IR en unites DrawingML, sans tourner le flux ordinaire."""
+    angle = float(getattr(element, "angle_deg", 0.0) or 0.0)
+    if abs(angle) <= 7.0:
+        return 0
+    return round(-angle * 60000)
 
 
 def _copier_span(span, **changements):
@@ -361,7 +447,7 @@ def zone_texte_xml(
         "<a:noFill/><a:ln><a:noFill/></a:ln>"
         "</wps:spPr>"
         f"<wps:txbx><w:txbxContent>{paragraphe}</w:txbxContent></wps:txbx>"
-        '<wps:bodyPr rot="0" spcFirstLastPara="0" vertOverflow="overflow" '
+        f'<wps:bodyPr rot="{_rotation_ooxml(ligne)}" spcFirstLastPara="0" vertOverflow="overflow" '
         'horzOverflow="clip" vert="horz" wrap="none" '
         'lIns="0" tIns="0" rIns="0" bIns="0" anchor="t" anchorCtr="0">'
         "<a:noAutofit/></wps:bodyPr>"
@@ -385,7 +471,10 @@ def _interligne_paragraphe(paragraphe: FlowParagraph) -> int:
         ]
         deltas = sorted(delta for delta in deltas if delta > 0)
         if deltas:
-            return max(minimum, deltas[len(deltas) // 2])
+            # Un paragraphe OCR peut contenir un saut visuel entre deux styles
+            # (titre puis metadonnees). Le plus grand delta ne doit pas devenir
+            # l'interligne de toutes les lignes.
+            return max(minimum, deltas[0], paragraphe.interligne_emu)
     return max(minimum, paragraphe.interligne_emu, paragraphe.bbox.hauteur)
 
 
@@ -405,10 +494,26 @@ def _bbox_paragraphe_word(paragraphe: FlowParagraph) -> BBox:
     return quantifier_bbox(BBox(paragraphe.bbox.x0, paragraphe.bbox.y0, paragraphe.bbox.x1, paragraphe.bbox.y0 + hauteur))
 
 
-def zone_paragraphe_xml(paragraphe: FlowParagraph, identifiant: int, z: int, relations=None) -> str:
+def zone_paragraphe_xml(
+    paragraphe: FlowParagraph,
+    identifiant: int,
+    z: int,
+    relations=None,
+    *,
+    natif: bool = False,
+    espacement_avant_emu: int = 0,
+    flux_origine_x_emu: int | None = None,
+    flux_largeur_emu: int | None = None,
+    echelle_verticale: float = 1.0,
+    echelle_police: float = 1.0,
+    polices: dict | None = None,
+) -> str:
     """Rend un paragraphe Word editable ancre a sa bbox PDF."""
     bbox_ancre = _bbox_paragraphe_word(paragraphe)
-    interligne = max(pt_vers_twips(emu_vers_pt(_interligne_paragraphe(paragraphe))), 1)
+    interligne = max(
+        pt_vers_twips(emu_vers_pt(_interligne_paragraphe(paragraphe) * echelle_verticale)),
+        1,
+    )
     spans = paragraphe.spans or [
         Span(
             paragraphe.texte,
@@ -422,8 +527,17 @@ def zone_paragraphe_xml(paragraphe: FlowParagraph, identifiant: int, z: int, rel
             surlignage=paragraphe.surlignage,
         )
     ]
-    runs = "".join(_run_xml(span, relations, autoriser_espacement_negatif=True) for span in spans)
+    if echelle_police != 1.0:
+        spans = [
+            replace(span, size_pt=max(4.0, round(span.size_pt * echelle_police, 2)))
+            for span in spans
+        ]
+    runs = _runs_paragraphe(paragraphe, relations, polices=polices) or "".join(
+        _run_xml(span, relations, autoriser_espacement_negatif=True) for span in spans
+    )
     alignement = getattr(paragraphe, "alignement", "left") or "left"
+    if natif and len(paragraphe.lignes) <= 1 and alignement == "both":
+        alignement = "left"
     gauche_emu = max(0, paragraphe.retrait_gauche_emu - paragraphe.bbox.x0)
     gauche = max(pt_vers_twips(emu_vers_pt(gauche_emu)), 0)
     premiere = pt_vers_twips(emu_vers_pt(paragraphe.retrait_premiere_ligne_emu))
@@ -438,15 +552,41 @@ def zone_paragraphe_xml(paragraphe: FlowParagraph, identifiant: int, z: int, rel
         tab_stops.append(f'<w:tab w:val="left" w:pos="{gauche}"/>')
     tabs = f"<w:tabs>{''.join(dict.fromkeys(tab_stops))}</w:tabs>" if tab_stops else ""
 
+    avant = max(pt_vers_twips(emu_vers_pt(espacement_avant_emu * echelle_verticale)), 0)
+    retrait_droite_emu = paragraphe.retrait_droite_emu
+    if natif:
+        origine_x = flux_origine_x_emu or 0
+        gauche_emu = max(paragraphe.bbox.x0, paragraphe.retrait_gauche_emu) - origine_x
+        if flux_largeur_emu is not None:
+            retrait_droite_emu = max(
+                0,
+                flux_largeur_emu - max(0, paragraphe.bbox.x1 - origine_x),
+            )
+        # Les titres OCR tres grands ont souvent une bbox trop etroite. En flux Word,
+        # conserver ce retrait droit force un retour artificiel au milieu du mot.
+        if paragraphe.size_pt >= 18 or len(paragraphe.texte.strip()) <= 20 or len(paragraphe.texte.strip()) > 30:
+            retrait_droite_emu = 0
+    alignement_vertical = getattr(paragraphe, "vertical_alignement", "top") or "top"
+    alignement_vertical_xml = (
+        '<w:textAlignment w:val="center"/>'
+        if natif and alignement_vertical in {"center", "middle"}
+        else ""
+    )
     contenu_para = (
         "<w:p><w:pPr>"
-        f'<w:spacing w:before="0" w:after="0" w:line="{interligne}" w:lineRule="exact"/>'
+        f'<w:spacing w:before="{avant}" w:after="0" w:line="{interligne}" w:lineRule="exact"/>'
         f"{tabs}"
-        f'<w:ind w:left="{gauche}" w:right="0" w:firstLine="{premiere}"/>'
+        f'<w:ind w:left="{max(pt_vers_twips(emu_vers_pt(gauche_emu)), 0) if natif else gauche}" '
+        f'w:right="{max(pt_vers_twips(emu_vers_pt(retrait_droite_emu)), 0) if natif else 0}" '
+        f'w:firstLine="{premiere}"/>'
+        f"{alignement_vertical_xml}"
         f'<w:jc w:val="{alignement}"/>'
         "</w:pPr>"
         f"{runs}</w:p>"
     )
+
+    if natif:
+        return contenu_para
 
     vertical = getattr(paragraphe, "vertical_alignement", "top") or "top"
     ancre_verticale = {"center": "ctr", "middle": "ctr", "bottom": "b"}.get(vertical, "t")
@@ -462,7 +602,7 @@ def zone_paragraphe_xml(paragraphe: FlowParagraph, identifiant: int, z: int, rel
         "<a:noFill/><a:ln><a:noFill/></a:ln>"
         "</wps:spPr>"
         f"<wps:txbx><w:txbxContent>{contenu_para}</w:txbxContent></wps:txbx>"
-        '<wps:bodyPr rot="0" spcFirstLastPara="0" vertOverflow="clip" '
+        f'<wps:bodyPr rot="{_rotation_ooxml(paragraphe)}" spcFirstLastPara="0" vertOverflow="clip" '
         'horzOverflow="clip" vert="horz" wrap="square" '
         f'lIns="0" tIns="0" rIns="0" bIns="0" anchor="{ancre_verticale}" anchorCtr="{centre_vertical}">'
         "<a:noAutofit/></wps:bodyPr>"
@@ -472,11 +612,15 @@ def zone_paragraphe_xml(paragraphe: FlowParagraph, identifiant: int, z: int, rel
     return _ancre(bbox_ancre, identifiant, z, f"Paragraphe {identifiant}", contenu)
 
 
-def image_xml(element, identifiant: int, z: int, rel_id: str, derriere: bool = False) -> str:
+def image_xml(element, identifiant: int, z: int, rel_id: str, derriere: bool = False, *, planned: bool = False) -> str:
     """Rend une image, ou une région rastérisée, comme image flottante ancrée."""
     bbox = quantifier_bbox(element.bbox)
     largeur = max(bbox.largeur, 1)
     hauteur = max(bbox.hauteur, 1)
+    if not planned and getattr(element, "z_index", None) is not None:
+        z = 100 + 10 * element.z_index
+    elif not planned and getattr(element, "purpose", None) in {"formula", "symbol"}:
+        z += 100000
 
     contenu = (
         "<a:graphic><a:graphicData "
@@ -532,7 +676,9 @@ def _span_contraste_cellule(span, fond: str | None):
 
 
 def _union_bbox(a: BBox, b: BBox) -> BBox:
-    return BBox(min(a.x0, b.x0), min(a.y0, b.y0), max(a.x1, b.x1), max(a.y1, b.y1))
+    from pdfexact.geometry import union
+
+    return union(a, b)
 
 
 def _bbox_spans_cellule(spans: list[Span]) -> BBox | None:
@@ -1013,11 +1159,13 @@ def _commandes_xml(chemins, origine_x: int, origine_y: int) -> str:
     return "".join(morceaux)
 
 
-def forme_xml(element, identifiant: int, z: int, derriere: bool = False) -> str:
+def forme_xml(element, identifiant: int, z: int, derriere: bool = False, *, planned: bool = False) -> str:
     """Rend une forme vectorielle en géométrie personnalisée DrawingML."""
     bbox = quantifier_bbox(element.bbox)
     largeur = max(bbox.largeur, 1)
     hauteur = max(bbox.hauteur, 1)
+    if not planned and getattr(element, "z_index", None) is not None:
+        z = 100 + 10 * element.z_index
 
     if element.remplissage:
         alpha = ""
@@ -1041,16 +1189,14 @@ def forme_xml(element, identifiant: int, z: int, derriere: bool = False) -> str:
         trait = "<a:ln><a:noFill/></a:ln>"
 
     commandes = _commandes_xml(element.chemins, bbox.x0, bbox.y0)
-    forme_remplie_simple = bool(element.remplissage) and (
-        not commandes or largeur >= hauteur * 3 or hauteur <= pt_vers_emu(36)
-    )
     geometrie = (
-        '<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>'
-        if forme_remplie_simple
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+        if not commandes
         else (
             "<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/>"
             f'<a:rect l="0" t="0" r="{largeur}" b="{hauteur}"/>'
-            f'<a:pathLst><a:path w="{largeur}" h="{hauteur}">{commandes}</a:path></a:pathLst>'
+            f'<a:pathLst><a:path w="{largeur}" h="{hauteur}" '
+            f'fill="{"norm" if element.remplissage else "none"}">{commandes}</a:path></a:pathLst>'
             "</a:custGeom>"
         )
     )

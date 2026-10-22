@@ -51,6 +51,10 @@ class DiagnosticWordNative:
     textboxes: int = 0
     tableaux_positionnes: int = 0
     runs_compresses: int = 0
+    elements_manquants: list[str] = field(default_factory=list)
+    elements_hors_page: list[str] = field(default_factory=list)
+    doublons_ignores: int = 0
+    risques_lecteur: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -73,7 +77,10 @@ class IssueCertificationFinale:
 class CertificationFinale:
     active: bool = False
     conforme: bool = True
+    audit_rendu_verifie: bool = False
     pages_analysees: int = 0
+    pages_source: int = 0
+    pages_rendues: int = 0
     zones_ai: int = 0
     zones_visuelles_attendues: int = 0
     zones_visuelles_comparees: int = 0
@@ -84,6 +91,13 @@ class CertificationFinale:
     ratio_texte: float = 1.0
     score_visuel_min: float | None = None
     score_zone_visuelle_min: float | None = None
+    elements_hors_page: int = 0
+    textes_non_visibles: int = 0
+    superpositions_signalees: int = 0
+    audit_elements: list[dict] = field(default_factory=list)
+    audit_elements_en_erreur: int = 0
+    corrections_locales: list[dict] = field(default_factory=list)
+    audit_diagnostics: list[dict] = field(default_factory=list)
     avertissements: list[str] = field(default_factory=list)
     issues: list[IssueCertificationFinale] = field(default_factory=list)
 
@@ -143,6 +157,13 @@ class Rapport:
                 f"tableaux positionnés={diag.tableaux_positionnes}, runs compressés={diag.runs_compresses}, "
                 f"ancres derrière={diag.ancres_derriere})."
             )
+            if diag.elements_manquants or diag.elements_hors_page or diag.doublons_ignores:
+                lignes.append(
+                    "Diagnostics réécriture : "
+                    f"manquants={len(diag.elements_manquants)}, "
+                    f"hors-page={len(diag.elements_hors_page)}, "
+                    f"doublons ignorés={diag.doublons_ignores}."
+                )
         if self.correction_word_native is not None and self.correction_word_native.textboxes_converties:
             correction = self.correction_word_native
             lignes.append(
@@ -153,7 +174,10 @@ class Rapport:
             )
         if self.certification_finale is not None and self.certification_finale.active:
             certification = self.certification_finale
-            statut = "OK" if certification.conforme else "À REVOIR"
+            if "audit_rendu_ignore:export_docx_pdf_indisponible" in certification.avertissements:
+                statut = "INCOMPLÈTE"
+            else:
+                statut = "OK" if certification.conforme else "À REVOIR"
             lignes.append(
                 "Certification finale : "
                 f"{statut}, {certification.zones_visuelles_recuperees} zone(s) récupérée(s), "

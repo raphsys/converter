@@ -1,0 +1,70 @@
+{
+  "schema": "pdfexact.visual-reference.v1",
+  "source_pdf_name": "0c6daef79b7165c1_000744.pdf",
+  "page_index": 0,
+  "page_size_pt": [792, 612],
+  "coordinate_space": "page-visible-canonical",
+  "origin": "top-left",
+  "method": "Codex visual inspection of the rendered source page; approximate visual bounds",
+  "purpose": "Independent benchmark reference, never a production layout rule",
+  "regions": [
+    {
+      "id": "F1", "role": "background", "label": "Fond du bandeau superieur",
+      "bbox_pt": [36, 36, 756, 116], "parent_id": null
+    },
+    {
+      "id": "F2", "role": "background", "label": "Fond Terre et espace",
+      "bbox_pt": [36, 116, 756, 576], "parent_id": null
+    },
+    {
+      "id": "01", "role": "logo", "label": "Logo NASA",
+      "bbox_pt": [51, 45, 130, 113], "parent_id": "F1"
+    },
+    {
+      "id": "02", "role": "text", "label": "Titre, un paragraphe de deux lignes",
+      "bbox_pt": [175, 51, 688, 107], "parent_id": "F1",
+      "text": "Concept Exploration and Refinement (CE&R)\nConcept Area 1 (CA-1) Mid-Term Review",
+      "native_editable": true
+    },
+    {
+      "id": "03", "role": "figure", "label": "Illustration de capsule",
+      "bbox_pt": [158, 122, 260, 225], "parent_id": "F2"
+    },
+    {
+      "id": "04", "role": "text", "label": "Date et organisme, un bloc de trois lignes",
+      "bbox_pt": [275, 148, 525, 212], "parent_id": "F2",
+      "text": "December 1, 2004\nAdvanced Programs Group\nOrbital Sciences Corporation",
+      "native_editable": true
+    },
+    {
+      "id": "05", "role": "figure", "label": "Lancement de fusee",
+      "bbox_pt": [606, 123, 708, 225], "parent_id": "F2"
+    },
+    {
+      "id": "06", "role": "figure", "label": "Illustration centrale du vehicule spatial",
+      "bbox_pt": [416, 221, 557, 362], "parent_id": "F2"
+    },
+    {
+      "id": "07", "role": "figure", "label": "Vehicule en transit devant la Lune",
+      "bbox_pt": [608, 234, 708, 334], "parent_id": "F2"
+    },
+    {
+      "id": "08", "role": "figure", "label": "Descente vers la surface lunaire",
+      "bbox_pt": [610, 344, 709, 444], "parent_id": "F2"
+    },
+    {
+      "id": "09", "role": "logo", "label": "Logo Orbital",
+      "bbox_pt": [72, 446, 288, 542], "parent_id": "F2"
+    },
+    {
+      "id": "10", "role": "figure", "label": "Atterrisseur sur la surface lunaire",
+      "bbox_pt": [608, 454, 708, 553], "parent_id": "F2"
+    }
+  ],
+  "observations": [
+    "The 10 foreground regions are visual semantic units, not PDF resource counts.",
+    "The white borders belong to their illustrations, not to additional semantic objects.",
+    "The extracted text A-1 is not visibly readable in the rendered source and is not counted as a visible text region.",
+    "Background bounds describe visible layers, not the untrimmed bounds of embedded image resources."
+  ]
+}

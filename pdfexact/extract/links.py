@@ -6,16 +6,22 @@ devient une forme rectangulaire invisible cliquable.
 """
 import pymupdf
 
-from pdfexact.geometry import bbox_depuis_rect, se_chevauchent
+from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, se_chevauchent
 from pdfexact.ir import LinkZone
 
 
-def appliquer_liens(page, blocs) -> list[LinkZone]:
+def appliquer_liens(
+    page,
+    blocs,
+    geometrie: PageGeometry | None = None,
+) -> list[LinkZone]:
     """Pose les liens sur les spans recouverts, retourne les liens de zone restants."""
+    geometrie = geometrie or PageGeometry.depuis_page(page)
     zones: list[LinkZone] = []
 
     for lien in page.get_links():
-        boite = bbox_depuis_rect(pymupdf.Rect(lien["from"]))
+        rect = pymupdf.Rect(lien["from"])
+        boite = geometrie.bbox_depuis_rect_natif(rect)
         uri = lien.get("uri")
         page_cible = lien.get("page") if lien.get("kind") == pymupdf.LINK_GOTO else None
         if page_cible is not None and page_cible < 0:

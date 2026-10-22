@@ -270,6 +270,7 @@ def test_myriad_et_geneva_sont_resolus_par_alias_libres():
         "Myriad-Italic": ("Source Sans Pro", "Italic"),
         "Myriad-Bold": ("Source Sans Pro", "Bold"),
         "MyriadPro-Black": ("Source Sans Pro", "Bold"),
+        "FuturaStd-CondensedBold": ("Nimbus Sans Narrow", "Bold"),
         "Geneva": ("Liberation Sans", "Regular"),
         "CenturyGothic": ("URW Gothic", "Book"),
         "CenturyGothic-Bold": ("URW Gothic", "Demi"),

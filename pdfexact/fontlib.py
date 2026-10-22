@@ -1,13 +1,9 @@
-"""Bibliothèque de polices : reconnaître la police exacte nommée par un PDF.
+"""Bibliothèque de polices : résolution exacte, alias ou substitution explicite.
 
-Un PDF n'embarque qu'un sous-ensemble de police, dont la table cmap est souvent vide ou
-absente — inutilisable pour mesurer du texte. En revanche il en donne toujours le nom
-PostScript. Ce module retrouve le vrai fichier de police correspondant, dans un dossier
-curaté ou parmi les polices du système, et c'est ce fichier qui fait autorité pour les
-métriques et pour le nom déclaré dans le docx.
-
-Substituer à l'aveugle vers Arial fausse les largeurs, donc la mise en page. Reconnaître
-la police évite ce détour.
+Les noms PDF peuvent être opaques et leurs sous-ensembles ne sont pas toujours
+exploitables pour Word. Le fichier résolu fournit les métriques et le nom déclarés
+dans le DOCX ; une substitution dynamique ne prouve ni l'identité de la police source
+ni l'équivalence de ses métriques.
 """
 import json
 import re
@@ -101,7 +97,7 @@ class ResolutionPolice:
 
     demandee: str
     police: PoliceIndexee | None
-    mode: str  # "exact", "famille_style", "alias", "famille", "manquante"
+    mode: str  # "exact", "famille_style", "alias", "famille", "dynamique", "manquante"
     alias_depuis: str | None = None
     confiance: float = 0.0
 
@@ -223,7 +219,7 @@ def _classe_nom_police(nom: str) -> str:
         return "serif"
     if any(indice in cle for indice in _SANS_HINTS):
         return "sans"
-    return "sans"
+    return "unknown"
 
 
 @lru_cache(maxsize=512)
@@ -257,7 +253,7 @@ def _distance_signature(signature: tuple[float, ...] | None, classe: str) -> flo
 
 def _style_flags(style: str) -> tuple[bool, bool]:
     normal = _normaliser_style(style)
-    return "bold" in normal, "italic" in normal
+    return "bold" in normal, "italic" in normal or "oblique" in normal
 
 
 def _score_substitut(
@@ -270,6 +266,10 @@ def _score_substitut(
     classe_candidate = _classe_nom_police(candidat.famille)
     if classe_voulue == "symbol":
         return 0.0
+    # A default sans substitute is a policy, not evidence about an opaque name.
+    # In particular an unclassified candidate must not inherit that same class.
+    if classe_voulue == "unknown":
+        classe_voulue = "sans"
 
     bold_voulu, italic_voulu = _style_flags(style)
     bold_candidat, italic_candidat = _style_flags(candidat.style)
@@ -327,8 +327,7 @@ class Bibliotheque:
         """Retrouve la police correspondant au nom relevé dans un PDF.
 
         Cascade, du plus sûr au plus permissif : nom PostScript exact, puis famille et
-        style, puis famille seule en Regular. Aucune correspondance approximative au-delà :
-        mieux vaut retomber sur une substitution explicite qu'inventer un rapprochement.
+        style, alias, famille seule en Regular puis substitution dynamique explicite.
         """
         return self.resoudre_detail(nom_pdf).police
 
@@ -371,6 +370,8 @@ class Bibliotheque:
         dynamique = _substitut_dynamique(nom, famille, style, self.par_famille_style.values())
         if dynamique is not None:
             police, confiance = dynamique
+            if _classe_nom_police(famille or nom) == "unknown":
+                confiance = min(confiance, 0.60)
             return ResolutionPolice(nom, police, "dynamique", alias_depuis=famille, confiance=confiance)
 
         return ResolutionPolice(nom, None, "manquante", confiance=0.0)

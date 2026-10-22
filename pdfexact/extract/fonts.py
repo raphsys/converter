@@ -1,8 +1,8 @@
 """Polices : du nom relevé dans le PDF aux métriques réelles.
 
-Le PDF nomme ses polices mais n'embarque que des sous-ensembles inexploitables. La
-bibliothèque (pdfexact.fontlib) retrouve le vrai fichier ; ce module en tire les trois
-grandeurs dont le writer a besoin :
+Le PDF peut embarquer des sous-ensembles et employer des noms opaques. La bibliothèque
+(pdfexact.fontlib) résout un fichier exact ou un substitut explicite ; ce module en tire
+les trois grandeurs dont le writer a besoin :
 
 - la largeur rendue d'une chaîne, pour corriger la dérive horizontale ;
 - l'ascendante, pour que la baseline tombe au bon endroit ;
@@ -11,6 +11,7 @@ grandeurs dont le writer a besoin :
 Ces métriques sont celles de la police **déclarée dans le docx**, pas celles du PDF :
 c'est avec elles que Word composera, donc c'est elles qui doivent servir au calcul.
 """
+import logging
 from functools import lru_cache
 
 from fontTools.ttLib import TTFont
@@ -23,6 +24,7 @@ from pdfexact.ir import FontAsset
 ASCENDANTE_DEFAUT = 0.8
 DESCENDANTE_DEFAUT = -0.2
 LARGEUR_MOYENNE_DEFAUT = 0.5
+_LOGGER = logging.getLogger(__name__)
 
 
 def _famille_de_repli(nom_postscript: str) -> str:
@@ -52,17 +54,39 @@ def collecter_polices(doc, bibliotheque: Bibliotheque | None = None) -> dict[str
 
             resolution = bibliotheque.resoudre_detail(nom_base)
             trouvee = resolution.police
+            donnees_source = None
+            extension_source = ""
+            try:
+                _nom, extension, _type, donnees = doc.extract_font(entree[0])
+                if donnees:
+                    donnees_source = donnees
+                    extension_source = extension
+            except (AttributeError, OSError, RuntimeError, ValueError) as exc:
+                _LOGGER.warning(
+                    "Lecture de la police PDF %s (xref=%s) impossible : %s. "
+                    "Poursuite avec la resolution locale ou les metriques de repli.",
+                    font_id, entree[0], exc,
+                )
+            metriques = {}
+            if trouvee and trouvee.chemin:
+                valeurs = _ascendante_descendante(trouvee.chemin)
+                if valeurs:
+                    metriques = {
+                        "ascender_ratio": float(valeurs[0]),
+                        "descender_ratio": float(valeurs[1]),
+                    }
             assets[font_id] = FontAsset(
                 font_id=font_id,
                 famille=trouvee.famille if trouvee else _famille_de_repli(font_id),
-                donnees=None,
-                extension="",
-                embarquee=False,
+                donnees=donnees_source,
+                extension=extension_source,
+                embarquee=donnees_source is not None,
                 chemin=trouvee.chemin if trouvee else None,
                 reconnue=trouvee is not None,
                 mode_resolution=resolution.mode,
                 confiance_resolution=resolution.confiance,
                 alias_resolution=resolution.police.famille if trouvee and resolution.mode != "exact" else None,
+                metriques=metriques,
             )
 
     return assets

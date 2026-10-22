@@ -1,5 +1,6 @@
 """Interface en ligne de commande."""
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -10,12 +11,19 @@ from pdfexact.extract.fonts import collecter_polices
 from pdfexact.extract.vector import SEUIL_CHEMINS_PAR_DEFAUT
 from pdfexact.font_fetcher import telecharger_polices_manquantes
 from pdfexact.fontlib import construire, dossiers_par_defaut
-from pdfexact.ir import FlowParagraph, TextBox
-from pdfexact.layout.text_comprehension import configurer_fournisseur_comprehension_texte
-from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehension_texte_ai
-from pdfexact.render.native_contract import corriger_document_word_native, inspecter_docx_word_native
+from pdfexact.layout.text_comprehension import (
+    configurer_fournisseur_comprehension_texte,
+    contexte_comprehension_texte,
+)
+from pdfexact.layout.text_comprehension_ai import (
+    creer_fournisseur_comprehension_texte_ai,
+    creer_fournisseur_orientation_ai,
+)
+from pdfexact.extract.orientation import configurer_fournisseur_orientation
+from pdfexact.render.native_contract import inspecter_docx_word_native, valider_contrat_word_native
 from pdfexact.render.package import ecrire_docx
 from pdfexact.report import CorrectionWordNative, DiagnosticWordNative, Rapport
+from pdfexact.model_paths import resolve_ai_models_root
 
 
 def analyser_pages(expression: str) -> list[int]:
@@ -39,6 +47,7 @@ def analyser_pages(expression: str) -> list[int]:
     return indices
 
 
+@contexte_comprehension_texte()
 def convertir(
     source,
     destination,
@@ -54,7 +63,7 @@ def convertir(
     ocr_visible: bool = False,
     ocr_granularity: str = "word",
     ocr_layout: str = "blocks",
-    layout_ai: bool = False,
+    layout_ai: bool = True,
     layout_provider: str | None = None,
     layout_model: str | None = None,
     layout_model_root: str | None = None,
@@ -62,13 +71,35 @@ def convertir(
     text_understanding_ai: bool = False,
     text_understanding_url: str | None = None,
     text_understanding_timeout: float = 3.0,
+    text_orientation_ai: bool = False,
+    text_orientation_url: str | None = None,
+    text_orientation_timeout: float = 3.0,
     fetch_missing_fonts: bool = False,
     font_cache_dir: str = "fonts/local",
     final_audit: bool = False,
     final_audit_dpi: int = 120,
+    native_rewriter: bool = False,
     verbose: bool = False,
+    ai_models_root: str | None = None,
+    ocr_language: str = "auto",
+    experimental_local_text_understanding: bool = False,
 ) -> Rapport:
     """Convertit un PDF en docx. Retourne le rapport de conversion."""
+    # Un endpoint configure est un engagement explicite du runtime : les
+    # decisions semantiques et d'orientation passent alors automatiquement par
+    # l'IA, meme si le drapeau historique n'a pas ete repete sur la commande.
+    text_understanding_ai = text_understanding_ai or bool(
+        os.environ.get("PDFEXACT_TEXT_UNDERSTANDING_URL", "").strip()
+    )
+    text_orientation_ai = text_orientation_ai or bool(
+        os.environ.get("PDFEXACT_TEXT_ORIENTATION_URL", "").strip()
+    )
+    # ``word-native`` décrit le renderer final, pas seulement la granularité
+    # OCR. L'option historique --native-rewriter reste acceptée, mais ne doit
+    # plus être obligatoire pour obtenir réellement le document Word-native.
+    native_rewriter = native_rewriter or (
+        text_mode == "rapidocr" and ocr_layout == "word-native"
+    )
     rapport = Rapport()
     destination = Path(destination)
     if destination.parent != Path("."):
@@ -115,16 +146,36 @@ def convertir(
         ocr_granularity = "line"
         if verbose:
             print(f"      {ocr_layout}: granularité OCR forcée à line", file=sys.stderr)
-    provider_texte = None
-    if text_understanding_ai:
-        provider_texte = creer_fournisseur_comprehension_texte_ai(
-            url=text_understanding_url,
-            timeout=text_understanding_timeout,
+    provider_texte = creer_fournisseur_comprehension_texte_ai(
+        url=text_understanding_url,
+        timeout=text_understanding_timeout,
+        model_root=(resolve_ai_models_root(ai_models_root if ai_models_root is not None else layout_model_root)
+                    if ai_models_root is not None or layout_model_root is not None else None),
+        experimental_local=experimental_local_text_understanding,
+    )
+    configurer_fournisseur_comprehension_texte(provider_texte, annoncer=True)
+    provider_orientation = None
+    if text_understanding_ai or text_orientation_ai:
+        endpoint_orientation = text_orientation_url or text_understanding_url
+        timeout_orientation = (
+            text_orientation_timeout
+            if text_orientation_ai
+            else text_understanding_timeout
         )
-        configurer_fournisseur_comprehension_texte(provider_texte)
+        provider_orientation = creer_fournisseur_orientation_ai(
+            url=endpoint_orientation,
+            timeout=timeout_orientation,
+        )
+        configurer_fournisseur_orientation(provider_orientation)
         if verbose:
-            statut = "active" if provider_texte is not None else "inactive"
-            print(f"      compréhension IA intra-bloc: {statut}", file=sys.stderr)
+            statut = "active" if provider_orientation is not None else "inactive"
+            print(f"      compréhension IA orientation: {statut}", file=sys.stderr)
+    if verbose:
+        diagnostics = getattr(provider_texte, "diagnostics", {})
+        statut = (diagnostics.get("status") if isinstance(diagnostics, dict) else None) or (
+            "configuree" if provider_texte is not None else "indisponible (repli geometrique)"
+        )
+        print(f"      compréhension IA intra-bloc: {statut}", file=sys.stderr)
     try:
         document = extraire(
             source,
@@ -143,33 +194,34 @@ def convertir(
             layout_ai=layout_ai,
             layout_provider=layout_provider,
             layout_model=layout_model,
-            layout_model_root=layout_model_root,
+            layout_model_root=layout_model_root if layout_model_root is not None else ai_models_root,
             layout_device=layout_device,
             verbose=verbose,
             rapport=rapport,
+            ai_models_root=resolve_ai_models_root(ai_models_root if ai_models_root is not None else layout_model_root),
+            ocr_language=ocr_language,
         )
         if verbose:
             print(f"[3/4] Écriture DOCX: {destination}", file=sys.stderr)
-        textes_positionnes_attendus = (
-            _compter_textes_positionnes(document)
-            if text_mode == "rapidocr" and ocr_layout == "word-native"
-            else 0
-        )
         if text_mode == "rapidocr" and ocr_layout == "word-native":
-            correction = corriger_document_word_native(document)
-            rapport.correction_word_native = CorrectionWordNative(
-                pages_corrigees=correction.pages_corrigees,
-                textboxes_converties=correction.textboxes_converties,
-                lignes_converties=correction.lignes_converties,
-            )
-            if verbose and correction.appliquee:
+            contract = valider_contrat_word_native(document)
+            if verbose and not contract.conforme:
                 print(
-                    "      correction Word native: "
-                    f"{correction.textboxes_converties} textbox(es) -> "
-                    f"{correction.lignes_converties} paragraphe(s)",
+                    "      contrat Word-native avant écriture: "
+                    f"erreurs={len(contract.plan_errors) + len(contract.missing_bbox) + len(contract.unsupported_modes)}",
                     file=sys.stderr,
                 )
-        ecrire_docx(document, destination)
+        rewrite_result = ecrire_docx(document, destination, native_rewriter=native_rewriter)
+        if verbose and rewrite_result is not None:
+            diagnostic = rewrite_result.diagnostics
+            print(
+                "      réécriture Word-native: "
+                f"flow={diagnostic.flow_paragraphs + diagnostic.positioned_flow_paragraphs}, "
+                f"cadres ancrés={diagnostic.anchored_frames}, "
+                f"cadres inline={diagnostic.inline_frames}, tables={diagnostic.real_tables}, "
+                f"images ancrées={diagnostic.anchored_images}",
+                file=sys.stderr,
+            )
         if final_audit:
             if verbose:
                 print("[3/4] Audit final IA + récupération: actif", file=sys.stderr)
@@ -184,61 +236,68 @@ def convertir(
                 layout_model=layout_model,
                 layout_model_root=layout_model_root,
                 layout_device=layout_device,
+                native_rewriter=native_rewriter,
                 verbose=verbose,
             )
     finally:
-        if text_understanding_ai:
-            configurer_fournisseur_comprehension_texte(None)
+        if text_understanding_ai or text_orientation_ai:
+            configurer_fournisseur_orientation(None)
     if text_mode == "rapidocr" and ocr_layout == "word-native":
-        diagnostic = inspecter_docx_word_native(destination)
-        conforme = diagnostic.conforme and not (
-            textes_positionnes_attendus > 0 and diagnostic.textboxes == 0
-        )
-        rapport.diagnostic_word_native = DiagnosticWordNative(
-            conforme=conforme,
-            paragraphes=diagnostic.paragraphes,
-            tableaux=diagnostic.tableaux,
-            images=diagnostic.images,
-            ancres=diagnostic.ancres,
-            ancres_derriere=diagnostic.ancres_derriere,
-            frames=diagnostic.frames,
-            textboxes=diagnostic.textboxes,
-            tableaux_positionnes=diagnostic.tableaux_positionnes,
-            runs_compresses=diagnostic.runs_compresses,
-        )
-        if verbose:
-            statut = "OK" if conforme else "NON CONFORME"
-            print(
-                "      contrat Word native page-exact: "
-                f"{statut}, frames={diagnostic.frames}, ancres={diagnostic.ancres}, "
-                f"textboxes éditables={diagnostic.textboxes}, tableaux positionnés={diagnostic.tableaux_positionnes}, "
-                f"runs compressés={diagnostic.runs_compresses}",
-                file=sys.stderr,
+        if native_rewriter and rewrite_result is not None:
+            diagnostic = rewrite_result.diagnostics
+            rapport.diagnostic_word_native = DiagnosticWordNative(
+                conforme=diagnostic.conforme,
+                paragraphes=diagnostic.direct_body_paragraphs,
+                tableaux=diagnostic.real_tables,
+                images=diagnostic.anchored_images,
+                ancres=diagnostic.anchored_frames + diagnostic.anchored_images + diagnostic.anchored_shapes,
+                ancres_derriere=0,
+                frames=0,
+                textboxes=diagnostic.anchored_frames + diagnostic.inline_frames,
+                tableaux_positionnes=diagnostic.positioned_tables,
+                runs_compresses=0,
+                elements_manquants=list(diagnostic.missing_elements),
+                elements_hors_page=list(diagnostic.out_of_page_elements),
+                doublons_ignores=diagnostic.skipped_duplicates,
+                risques_lecteur=list(diagnostic.reader_risks),
             )
-            if textes_positionnes_attendus > 0 and diagnostic.textboxes == 0:
+            if verbose:
+                statut = "OK" if diagnostic.conforme else "NON CONFORME"
                 print(
-                    "      anomalie Word native: texte OCR extrait mais aucune textbox écrite",
+                    "      audit Word-native réécrit: "
+                    f"{statut}, body-p={diagnostic.direct_body_paragraphs}, "
+                    f"cadres autorisés={diagnostic.anchored_frames + diagnostic.inline_frames}, "
+                    f"manquants={len(diagnostic.missing_elements)}, "
+                    f"hors-page={len(diagnostic.out_of_page_elements)}",
+                    file=sys.stderr,
+                )
+        else:
+            diagnostic = inspecter_docx_word_native(destination)
+            conforme = diagnostic.conforme
+            rapport.diagnostic_word_native = DiagnosticWordNative(
+                conforme=conforme,
+                paragraphes=diagnostic.paragraphes,
+                tableaux=diagnostic.tableaux,
+                images=diagnostic.images,
+                ancres=diagnostic.ancres,
+                ancres_derriere=diagnostic.ancres_derriere,
+                frames=diagnostic.frames,
+                textboxes=diagnostic.textboxes,
+                tableaux_positionnes=diagnostic.tableaux_positionnes,
+                runs_compresses=diagnostic.runs_compresses,
+            )
+            if verbose:
+                statut = "OK" if conforme else "NON CONFORME"
+                print(
+                    "      contrat Word native page-exact: "
+                    f"{statut}, frames={diagnostic.frames}, ancres={diagnostic.ancres}, "
+                    f"textboxes éditables={diagnostic.textboxes}, tableaux positionnés={diagnostic.tableaux_positionnes}, "
+                    f"runs compressés={diagnostic.runs_compresses}",
                     file=sys.stderr,
                 )
     if verbose:
         print("[4/4] Conversion terminée.", file=sys.stderr)
     return rapport
-
-
-def _compter_textes_positionnes(document) -> int:
-    total = 0
-    for page in document.pages:
-        for element in page.elements:
-            if isinstance(element, TextBox):
-                if any(
-                    any(span.texte.strip() for span in ligne.spans)
-                    for ligne in element.lignes
-                ):
-                    total += 1
-            elif isinstance(element, FlowParagraph):
-                if element.texte.strip() or any(span.texte.strip() for span in element.spans):
-                    total += 1
-    return total
 
 
 def _analyseur() -> argparse.ArgumentParser:
@@ -308,9 +367,10 @@ def _analyseur() -> argparse.ArgumentParser:
         "--ocr-engine",
         choices=("tesseract", "fastocr"),
         default="tesseract",
-        help="moteur OCR demandé ; fastocr est installé mais ne fournit pas de boîtes locales",
+        help="moteur de couche OCR ; fastocr n'est pas pris en charge localement",
     )
-    analyseur.add_argument("--ocr-lang", default="eng", help="langue OCR, ex. eng ou fra")
+    analyseur.add_argument("--ocr-lang", "--ocr-language", default="auto",
+                          help="RapidOCR: auto best-effort par région ou ru, zh, ja, ko, ru+ja ; couche Tesseract: eng/fra installés")
     analyseur.add_argument(
         "--ocr-granularity",
         choices=("line", "word", "char"),
@@ -347,6 +407,10 @@ def _analyseur() -> argparse.ArgumentParser:
         help="modèle layout IA, ex. ppstructurev3/PP-DocLayout_plus-L",
     )
     analyseur.add_argument(
+        "--ai-models-root", default=None,
+        help="racine IA commune locale (OCR, compréhension et layout), sans téléchargement",
+    )
+    analyseur.add_argument(
         "--layout-model-root",
         default=None,
         help="racine des modèles IA layout",
@@ -355,6 +419,11 @@ def _analyseur() -> argparse.ArgumentParser:
         "--layout-device",
         default=None,
         help="device IA layout, ex. cpu/gpu",
+    )
+    analyseur.add_argument(
+        "--experimental-local-text-understanding",
+        action="store_true",
+        help="active explicitement la compréhension Qwen locale expérimentale ; aucune garantie de qualité",
     )
     analyseur.add_argument(
         "--text-understanding-ai",
@@ -373,6 +442,22 @@ def _analyseur() -> argparse.ArgumentParser:
         help="timeout par appel IA intra-bloc",
     )
     analyseur.add_argument(
+        "--text-orientation-ai",
+        action="store_true",
+        help="active la compréhension IA sémantique des orientations et rôles de texte",
+    )
+    analyseur.add_argument(
+        "--text-orientation-url",
+        default=None,
+        help="endpoint HTTP JSON local pour la compréhension sémantique de l'orientation",
+    )
+    analyseur.add_argument(
+        "--text-orientation-timeout",
+        type=float,
+        default=3.0,
+        help="timeout par appel IA d'orientation",
+    )
+    analyseur.add_argument(
         "--ocr-visible",
         action="store_true",
         help="rend la couche OCR visible pour debug au lieu de la masquer",
@@ -387,6 +472,11 @@ def _analyseur() -> argparse.ArgumentParser:
         type=int,
         default=120,
         help="résolution de l'audit final et des zones récupérées",
+    )
+    analyseur.add_argument(
+        "--native-rewriter",
+        action="store_true",
+        help="reconstruit document.xml depuis l'IR avec paragraphes Word directs et cadres contrôlés",
     )
     analyseur.add_argument(
         "--verbose", "-v", action="store_true", help="affiche la progression détaillée"
@@ -419,13 +509,16 @@ def main(argv=None) -> int:
                 "--ocr-layout hybrid --ocr-granularity line",
                 file=sys.stderr,
             )
-    if arguments.ocr_layout in {"hybrid", "word-native"} and not arguments.no_layout_ai:
-        arguments.layout_ai = True
+    # L'analyse de layout est une étape obligatoire du contrat universel.
+    # L'option historique --no-layout-ai est conservée pour compatibilité de
+    # parsing, mais elle ne peut plus retirer l'analyse; en cas d'indisponibilité
+    # du moteur, document.py signale le warning et active son repli géométrique.
+    arguments.layout_ai = True
 
     try:
         if arguments.ocr_engine == "fastocr":
             raise ValueError(
-                "fastocr est installé, mais ce paquet expose des API distantes sans "
+                "fastocr n'est pas pris en charge par cette installation et ne fournit pas de "
                 "boîtes de mots locales ; utilisez --ocr-engine tesseract pour une "
                 "couche positionnée"
             )
@@ -440,22 +533,29 @@ def main(argv=None) -> int:
             rasteriser_pages=arguments.raster_pages,
             text_mode=arguments.text_mode,
             ocr_layer=arguments.ocr_layer,
-            ocr_lang=arguments.ocr_lang,
+            ocr_lang="eng" if arguments.ocr_lang == "auto" else arguments.ocr_lang,
+            ocr_language=arguments.ocr_lang,
+            ai_models_root=arguments.ai_models_root,
             ocr_visible=arguments.ocr_visible,
             ocr_granularity=arguments.ocr_granularity,
             ocr_layout=arguments.ocr_layout,
-            layout_ai=arguments.layout_ai and not arguments.no_layout_ai,
+            layout_ai=True,
             layout_provider=arguments.layout_provider,
             layout_model=arguments.layout_model,
             layout_model_root=arguments.layout_model_root,
             layout_device=arguments.layout_device,
             text_understanding_ai=arguments.text_understanding_ai,
+            experimental_local_text_understanding=arguments.experimental_local_text_understanding,
             text_understanding_url=arguments.text_understanding_url,
             text_understanding_timeout=arguments.text_understanding_timeout,
+            text_orientation_ai=arguments.text_orientation_ai,
+            text_orientation_url=arguments.text_orientation_url,
+            text_orientation_timeout=arguments.text_orientation_timeout,
             fetch_missing_fonts=arguments.fetch_missing_fonts,
             font_cache_dir=arguments.font_cache_dir,
             final_audit=arguments.final_audit,
             final_audit_dpi=arguments.final_audit_dpi,
+            native_rewriter=arguments.native_rewriter,
             verbose=arguments.verbose,
         )
     except Exception as erreur:  # noqa: BLE001 — la CLI rend un code, pas une trace
@@ -468,6 +568,18 @@ def main(argv=None) -> int:
         if rapport_path.parent != Path("."):
             rapport_path.parent.mkdir(parents=True, exist_ok=True)
         rapport_path.write_text(rapport.vers_json(), encoding="utf-8")
+
+    if (
+        arguments.final_audit
+        and rapport.certification_finale is not None
+        and not rapport.certification_finale.conforme
+    ):
+        print(
+            "échec de certification visuelle : le DOCX n'est pas conforme ou "
+            "n'a pas pu être rendu/audité",
+            file=sys.stderr,
+        )
+        return 3
 
     return 0
 

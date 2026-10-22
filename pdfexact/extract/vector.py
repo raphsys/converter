@@ -4,8 +4,14 @@ Les primitives de PyMuPDF se transposent une à une en commandes DrawingML. Rien
 approximé : ce qui n'est pas transposable relève du repli raster, décidé ici mais exécuté
 dans pdfexact.fallback.
 """
-from pdfexact.geometry import BBox, bbox_depuis_rect, pt_vers_emu, se_chevauchent, union
+from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, pt_vers_emu, se_chevauchent, union
 from pdfexact.ir import ShapeEl
+from pdfexact.extract.images import (
+    _graphic_paint_operations,
+    _graphic_requires_raster,
+    _rectangular_fill,
+    _visible_paint_rect,
+)
 
 SEUIL_CHEMINS_PAR_DEFAUT = 300
 
@@ -124,16 +130,107 @@ def _formes_traits_larges_verticaux(dessin, geometrie=None) -> list[ShapeEl]:
                 epaisseur_emu=pt_vers_emu(1.0),
                 pointilles=None,
                 alpha=float(dessin.get("fill_opacity", 1.0) or 1.0),
+                z_index=dessin.get("seqno"),
             )
         )
     return formes
 
 
+def _paint_commands(operation, geometrie=None):
+    import pymupdf
+
+    m = pymupdf.mupdf
+    ctm = operation["ctm"]
+    matrix = pymupdf.Matrix(ctm.a, ctm.b, ctm.c, ctm.d, ctm.e, ctm.f)
+
+    class Walker(m.FzPathWalker2):
+        def __init__(self):
+            super().__init__()
+            self.commands = []
+            for name in ("moveto", "lineto", "curveto", "closepath"):
+                getattr(self, "use_virtual_" + name)()
+
+        def point(self, x, y):
+            point = pymupdf.Point(x, y) * matrix
+            return _point_transforme(point, geometrie)
+
+        def moveto(self, ctx, x, y):
+            self.commands.append(("move", (self.point(x, y),)))
+
+        def lineto(self, ctx, x, y):
+            self.commands.append(("line", (self.point(x, y),)))
+
+        def curveto(self, ctx, x1, y1, x2, y2, x3, y3):
+            self.commands.append(("cubic", (self.point(x1, y1), self.point(x2, y2), self.point(x3, y3))))
+
+        def closepath(self, ctx):
+            self.commands.append(("close", ()))
+
+    walker = Walker()
+    m.fz_walk_path(operation["path"], walker, walker.m_internal)
+    return walker.commands
+
+
+def _formes_depuis_peinture(operations, geometrie):
+    import pymupdf
+
+    formes = []
+    for operation in operations:
+        if operation["kind"] not in {"fill_path", "stroke_path"} or _graphic_requires_raster(operation):
+            continue
+        visible = _visible_paint_rect(operation, geometrie)
+        if visible.is_empty:
+            continue
+        stroke = operation["stroke"]
+        width = stroke.m_internal.linewidth * pymupdf.mupdf.fz_matrix_expansion(operation["ctm"]) if stroke else 0
+        if stroke and width > 20:
+            native = _paint_commands(operation)
+            items = [
+                ("l", pymupdf.Point(points[0][0] / 12700, points[0][1] / 12700), pymupdf.Point(following[0][0] / 12700, following[0][1] / 12700))
+                for (kind, points), (next_kind, following) in zip(native, native[1:])
+                if kind == "move" and next_kind == "line"
+            ]
+            special = _formes_traits_larges_verticaux({
+                "items": items, "width": width, "color": operation["color"],
+                "fill_opacity": operation["alpha"], "seqno": operation["seqno"],
+            }, geometrie)
+            if special:
+                formes.extend(special)
+                continue
+        if operation["clips"] and _rectangular_fill(operation):
+            rect = visible
+            commands = _chemin_depuis_item(("re", rect), geometrie)
+        else:
+            rect = operation["path_rect"]
+            commands = _paint_commands(operation, geometrie)
+        if not commands:
+            continue
+        formes.append(ShapeEl(
+            bbox=_boite_rendable(rect, geometrie), chemins=[commands],
+            remplissage=_couleur_hexa(operation["color"]) if stroke is None else None,
+            contour=_couleur_hexa(operation["color"]) if stroke else None,
+            epaisseur_emu=pt_vers_emu(1 if width > 20 else width),
+            pointilles="dash" if stroke and stroke.m_internal.dash_len else None,
+            alpha=operation["alpha"], z_index=operation["seqno"],
+        ))
+    return formes
+
+
 def extraire_vectoriel(page, geometrie=None) -> list[ShapeEl]:
     """Retourne les formes vectorielles de la page, en EMU."""
+    geometrie = geometrie or PageGeometry.depuis_page(page)
+    operations = _graphic_paint_operations(page)
+    if operations:
+        # Actual callbacks keep fill/stroke apart even when get_drawings merges
+        # matching paths across an intervening image or text paint. Graphics
+        # needing alpha clips/groups are emitted by extraire_images instead.
+        return _formes_depuis_peinture(operations, geometrie)
     formes: list[ShapeEl] = []
 
-    for dessin in page.get_drawings():
+    # Compatibility for page-like callers without the native device interface.
+    for dessin in page.get_drawings(extended=True):
+        if dessin.get("type") not in {"f", "s", "fs"}:
+            continue
         traits_verticaux = _formes_traits_larges_verticaux(dessin, geometrie)
         if traits_verticaux:
             formes.extend(traits_verticaux)
@@ -159,7 +256,12 @@ def extraire_vectoriel(page, geometrie=None) -> list[ShapeEl]:
                 contour=_couleur_hexa(dessin.get("color")),
                 epaisseur_emu=pt_vers_emu(width_pt),
                 pointilles="dash" if dashes and dashes != "[] 0" else None,
-                alpha=float(dessin.get("fill_opacity", 1.0) or 1.0),
+                alpha=float(
+                    dessin.get("fill_opacity")
+                    if dessin.get("fill_opacity") is not None
+                    else dessin.get("stroke_opacity", 1.0)
+                ),
+                z_index=dessin.get("seqno"),
             )
         )
 
@@ -210,11 +312,12 @@ def doit_rasteriser(
 ) -> bool:
     """Décide si un cluster dépasse ce que DrawingML restitue fidèlement.
 
-    Deux critères seulement, tous deux observables sans interprétation : la présence d'un
-    dégradé sur la page, et la densité de chemins. Un score appris serait moins
-    explicable pour un gain nul — la règle suffit et se justifie.
-    """
-    if page_a_des_degrades:
-        return True
+    La présence d'une ressource shading sur la page n'est pas une preuve que ce
+    cluster en dépend : le shading peut être une décoration locale indépendante.
+    Les shadings effectivement peints sont extraits séparément par le fallback
+    visuel. La décision du cluster repose donc sur sa complexité propre.
 
+    ``page_a_des_degrades`` reste accepté pour compatibilité avec les appelants
+    historiques, mais ne force plus la rasterisation d'une forme représentable.
+    """
     return sum(len(forme.chemins) for forme in cluster) > seuil

@@ -5,12 +5,24 @@ les zones de texte ancrées et les tableaux positionnés sont donc autorisés.
 """
 import re
 import zipfile
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from pdfexact.geometry import BBox, pt_vers_emu, se_chevauchent, union
 from pdfexact.ir import Document, FlowParagraph, FontRef, ImageEl, Line, RasterEl, ShapeEl, Span, TableEl, TextBox
 from pdfexact.layout.text_comprehension import comprendre_groupe_lignes, comprendre_ligne_texte
+from pdfexact.analysis.options import AnalysisOptions
+from pdfexact.analysis.semantic import (
+    calculer_features_continuite,
+    detecter_colonnes_textuelles,
+    detecter_marqueur_liste,
+    est_continuation_de_ligne,
+    est_texte_de_corps,
+    regrouper_paragraphes,
+    text_of,
+)
+from pdfexact.render.render_plan import RenderPlan, build_document_render_plan
 
 
 @dataclass(frozen=True)
@@ -24,6 +36,10 @@ class DiagnosticWordNative:
     textboxes: int = 0
     tableaux_positionnes: int = 0
     runs_compresses: int = 0
+    element_ids: tuple[str, ...] = ()
+    modes: tuple[str, ...] = ()
+    losses: tuple[str, ...] = ()
+    divergences: tuple[str, ...] = ()
 
     @property
     def conforme(self) -> bool:
@@ -39,6 +55,34 @@ class CorrectionWordNative:
     @property
     def appliquee(self) -> bool:
         return self.textboxes_converties > 0 or self.lignes_converties > 0
+
+
+@dataclass(frozen=True)
+class NativeContractReport:
+    """Verdict structurel sans mutation de l'IR.
+
+    ``corriger_document_word_native`` est conservé pour les appelants historiques,
+    mais le pipeline nouveau utilise ce rapport avant l'écriture. Une validation ne
+    réécrit donc jamais silencieusement les paragraphes ou les frames.
+    """
+
+    planned_element_ids: tuple[str, ...] = ()
+    plan_errors: tuple[str, ...] = ()
+    missing_bbox: tuple[str, ...] = ()
+    unsupported_modes: tuple[str, ...] = ()
+    nonrepresentable_sources: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def errors(self) -> tuple[str, ...]:
+        return (
+            self.plan_errors
+            + tuple(f"missing-bbox:{element_id}" for element_id in self.missing_bbox)
+            + tuple(f"unsupported-mode:{mode}" for mode in self.unsupported_modes)
+        )
+
+    @property
+    def conforme(self) -> bool:
+        return not self.errors
 
 
 _ESPACEMENT_RUN_RE = re.compile(r'<w:spacing w:val="(-?\d+)"/>')
@@ -68,8 +112,47 @@ def inspecter_docx_word_native(chemin: str | Path) -> DiagnosticWordNative:
     )
 
 
+def valider_contrat_word_native(
+    document: Document,
+    render_plan: RenderPlan | None = None,
+) -> NativeContractReport:
+    """Valide le plan et ses éléments sans appliquer de correction destructive.
+
+    Le plan fourni est toujours préféré. En son absence, le module central le
+    construit sur une copie, sans initialiser ni modifier les objets appelants.
+    """
+    if render_plan is None:
+        document = deepcopy(document)
+        plan = build_document_render_plan(document)
+    else:
+        plan = render_plan
+    plan_errors = tuple(plan.validate(document))
+    planned = [item for page in plan.pages.values() for item in page]
+    missing_bbox = tuple(
+        item.element.element_id
+        for item in planned
+        if getattr(item.element, "bbox", None) is None
+    )
+    unsupported_modes = tuple(
+        f"{item.element.element_id}:{item.decision.mode.value}"
+        for item in planned
+        if item.decision.mode.value == "unknown"
+    )
+    return NativeContractReport(
+        planned_element_ids=tuple(item.element.element_id for item in planned),
+        plan_errors=plan_errors,
+        missing_bbox=missing_bbox,
+        unsupported_modes=unsupported_modes,
+        nonrepresentable_sources=tuple(
+            (source_id, coverage.reason)
+            for source_id, coverage in sorted((plan.source_coverage or {}).items())
+            if coverage.relationship == "non-representable"
+        ),
+    )
+
+
 def _texte_ligne(ligne: Line) -> str:
-    return "".join(span.texte for span in ligne.spans).strip()
+    return text_of(ligne).strip()
 
 
 def _style_ligne(ligne: Line) -> Span:
@@ -105,59 +188,17 @@ def _paragraphe_depuis_ligne(ligne: Line, largeur_page_emu: int) -> FlowParagrap
         capitales=style.capitales,
         surlignage=style.surlignage,
         espacement_twips=style.espacement_twips,
-        spans=[
-            Span(
-                texte=span.texte,
-                police=span.police,
-                size_pt=span.size_pt,
-                couleur=span.couleur,
-                espacement_twips=span.espacement_twips,
-                lien=span.lien,
-                invisible=span.invisible,
-                souligne=span.souligne,
-                barre=span.barre,
-                capitales=span.capitales,
-                exposant=span.exposant,
-                indice=span.indice,
-                surlignage=span.surlignage,
-                bbox=span.bbox,
-            )
-            for span in ligne.spans
-        ],
+        spans=[replace(span) for span in ligne.spans],
         layout_frame_id=ligne.layout_frame_id,
         layout_frame_role=ligne.layout_frame_role,
         layout_frame_strategy=ligne.layout_frame_strategy,
         layout_frame_bbox=ligne.layout_frame_bbox,
         vertical_alignement=_alignement_vertical_groupe([ligne]),
         lignes=[
-            Line(
-                bbox=ligne.bbox,
-                spans=[
-                    Span(
-                        texte=span.texte,
-                        police=span.police,
-                        size_pt=span.size_pt,
-                        couleur=span.couleur,
-                        espacement_twips=span.espacement_twips,
-                        lien=span.lien,
-                        invisible=span.invisible,
-                        souligne=span.souligne,
-                        barre=span.barre,
-                        capitales=span.capitales,
-                        exposant=span.exposant,
-                        indice=span.indice,
-                        surlignage=span.surlignage,
-                        bbox=span.bbox,
-                    )
-                    for span in ligne.spans
-                ],
+            replace(
+                ligne,
+                spans=[replace(span) for span in ligne.spans],
                 hauteur_ligne_emu=max(ligne.hauteur_ligne_emu, ligne.bbox.hauteur),
-                largeur_cible_emu=ligne.largeur_cible_emu,
-                alignement=ligne.alignement,
-                layout_frame_id=ligne.layout_frame_id,
-                layout_frame_role=ligne.layout_frame_role,
-                layout_frame_strategy=ligne.layout_frame_strategy,
-                layout_frame_bbox=ligne.layout_frame_bbox,
             )
         ],
     )
@@ -228,16 +269,10 @@ def _paragraphe_depuis_groupe(lignes: list[Line], largeur_page_emu: int) -> Flow
         layout_frame_bbox=lignes[0].layout_frame_bbox,
         vertical_alignement=_alignement_vertical_groupe(lignes),
         lignes=[
-            Line(
-                bbox=ligne.bbox,
+            replace(
+                ligne,
                 spans=_copier_spans_ligne(ligne),
                 hauteur_ligne_emu=max(ligne.hauteur_ligne_emu, ligne.bbox.hauteur),
-                largeur_cible_emu=ligne.largeur_cible_emu,
-                alignement=ligne.alignement,
-                layout_frame_id=ligne.layout_frame_id,
-                layout_frame_role=ligne.layout_frame_role,
-                layout_frame_strategy=ligne.layout_frame_strategy,
-                layout_frame_bbox=ligne.layout_frame_bbox,
             )
             for ligne in lignes
         ],
@@ -246,21 +281,9 @@ def _paragraphe_depuis_groupe(lignes: list[Line], largeur_page_emu: int) -> Flow
 
 def _copier_spans_ligne(ligne: Line) -> list[Span]:
     return [
-        Span(
+        replace(
+            span,
             texte=_texte_span_paragraphe(span.texte),
-            police=span.police,
-            size_pt=span.size_pt,
-            couleur=span.couleur,
-            espacement_twips=span.espacement_twips,
-            lien=span.lien,
-            invisible=span.invisible,
-            souligne=span.souligne,
-            barre=span.barre,
-            capitales=span.capitales,
-            exposant=span.exposant,
-            indice=span.indice,
-            surlignage=span.surlignage,
-            bbox=span.bbox,
         )
         for span in ligne.spans
     ]
@@ -410,18 +433,7 @@ def _ligne_dans_frame_texte_fiable(ligne: Line) -> bool:
 
 
 def _texte_ligne_semantique(texte: str) -> bool:
-    mots = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’\-]*", texte)
-    if len(mots) < 4:
-        return False
-    lettres = [car for car in texte if car.isalpha()]
-    if not lettres:
-        return False
-    if len(lettres) / max(len(texte), 1) < 0.45:
-        return False
-    tokens_non_phrase = re.findall(r"\b[A-Z]\d+|\b\d+[A-Z]\b|[A-Z]-\d+|\d+-\d+", texte)
-    if len(tokens_non_phrase) >= max(2, len(mots) // 3):
-        return False
-    return True
+    return est_texte_de_corps(texte)
 
 
 def _groupe_semantiquement_paragraphe(
@@ -431,29 +443,17 @@ def _groupe_semantiquement_paragraphe(
 ) -> bool:
     if not lignes:
         return False
-    frame_role = lignes[0].layout_frame_role
-    frame_strategy = lignes[0].layout_frame_strategy
-    if autoriser_sans_frame and not lignes[0].layout_frame_id:
-        frame_role = "text-column"
-        frame_strategy = "word-text"
-    decision = comprendre_groupe_lignes(
-        (_texte_ligne(ligne) for ligne in lignes),
-        frame_role=frame_role,
-        frame_strategy=frame_strategy,
+    options = AnalysisOptions(
+        extra={"semantic_ignore_frame_id": autoriser_sans_frame}
     )
-    return decision.action == "merge-paragraph"
+    groups = regrouper_paragraphes(lignes, options)
+    return len([group for group in groups if any(_texte_ligne(item) for item in group)]) == 1
 
 
 def _memes_styles(a: Line, b: Line) -> bool:
-    sa = _style_ligne(a)
-    sb = _style_ligne(b)
-    return (
-        sa.police.famille == sb.police.famille
-        and sa.police.gras == sb.police.gras
-        and sa.police.italique == sb.police.italique
-        and abs(sa.size_pt - sb.size_pt) <= 1.2
-        and sa.couleur == sb.couleur
-    )
+    from pdfexact.analysis.semantic import styles_compatibles
+
+    return styles_compatibles(a, b)
 
 
 def _meme_paragraphe(
@@ -462,40 +462,15 @@ def _meme_paragraphe(
     *,
     ignorer_frame_id: bool = False,
 ) -> bool:
-    if _commence_item_liste(courante):
-        return False
-    if not ignorer_frame_id and precedente.layout_frame_id != courante.layout_frame_id and (
-        precedente.layout_frame_id or courante.layout_frame_id
-    ):
-        return False
-    if not _memes_styles(precedente, courante):
-        return False
-    hauteur = max(precedente.bbox.hauteur, courante.bbox.hauteur, pt_vers_emu(6))
-    gap = courante.bbox.y0 - precedente.bbox.y1
-    if gap < -hauteur * 0.25 or gap > hauteur * 1.35:
-        return False
-    tolerance_x = max(pt_vers_emu(10), int(hauteur * 1.2))
-    meme_gauche = abs(courante.bbox.x0 - precedente.bbox.x0) <= tolerance_x
-    retrait_possible = (
-        0 < courante.bbox.x0 - precedente.bbox.x0 <= pt_vers_emu(26)
-        or 0 < precedente.bbox.x0 - courante.bbox.x0 <= pt_vers_emu(26)
+    return est_continuation_de_ligne(
+        precedente,
+        courante,
+        AnalysisOptions(extra={"semantic_ignore_frame_id": ignorer_frame_id}),
     )
-    chevauchement_x = max(0, min(precedente.bbox.x1, courante.bbox.x1) - max(precedente.bbox.x0, courante.bbox.x0))
-    ratio_x = chevauchement_x / max(min(precedente.bbox.largeur, courante.bbox.largeur), 1)
-    if ratio_x < 0.55:
-        return False
-    if not (meme_gauche or retrait_possible):
-        return False
-    fin = _texte_ligne(precedente)[-1:]
-    if fin in {".", "!", "?", ":"} and gap > hauteur * 0.55:
-        return False
-    if not _continuite_semantique(precedente, courante):
-        return False
-    return True
 
 
 def _commence_item_liste(ligne: Line) -> bool:
-    return bool(_ITEM_LISTE_RE.match(_texte_ligne(ligne)))
+    return detecter_marqueur_liste(ligne) is not None
 
 
 def _groupe_bloc_detecte(lignes: list[Line], *, ignorer_frame_id: bool = False) -> bool:
@@ -509,6 +484,8 @@ def _groupe_bloc_detecte(lignes: list[Line], *, ignorer_frame_id: bool = False) 
     if any(ligne.layout_frame_strategy and ligne.layout_frame_strategy != "word-text" for ligne in lignes):
         return False
     if any(ligne.layout_frame_role not in {"text-column", "caption", "heading", "list"} for ligne in lignes):
+        return False
+    if any(_style_ligne(ligne).size_pt >= 20 for ligne in lignes):
         return False
     ordonnees = sorted(lignes, key=lambda ligne: (ligne.bbox.y0, ligne.bbox.x0))
     if any(_LEADER_LIGNE_RE.match(_texte_ligne(ligne)) for ligne in ordonnees):
@@ -545,27 +522,11 @@ def _groupe_bloc_detecte(lignes: list[Line], *, ignorer_frame_id: bool = False) 
 
 
 def _colonnes_lignes_sans_frame(items: list[tuple[int, TextBox, Line]]) -> list[list[tuple[int, TextBox, Line]]]:
-    colonnes: list[list[tuple[int, TextBox, Line]]] = []
-    for item in sorted(items, key=lambda valeur: ((valeur[2].bbox.x0 + valeur[2].bbox.x1) // 2, valeur[2].bbox.y0)):
-        ligne = item[2]
-        meilleure_colonne = None
-        meilleur_score = 0.0
-        for index, colonne in enumerate(colonnes):
-            bbox_colonne = colonne[0][2].bbox
-            for _idx, _tb, ligne_colonne in colonne[1:]:
-                bbox_colonne = union(bbox_colonne, ligne_colonne.bbox)
-            chevauchement = max(0, min(bbox_colonne.x1, ligne.bbox.x1) - max(bbox_colonne.x0, ligne.bbox.x0))
-            score = chevauchement / max(min(bbox_colonne.largeur, ligne.bbox.largeur), 1)
-            if score > meilleur_score:
-                meilleure_colonne = index
-                meilleur_score = score
-        if meilleure_colonne is None or meilleur_score < 0.35:
-            colonnes.append([item])
-        else:
-            colonnes[meilleure_colonne].append(item)
+    by_line = {id(item[2]): item for item in items}
+    columns = detecter_colonnes_textuelles([item[2] for item in items], AnalysisOptions())
     return [
-        sorted(colonne, key=lambda valeur: (valeur[2].bbox.y0, valeur[2].bbox.x0, valeur[2].bbox.x1))
-        for colonne in sorted(colonnes, key=lambda colonne: min(item[2].bbox.x0 for item in colonne))
+        [by_line[id(line)] for line in column if id(line) in by_line]
+        for column in columns
     ]
 
 
@@ -663,25 +624,7 @@ def _groupes_paragraphes_frame_par_colonne(
 
 
 def _continuite_semantique(precedente: Line, courante: Line) -> bool:
-    avant = _texte_ligne(precedente)
-    apres = _texte_ligne(courante)
-    if not avant or not apres:
-        return False
-    if avant.endswith("-"):
-        return True
-    premier = apres.lstrip()[:1]
-    if avant.rstrip().endswith((".", "!", "?")) and premier.isupper():
-        hauteur = max(precedente.bbox.hauteur, courante.bbox.hauteur, pt_vers_emu(6))
-        return courante.bbox.y0 - precedente.bbox.y1 <= hauteur * 0.45
-    if premier in {")",
-        "]",
-        "}",
-        ",",
-        ";",
-        ":",
-    }:
-        return False
-    return True
+    return est_continuation_de_ligne(precedente, courante, AnalysisOptions())
 
 
 def _assembler_textboxes_page(page) -> tuple[list, int, int]:
@@ -722,10 +665,19 @@ def _assembler_textboxes_page(page) -> tuple[list, int, int]:
         lignes_groupe = [item[2] for item in groupe]
         paragraphe = _paragraphe_depuis_groupe(lignes_groupe, page.largeur_emu)
         if paragraphe is None:
-            for index, element, _ligne in groupe:
-                if id(element) not in textes_convertis:
-                    remplacements.append((index, element))
-                    textes_convertis.add(id(element))
+            lignes_par_element: dict[int, tuple[int, TextBox, list[Line]]] = {}
+            for index, element, ligne in groupe:
+                entree = lignes_par_element.get(id(element))
+                if entree is None:
+                    lignes_par_element[id(element)] = (index, element, [ligne])
+                else:
+                    index_initial, element_initial, lignes = entree
+                    lignes.append(ligne)
+                    lignes_par_element[id(element)] = (index_initial, element_initial, lignes)
+            for index, element, lignes_element in lignes_par_element.values():
+                textbox = _textbox_depuis_lignes(element, lignes_element)
+                if textbox is not None:
+                    remplacements.append((index, textbox))
             continue
         index_min = min(item[0] for item in groupe)
         remplacements.append((index_min, paragraphe))
@@ -739,6 +691,22 @@ def _assembler_textboxes_page(page) -> tuple[list, int, int]:
     remplacements.sort(key=lambda item: (item[0], 0 if not isinstance(item[1], FlowParagraph) else 1))
     nouveaux = [element for _index, element in remplacements]
     return nouveaux, textboxes_converties, lignes_converties
+
+
+def _textbox_depuis_lignes(element: TextBox, lignes: list[Line]) -> TextBox | None:
+    if not lignes:
+        return None
+    bbox = lignes[0].bbox
+    for ligne in lignes[1:]:
+        bbox = union(bbox, ligne.bbox)
+    return TextBox(
+        bbox=bbox,
+        lignes=lignes,
+        layout_frame_id=element.layout_frame_id,
+        layout_frame_role=element.layout_frame_role,
+        layout_frame_strategy=element.layout_frame_strategy,
+        layout_frame_bbox=element.layout_frame_bbox,
+    )
 
 
 def corriger_document_word_native(document: Document) -> CorrectionWordNative:

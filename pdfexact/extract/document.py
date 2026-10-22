@@ -1,12 +1,14 @@
 """Ouverture du PDF et assemblage du Document.
 
-L'ordre de construction des éléments d'une page fixe leur superposition : vectoriel et
-zones rastérisées d'abord — ce sont les fonds —, puis les images, puis le texte, qui doit
-rester au-dessus et lisible en toute circonstance.
+La superposition suit l'ordre total des peintures source, avec l'ordre d'acquisition
+pour les sequences egales. L'ordre de lecture du texte reste distinct.
 """
 import pymupdf
 import re
 import sys
+from hashlib import sha256
+from pathlib import Path
+from types import SimpleNamespace
 
 from pdfexact.extract.fonts import collecter_polices
 from pdfexact.extract.glyph_images import extraire_glyphes_images
@@ -18,7 +20,12 @@ from pdfexact.extract.images import (
 )
 from pdfexact.extract.links import appliquer_liens
 from pdfexact.extract.layout_map import construire_layout_map
-from pdfexact.extract.ocr import extraire_ocr, extraire_rapidocr, extraire_textes_natifs_zones
+from pdfexact.extract.ocr import (
+    extraire_ocr,
+    extraire_rapidocr,
+    extraire_textes_natifs_zones,
+    extraire_tesseract_lignes_absentes,
+)
 from pdfexact.extract.tables import extraire_tableaux, extraire_tableaux_listing
 from pdfexact.extract.text import extraire_texte, extraire_texte_glyphes
 from pdfexact.extract.vector import (
@@ -29,10 +36,16 @@ from pdfexact.extract.vector import (
     regrouper,
 )
 from pdfexact.fallback.rasterize import (
+    extraire_zones_shading,
     nettoyer_images_fond_texte_positionne,
+    nettoyer_tuiles_page_depuis_source,
     page_a_des_degrades,
     rasteriser_region,
     rasteriser_region_sans_texte,
+    rasteriser_regions_segmentees_sans_texte,
+    resserrer_ancres_visuelles,
+    segmenter_elements_visuels_page,
+    verify_media_crop_partition,
 )
 from pdfexact.geometry import (
     BBox,
@@ -44,9 +57,20 @@ from pdfexact.geometry import (
     se_chevauchent,
     union,
 )
+from pdfexact.analysis.geometry import (
+    bbox_area,
+    center_in,
+    intersection_area,
+    intersection_over_min_area,
+    overlap_ratio,
+)
+from pdfexact.analysis.provenance import Evidence, expliquer_filtrage
+from pdfexact.analysis.options import AnalysisOptions
+from pdfexact.analysis.semantic import regrouper_paragraphes
 from pdfexact.ir import (
     Document,
     FlowParagraph,
+    FontRef,
     ImageEl,
     Line,
     LinkZone,
@@ -56,7 +80,10 @@ from pdfexact.ir import (
     Span,
     TableEl,
     TextBox,
+    clone_element_with_metadata,
+    element_source_ids,
 )
+from pdfexact.scene import capture_source_observations, ensure_source_identity, record_source_transformation
 from pdfexact.layout import (
     analyser_page,
     classer_regions,
@@ -64,6 +91,7 @@ from pdfexact.layout import (
     detecter_layout_ia,
     filtrer_elements_selon_plan,
     planifier_regions,
+    zones_ocr_dur_du_plan,
     zones_layout_du_plan,
     zones_ocr_du_plan,
 )
@@ -71,23 +99,19 @@ from pdfexact.report import DiagnosticElement, DiagnosticLayout, PageDegradee, R
 
 
 def _aire(bbox: BBox) -> int:
-    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+    return bbox_area(bbox)
 
 
 def _intersection(a: BBox, b: BBox) -> int:
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return max(0, x1 - x0) * max(0, y1 - y0)
+    return intersection_area(a, b)
 
 
 def _recouvrement_min(a: BBox, b: BBox) -> float:
-    return _intersection(a, b) / max(min(_aire(a), _aire(b)), 1)
+    return intersection_over_min_area(a, b)
 
 
 def _recouvrement_source(a: BBox, b: BBox) -> float:
-    return _intersection(a, b) / max(_aire(a), 1)
+    return overlap_ratio(a, b)
 
 
 def _zone_deja_couverte(zone: BBox, zones: list[BBox], seuil: float = 0.70) -> bool:
@@ -103,6 +127,380 @@ def _bbox_intersecte_page(bbox: BBox, page: Page) -> bool:
 
 def _zone_source_deja_couverte(zone: BBox, zones: list[BBox], seuil: float = 0.75) -> bool:
     return any(_recouvrement_source(zone, existante) >= seuil for existante in zones)
+
+
+def _journaliser_elements_rejetes(page: Page, avant: list, apres: list, reason: str) -> None:
+    """Conserve les objets écartés par une heuristique pour la scène d'audit."""
+    capture_source_observations(page, avant)
+    ids_apres = {id(element) for element in apres}
+    for output in apres:
+        observations = getattr(output, "_source_observations", ())
+        if observations:
+            capture_source_observations(page, observations)
+            record_source_transformation(page, observations, [output], reason,
+                                         removed_source_ids=output.attributes.get("removed_source_ids", ()))
+    for element in avant:
+        if id(element) in ids_apres or any(element is item for item in page.discarded_elements):
+            continue
+        page.discarded_elements.append(element)
+        expliquer_filtrage(element, reason)
+        record_source_transformation(page, [element], [], reason)
+
+
+def _appliquer_filtre_page(page: Page, filtre, *args, reason: str, **kwargs) -> list:
+    avant = list(page.elements)
+    capture_source_observations(page, avant)
+    apres = filtre(avant, *args, **kwargs)
+    _journaliser_elements_rejetes(page, avant, apres, reason)
+    page.elements = apres
+    return apres
+
+
+def _clone_apres_filtrage(element, *, children_name, children, bbox):
+    ensure_source_identity(element, getattr(element, "source_page_index", 0))
+    child_ids = tuple(source_id for child in children for source_id in element_source_ids(child))
+    digest = sha256("|".join(child_ids).encode()).hexdigest()[:16]
+    clone = clone_element_with_metadata(element, bbox=bbox, **{children_name: children})
+    clone.source_id = f"{element.source_id}:filtered:{digest}"
+    clone.source_ids = (clone.source_id, *dict.fromkeys(child_ids))
+    removed = tuple(source_id for source_id in element_source_ids(element)
+                    if source_id != element.source_id and source_id not in child_ids)
+    clone.attributes.update({"replaces": (element.source_id,), "transformation": "protected-zone-span-filter",
+                             "original_source_ids": element_source_ids(element), "removed_source_ids": removed})
+    clone.decision_history.append({"event": "transformed", "reason_code": "protected-zone-span-filter",
+                                   "source_ids": element_source_ids(element), "removed_source_ids": removed})
+    clone._source_observations = [clone_element_with_metadata(element)]
+    for child in children:
+        clone._source_observations.extend(getattr(child, "_source_observations", ()))
+    return clone
+
+
+def _zone_ia_ecrase_objet_natif(
+    item,
+    plan,
+    zones_existantes: list[BBox],
+    page: Page,
+) -> bool:
+    """Refuse une zone IA composite qui remplacerait des objets déjà extraits.
+
+    Paddlex voit parfois une composition entière (photo + carte + vecteurs + texte)
+    comme une seule image. Cette boîte ne doit pas devenir une autorité de rendu :
+    dès qu'elle recouvre fortement un objet natif ou une zone vectorielle déjà
+    protégée, on conserve les composants plus précis et on laisse l'IA guider
+    uniquement le classement/OCR.
+    """
+    aire_page = max(_aire(BBox(0, 0, page.largeur_emu, page.hauteur_emu)), 1)
+    aire_zone = max(_aire(item.bbox), 1)
+    ratio_page = aire_zone / aire_page
+    if ratio_page < 0.08:
+        return False
+
+    # Une image source ou une zone vectorielle déjà extraite est une preuve forte
+    # qu'une boîte IA plus large est composite. On exige une extension visible de
+    # la boîte IA pour ne pas perturber le cas trivial « IA == image source ».
+    for existante in zones_existantes:
+        couverture_zone = _recouvrement_source(item.bbox, existante)
+        couverture_existante = _recouvrement_source(existante, item.bbox)
+        if couverture_zone < 0.55 or couverture_existante < 0.80:
+            continue
+        if aire_zone > _aire(existante) * 1.10:
+            return True
+
+    # Deux preuves indépendantes dans la boîte sont suffisantes même si aucune
+    # n'occupe seule une grande partie de la zone : c'est le cas typique d'une
+    # page composée de colonnes, photos et formes vectorielles.
+    preuves: list[BBox] = []
+    for autre in plan:
+        if autre is item:
+            continue
+        source = str(getattr(autre.region, "style_hints", {}).get("source", ""))
+        if source == "paddlex":
+            continue
+        if _recouvrement_source(autre.bbox, item.bbox) < 0.55:
+            continue
+        if any(_recouvrement_min(autre.bbox, preuve) >= 0.65 for preuve in preuves):
+            continue
+        preuves.append(autre.bbox)
+    return len(preuves) >= 2
+
+
+def _zone_rasterisable(zone: BBox, page: Page) -> bool:
+    largeur = max(0, min(zone.x1, page.largeur_emu) - max(zone.x0, 0))
+    hauteur = max(0, min(zone.y1, page.hauteur_emu) - max(zone.y0, 0))
+    if largeur < pt_vers_emu(1.0) or hauteur < pt_vers_emu(1.0):
+        return False
+    return largeur * hauteur >= pt_vers_emu(2.0) * pt_vers_emu(2.0)
+
+
+def _page_image_pleine_sans_texte_natif(
+    zones_images_source: list[BBox],
+    lignes_natives: list[BBox],
+    page: Page,
+) -> bool:
+    # Une page qui contient déjà du texte PDF natif n'est pas une page scannée,
+    # même si ses images couvrent presque toute sa surface. Elle doit conserver
+    # ses objets source et suivre le chemin natif mixte.
+    if lignes_natives:
+        return False
+
+    # La région peut être découpée en tuiles : on mesure alors la couverture totale,
+    # pas la taille d'une tuile isolée.
+    aire_page = max(page.largeur_emu * page.hauteur_emu, 1)
+    if not zones_images_source:
+        return False
+    x0 = min(zone.x0 for zone in zones_images_source)
+    y0 = min(zone.y0 for zone in zones_images_source)
+    x1 = max(zone.x1 for zone in zones_images_source)
+    y1 = max(zone.y1 for zone in zones_images_source)
+    couverture = sum(_aire(zone) for zone in zones_images_source) / aire_page
+    return (
+        couverture >= 0.72
+        and x1 - x0 >= page.largeur_emu * 0.80
+        and y1 - y0 >= page.hauteur_emu * 0.80
+    )
+
+
+def _page_pdf_natif_dominant(
+    lignes_natives: list[BBox],
+    zones_images_source: list[BBox],
+    page: Page,
+) -> bool:
+    """Vrai pour les pages texte PDF natives où l'OCR massif est risqué.
+
+    Les pages scannées pleines restent exclues par la présence obligatoire de lignes
+    natives et par le seuil image pleine page.
+    """
+    if len(lignes_natives) < 8:
+        return False
+    aire_page = max(page.largeur_emu * page.hauteur_emu, 1)
+    if _page_image_pleine_sans_texte_natif(zones_images_source, [], page):
+        return False
+    lignes_utiles = [
+        ligne
+        for ligne in lignes_natives
+        if ligne.largeur >= page.largeur_emu * 0.08
+        and ligne.hauteur >= pt_vers_emu(2.5)
+        and ligne.hauteur <= pt_vers_emu(32)
+    ]
+    return len(lignes_utiles) >= 8
+
+
+def _page_pdf_natif_mixe(
+    lignes_natives: list[BBox],
+    zones_images_source: list[BBox],
+    page: Page,
+) -> bool:
+    """Détecte toute page combinant texte PDF et contenu bitmap.
+
+    Le nombre de lignes n'est pas un critère fiable : une couverture peut n'avoir que
+    trois lignes, tandis qu'une brochure en comporte des dizaines. Dès qu'un texte
+    natif et une image coexistent, le fond doit suivre le même traitement page-exact
+    afin d'éviter une seconde couche textuelle dans l'image.
+    """
+    return bool(
+        lignes_natives
+        and zones_images_source
+    )
+
+
+def _extraire_texte_pdf_natif_word_native(
+    page_pdf,
+    polices: dict,
+    plan_layout,
+    zones_images: list[BBox],
+    zones_textes_visuelles_natives: list[BBox],
+    page_ir: Page,
+    document: Document,
+    zones_ia=None,
+    *,
+    geometrie: PageGeometry | None = None,
+) -> list[FlowParagraph]:
+    if geometrie is None:
+        elements_natifs = extraire_texte(page_pdf, polices)
+    else:
+        elements_natifs = extraire_texte(page_pdf, polices, geometrie=geometrie)
+    capture_source_observations(page_ir, elements_natifs, source_kind="pdf-native")
+    if plan_layout:
+        elements_natifs = _attacher_frames_texte(
+            elements_natifs,
+            plan_layout,
+            zones_ia=zones_ia,
+        )
+        avant = elements_natifs
+        elements_natifs = filtrer_elements_selon_plan(
+            elements_natifs,
+            plan_layout,
+            preserver_texte_natif=True,
+        )
+        _journaliser_elements_rejetes(page_ir, avant, elements_natifs, "native-plan-filter")
+        lignes_texte = [ligne.bbox for element in elements_natifs for ligne in element.lignes]
+        avant = elements_natifs
+        elements_natifs = _filtrer_textes_intersectant_zones(
+            elements_natifs,
+            _zones_formules_du_plan(plan_layout, lignes_texte, page_ir),
+        )
+        _journaliser_elements_rejetes(page_ir, avant, elements_natifs, "native-protected-zone-filter")
+    paragraphes = []
+    for element in elements_natifs:
+        for ligne in element.lignes:
+            texte = "".join(span.texte for span in ligne.spans).strip()
+            if not texte:
+                continue
+            style = next((span for span in ligne.spans if span.texte.strip()), ligne.spans[0])
+            paragraphes.append(
+                FlowParagraph(
+                    bbox=ligne.bbox,
+                    texte=texte,
+                    police=style.police,
+                    size_pt=style.size_pt,
+                    couleur=style.couleur,
+                    alignement=ligne.alignement,
+                    retrait_gauche_emu=max(0, ligne.bbox.x0),
+                    retrait_droite_emu=max(0, page_ir.largeur_emu - ligne.bbox.x1),
+                    interligne_emu=max(ligne.hauteur_ligne_emu, ligne.bbox.hauteur),
+                    souligne=style.souligne,
+                    barre=style.barre,
+                    surlignage=style.surlignage,
+                    spans=list(ligne.spans),
+                    lignes=[ligne],
+                    **{name: getattr(ligne, name) if getattr(ligne, name) is not None else getattr(element, name)
+                       for name in ("layout_frame_id", "layout_frame_role", "layout_frame_strategy", "layout_frame_bbox")},
+                    angle_deg=ligne.angle_deg,
+                    orientation=ligne.orientation,
+                    baseline_points=ligne.baseline_points,
+                    semantic_role=ligne.semantic_role,
+                    curved=ligne.curved,
+                    source_id=f"{ligne.source_id}:paragraph",
+                    source_ids=element_source_ids(ligne),
+                    source_line_ids=(ligne.source_id,),
+                    source_kind=ligne.source_kind,
+                    language=ligne.language,
+                    script=ligne.script,
+                    confidence=ligne.confidence,
+                    quad=ligne.quad,
+                    z_index=ligne.z_index,
+                    attributes={"replaces": (ligne.source_id,), "source_block_id": element.source_id,
+                                "transformation": "native-line-paragraph-adapter"},
+                )
+            )
+        outputs = [item for item in paragraphes if item.attributes.get("source_block_id") == element.source_id]
+        record_source_transformation(page_ir, [element], outputs, "native-line-paragraph-adapter")
+    return paragraphes
+
+
+def _zones_formules_du_plan(
+    plan,
+    lignes_natives: list[BBox] | None = None,
+    page: Page | None = None,
+) -> list[BBox]:
+    if not plan:
+        return []
+    return [
+        item.bbox
+        for item in plan
+        if item.kind in {"formula", "formula-or-complex-vector"}
+        and item.strategy in {"raster-immutable", "raster-image"}
+        and not _zone_formule_inline_dans_texte(item.bbox, lignes_natives or [], page)
+    ]
+
+
+def _zone_formule_inline_dans_texte(
+    zone: BBox,
+    lignes_natives: list[BBox],
+    page: Page | None,
+) -> bool:
+    if not lignes_natives or page is None:
+        return False
+    if zone.largeur >= page.largeur_emu * 0.18:
+        return False
+    centre_y = (zone.y0 + zone.y1) // 2
+    centre_x = (zone.x0 + zone.x1) // 2
+    for ligne in lignes_natives:
+        if not (ligne.y0 - pt_vers_emu(2) <= centre_y <= ligne.y1 + pt_vers_emu(2)):
+            continue
+        if not (ligne.x0 - pt_vers_emu(2) <= centre_x <= ligne.x1 + pt_vers_emu(2)):
+            continue
+        if ligne.largeur < page.largeur_emu * 0.22:
+            continue
+        if zone.largeur <= ligne.largeur * 0.35:
+            return True
+    return False
+
+
+def _preparer_ocr_visible_page_image(elements: list) -> int:
+    lignes = 0
+    for element in elements:
+        if not isinstance(element, (TextBox, FlowParagraph)):
+            continue
+        if isinstance(element, TextBox):
+            setattr(element, "preserve_as_textbox", True)
+        for ligne in getattr(element, "lignes", []):
+            if any(span.texte.strip() for span in ligne.spans):
+                lignes += 1
+            for span in ligne.spans:
+                span.invisible = False
+                span.couleur = span.couleur or "000000"
+    return lignes
+
+
+def _styliser_ocr_depuis_image_scanee(page_pdf, elements: list, geometrie: PageGeometry) -> None:
+    for element in elements:
+        if not isinstance(element, (TextBox, FlowParagraph)):
+            continue
+        for ligne in getattr(element, "lignes", []):
+            couleur = _couleur_texte_depuis_rendu(page_pdf, ligne.bbox, geometrie)
+            for span in ligne.spans:
+                span.couleur = couleur
+                if span.size_pt >= 18:
+                    span.police = FontRef(span.police.font_id, span.police.famille, True, span.police.italique)
+
+
+def _couleur_texte_depuis_rendu(page_pdf, bbox: BBox, geometrie: PageGeometry) -> str:
+    rect_affiche = pymupdf.Rect(
+        emu_vers_pt(bbox.x0),
+        emu_vers_pt(bbox.y0),
+        emu_vers_pt(bbox.x1),
+        emu_vers_pt(bbox.y1),
+    ).intersect(pymupdf.Rect(0, 0, geometrie.largeur_pt, geometrie.hauteur_pt))
+    if rect_affiche.is_empty:
+        return "000000"
+    pix = page_pdf.get_pixmap(
+        matrix=pymupdf.Matrix(1, 1),
+        clip=geometrie.rect_affiche_vers_natif(rect_affiche),
+        alpha=False,
+    )
+    if pix.width <= 1 or pix.height <= 1:
+        return "000000"
+
+    samples = pix.samples
+    pas = pix.n
+    bord: list[float] = []
+    tous: list[float] = []
+    for y in range(pix.height):
+        for x in range(pix.width):
+            offset = (y * pix.width + x) * pas
+            r, g, b = samples[offset], samples[offset + 1], samples[offset + 2]
+            lum = 0.299 * r + 0.587 * g + 0.114 * b
+            tous.append(lum)
+            if x < 2 or y < 2 or x >= pix.width - 2 or y >= pix.height - 2:
+                bord.append(lum)
+    if not tous:
+        return "000000"
+    reference = _mediane(bord or tous)
+    sombres = sum(1 for lum in tous if lum < 80) / len(tous)
+    clairs = sum(1 for lum in tous if lum > 205) / len(tous)
+    if reference < 170 and clairs >= 0.01:
+        return "FFFFFF"
+    if reference < 145 and clairs >= 0.004:
+        return "FFFFFF"
+    if reference < 120 and sombres < 0.35:
+        return "FFFFFF"
+    return "000000"
+
+
+def _mediane(valeurs: list[float]) -> float:
+    valeurs = sorted(valeurs)
+    return valeurs[len(valeurs) // 2]
 
 
 def _zone_touche_tableau(zone: BBox, tableaux: list[TableEl], seuil: float = 0.04) -> bool:
@@ -208,11 +606,13 @@ def _filtrer_tableaux_contredits_par_ia(
 ) -> list[TableEl]:
     if not actif or not zones_ia:
         return tableaux
-    return [
-        tableau
-        for tableau in tableaux
-        if _tableau_confirme_par_layout_ia(tableau, zones_ia, largeur_page_emu, hauteur_page_emu)
-    ]
+    filtres = []
+    for tableau in tableaux:
+        if _tableau_confirme_par_layout_ia(tableau, zones_ia, largeur_page_emu, hauteur_page_emu):
+            filtres.append(tableau)
+        else:
+            expliquer_filtrage(tableau, "layout-ai-contradicts-table", source="layout-ai")
+    return filtres
 
 
 def _tableau_confirme_par_layout_ia(
@@ -257,11 +657,13 @@ def _forme_couverte_par_zone(forme: ShapeEl, zones: list[BBox], seuil: float = 0
 def _filtrer_formes_couvertes(elements: list, zones: list[BBox]) -> list:
     if not zones:
         return elements
-    return [
-        element
-        for element in elements
-        if not (isinstance(element, ShapeEl) and _forme_couverte_par_zone(element, zones))
-    ]
+    filtres = []
+    for element in elements:
+        if isinstance(element, ShapeEl) and _forme_couverte_par_zone(element, zones):
+            expliquer_filtrage(element, "covered-by-raster-zone")
+            continue
+        filtres.append(element)
+    return filtres
 
 
 def _element_visuel_couvert_par_zone(element, zones: list[BBox], seuil: float = 0.70) -> bool:
@@ -273,11 +675,13 @@ def _element_visuel_couvert_par_zone(element, zones: list[BBox], seuil: float = 
 def _filtrer_elements_visuels_couverts(elements: list, zones: list[BBox]) -> list:
     if not zones:
         return elements
-    return [
-        element
-        for element in elements
-        if not _element_visuel_couvert_par_zone(element, zones)
-    ]
+    filtres = []
+    for element in elements:
+        if _element_visuel_couvert_par_zone(element, zones):
+            expliquer_filtrage(element, "covered-by-visual-zone")
+            continue
+        filtres.append(element)
+    return filtres
 
 
 def _element_texte_couvert_par_zone(element, zones: list[BBox], seuil: float = 0.22) -> bool:
@@ -299,11 +703,13 @@ def _element_texte_couvert_par_zone(element, zones: list[BBox], seuil: float = 0
 def _filtrer_textes_couverts(elements: list, zones: list[BBox]) -> list:
     if not zones:
         return elements
-    return [
-        element
-        for element in elements
-        if not _element_texte_couvert_par_zone(element, zones)
-    ]
+    filtres = []
+    for element in elements:
+        if _element_texte_couvert_par_zone(element, zones):
+            expliquer_filtrage(element, "text-covered-by-visual-zone")
+            continue
+        filtres.append(element)
+    return filtres
 
 
 def _bbox_texte_elementaires(element) -> list[BBox]:
@@ -337,11 +743,66 @@ def _element_texte_intersecte_zone(element, zones: list[BBox]) -> bool:
 def _filtrer_textes_intersectant_zones(elements: list, zones: list[BBox]) -> list:
     if not zones:
         return elements
-    return [
-        element
-        for element in elements
-        if not _element_texte_intersecte_zone(element, zones)
+    filtres = []
+    for element in elements:
+        if isinstance(element, TextBox):
+            lignes = []
+            for ligne in element.lignes:
+                ligne_filtre = _ligne_sans_spans_intersectant_zones(ligne, zones)
+                if ligne_filtre is not None:
+                    lignes.append(ligne_filtre)
+            if lignes:
+                if len(lignes) == len(element.lignes) and all(a is b for a, b in zip(lignes, element.lignes)):
+                    filtres.append(element)
+                    continue
+                bbox = lignes[0].bbox
+                for ligne in lignes[1:]:
+                    bbox = union(bbox, ligne.bbox)
+                filtres.append(_clone_apres_filtrage(element, children_name="lignes", children=lignes, bbox=bbox))
+            continue
+        if not _element_texte_intersecte_zone(element, zones):
+            filtres.append(element)
+        else:
+            expliquer_filtrage(element, "text-intersects-protected-zone")
+    return filtres
+
+
+def _ligne_sans_spans_intersectant_zones(ligne: Line, zones: list[BBox]) -> Line | None:
+    spans_avec_bbox = [span for span in ligne.spans if span.bbox is not None]
+    if not spans_avec_bbox:
+        return None if _bbox_texte_intersecte_zone(ligne.bbox, ligne.spans, zones) else ligne
+    spans = [
+        span
+        for span in ligne.spans
+        if span.bbox is None or not _bbox_texte_intersecte_zone(span.bbox, [span], zones)
     ]
+    if not spans:
+        return None
+    if len(spans) == len(ligne.spans):
+        return ligne
+    bboxes = [span.bbox for span in spans if span.bbox is not None]
+    bbox = bboxes[0] if bboxes else ligne.bbox
+    for boite in bboxes[1:]:
+        bbox = union(bbox, boite)
+    return _clone_apres_filtrage(ligne, children_name="spans", children=spans, bbox=bbox)
+
+
+def _bbox_texte_intersecte_zone(bbox: BBox, spans: list[Span], zones: list[BBox]) -> bool:
+    bboxes = [span.bbox for span in spans if span.bbox is not None]
+    if not bboxes:
+        bboxes = [bbox]
+    aire_totale = sum(max(_aire(boite), 1) for boite in bboxes)
+    aire_couverte = 0
+    for boite in bboxes:
+        centre_x = (boite.x0 + boite.x1) // 2
+        centre_y = (boite.y0 + boite.y1) // 2
+        for zone in zones:
+            intersection = _intersection(boite, zone)
+            aire_couverte += intersection
+            if zone.x0 <= centre_x <= zone.x1 and zone.y0 <= centre_y <= zone.y1:
+                aire_couverte += max(_aire(boite), 1)
+                break
+    return (aire_couverte / max(aire_totale, 1)) >= 0.35
 
 
 def _zone_contient_lignes_natives(zone: BBox, lignes_natives: list[BBox], minimum: int = 2) -> bool:
@@ -414,9 +875,25 @@ def _zones_visuelles_ia_a_rasteriser(plan, zones_existantes: list[BBox], page: P
             continue
         if _aire(item.bbox) / aire_page < 0.018:
             continue
+        if _zone_ia_ecrase_objet_natif(item, plan, zones_existantes + zones, page):
+            continue
         if _zone_source_deja_couverte(item.bbox, zones_existantes + zones, seuil=0.75):
             continue
         zones.append(item.bbox)
+    return zones
+
+
+def _zones_formules_a_rasteriser(
+    plan,
+    zones_existantes: list[BBox],
+    lignes_natives: list[BBox] | None = None,
+    page: Page | None = None,
+) -> list[BBox]:
+    zones: list[BBox] = []
+    for zone in _zones_formules_du_plan(plan, lignes_natives, page):
+        if _zone_source_deja_couverte(zone, zones_existantes + zones, seuil=0.75):
+            continue
+        zones.append(zone)
     return zones
 
 
@@ -672,8 +1149,83 @@ def _quantifier_element(element, page: Page) -> None:
 
 
 def _quantifier_page(page: Page) -> None:
+    capture_source_observations(page, page.elements)
     for element in page.elements:
         _quantifier_element(element, page)
+
+
+def _securiser_elements_visuels_page(page: Page, media: dict) -> None:
+    avant = list(page.elements)
+    capture_source_observations(page, avant)
+    apres = []
+    for source in avant:
+        fragments = segmenter_elements_visuels_page([source], media, page.largeur_emu, page.hauteur_emu)
+        crop_proofs = [dict(evidence.details).get("proof")
+                       for fragment in fragments for evidence in getattr(fragment, "evidence", ())
+                       if isinstance(evidence, Evidence) and evidence.kind == "media-crop-partition"]
+        proof = next((proof for proof in crop_proofs if isinstance(proof, dict)
+                      and proof.get("source", {}).get("source_id") == source.source_id), None)
+        if proof is not None:
+            acquired = page.source_inventory[source.source_id]
+            errors = verify_media_crop_partition(acquired, fragments, media, proof)
+            if errors:
+                source.attributes["crop_unverified_reasons"] = errors
+                apres.append(source)
+                continue
+            apres.extend(fragments)
+            record_source_transformation(page, [source], fragments, "source-media-segmentation", proof=proof)
+            continue
+        if any(fragment is not source for fragment in fragments) and (
+            getattr(source, "quad", ()) or getattr(source, "transform", ()) or getattr(source, "clip_bbox", None) is not None
+        ):
+            source.attributes["crop_unverified_reasons"] = ["missing-producer-crop-proof"]
+            apres.append(source)
+            continue
+        outputs = []
+        for fragment in fragments:
+            if fragment is source:
+                outputs.append(source)
+                continue
+            output = clone_element_with_metadata(source, bbox=fragment.bbox, media_ref=fragment.media_ref)
+            digest = sha256(str((fragment.bbox.x0, fragment.bbox.y0, fragment.bbox.x1, fragment.bbox.y1)).encode()).hexdigest()[:16]
+            output.source_id = f"{source.source_id}:media-crop:{digest}"
+            output.source_ids = tuple(dict.fromkeys((output.source_id, *element_source_ids(source))))
+            output.attributes.update({"replaces": (source.source_id,), "transformation": "source-media-pixel-crop",
+                                      "source_media_ref": source.media_ref, "source_bbox": source.bbox,
+                                      "crop_unverified_reasons": ["missing-producer-crop-proof"]})
+            if isinstance(output, RasterEl):
+                output.source_component_ids = tuple(dict.fromkeys((source.source_id, *source.source_component_ids)))
+                output.fallback_reason = source.fallback_reason or "source-media-segmentation"
+            outputs.append(output)
+        apres.extend(outputs)
+        if any(output is not source for output in outputs):
+            record_source_transformation(page, [source], outputs, "source-media-segmentation",
+                                         proof={"capture_method": "source-media-pixel-crop", "source_media_ref": source.media_ref,
+                                                "output_ids": tuple(output.source_id for output in outputs),
+                                                "source_bbox": _bbox_report(source.bbox),
+                                                "output_bboxes": tuple(_bbox_report(output.bbox) for output in outputs),
+                                                "pixel_equivalence_verified": False,
+                                                "reasons": ["missing-producer-crop-proof"]})
+    _journaliser_elements_rejetes(page, avant, apres, "segmented-or-replaced-visual")
+    page.elements = apres
+
+
+def _lier_composants_raster(page: Page, raster: RasterEl, sources: list, reason: str, *, dpi: int) -> None:
+    capture_source_observations(page, sources)
+    raster.source_kind = "inferred"
+    raster.source_component_ids = tuple(source.source_id for source in sources)
+    raster.source_ids = tuple(dict.fromkeys(source_id for source in sources for source_id in element_source_ids(source)))
+    raster.fallback_reason = reason
+    raster.attributes.update({"source_component_ids": raster.source_component_ids,
+                              "replaces": raster.source_component_ids, "transformation": "raster-composition"})
+    ensure_source_identity(raster, page.index, source_pdf_id=page.source_pdf_id or "")
+    proof = {"reason": reason, "source_ids": raster.source_component_ids, "output_id": raster.source_id,
+             "dpi": dpi, "raster_bbox": _bbox_report(raster.bbox), "producer": "pdfexact.extract.document",
+             "capture_method": "source-page-region-render", "pixel_equivalence_verified": False}
+    raster.evidence.append(Evidence(kind="raster-replacement", source="pdfexact.extract.document", confidence=None,
+                                    details=tuple(proof.items())))
+    record_source_transformation(page, sources, [raster], reason, source_component_ids=raster.source_component_ids,
+                                 proof=proof)
 
 
 def _cadres_lecture_depuis_comprehension(comprehension) -> list[BBox]:
@@ -788,9 +1340,9 @@ def _dedoublonner_cadres_lecture(cadres: list[BBox]) -> list[BBox]:
     return sorted(resultat, key=lambda bbox: (bbox.x0, bbox.y0))
 
 
-def _attacher_frames_texte(elements: list, plan) -> list:
+def _attacher_frames_texte(elements: list, plan, zones_ia=None) -> list:
     """Associe chaque ligne native au frame de compréhension qui la contient."""
-    if not plan:
+    if not plan and not zones_ia:
         return elements
     frames = [
         (index, item)
@@ -799,17 +1351,79 @@ def _attacher_frames_texte(elements: list, plan) -> list:
         and item.kind in {"text-column", "caption", "heading", "list", "ai-zone"}
         and item.region is not None
     ]
+    # Le plan final peut ne retenir qu'une partie des zones IA. Les en-tetes,
+    # titres et textes detectes directement par le modele restent des conteneurs
+    # utiles pour la reconstruction native.
+    for zone_index, zone in enumerate(zones_ia or ()):
+        if zone.role == "caption" or zone.label == "figure_title":
+            role = "caption"
+        elif zone.label in {"header", "doc_title", "paragraph_title"}:
+            role = "heading"
+        else:
+            role = "text-column"
+        if zone.role not in {"text", "caption"} and zone.label not in {
+            "header",
+            "doc_title",
+            "paragraph_title",
+            "text",
+            "figure_title",
+        }:
+            continue
+        frames.append(
+            (
+                len(plan or []) + zone_index,
+                SimpleNamespace(
+                    bbox=zone.bbox,
+                    kind=role,
+                    strategy="word-text",
+                    region=zone,
+                ),
+            )
+        )
+    cadres_uniques = []
+    vus = set()
+    for frame_index, item in frames:
+        cle = (
+            item.kind,
+            item.strategy,
+            item.bbox.x0,
+            item.bbox.y0,
+            item.bbox.x1,
+            item.bbox.y1,
+        )
+        if cle in vus:
+            continue
+        vus.add(cle)
+        cadres_uniques.append((frame_index, item))
+    frames = cadres_uniques
     if not frames:
         return elements
 
+    # Frame inference is a layout view, not a new acquisition of native rows.
+    source_lines = {}
+    views = []
+    for element in elements:
+        if isinstance(element, (TextBox, FlowParagraph)) and any(
+            hasattr(line, "source_acquisition_index") for line in element.lignes
+        ):
+            view = clone_element_with_metadata(element)
+            source_lines.update((id(copied), source) for copied, source in zip(view.lignes, element.lignes)
+                                if hasattr(source, "source_acquisition_index"))
+            views.append(view)
+        else:
+            views.append(element)
+    elements = views
+    lignes_sans_frame: list[Line] = []
     for element in elements:
         if not isinstance(element, (TextBox, FlowParagraph)):
             continue
         lignes = element.lignes if isinstance(element, FlowParagraph) else element.lignes
         frame_lignes = []
+        lignes_non_attachees = []
         for ligne in lignes:
             meilleur = _meilleur_frame_ligne(ligne.bbox, frames)
             if meilleur is None:
+                lignes_non_attachees.append(ligne)
                 continue
             frame_index, item = meilleur
             role = item.kind
@@ -819,21 +1433,132 @@ def _attacher_frames_texte(elements: list, plan) -> list:
             ligne.layout_frame_strategy = item.strategy
             ligne.layout_frame_bbox = item.bbox
             frame_lignes.append((frame_id, role, item.strategy, item.bbox))
-        if frame_lignes:
+        lignes_sans_frame.extend(lignes_non_attachees)
+        if frame_lignes and len({frame[0] for frame in frame_lignes}) == 1 and not lignes_non_attachees:
             frame_id, role, strategy, bbox = frame_lignes[0]
             element.layout_frame_id = frame_id
             element.layout_frame_role = role
             element.layout_frame_strategy = strategy
             element.layout_frame_bbox = bbox
-    return elements
+        else:
+            # A source PDF block can span several semantic regions.
+            element.layout_frame_id = None
+            element.layout_frame_role = None
+            element.layout_frame_strategy = None
+            element.layout_frame_bbox = None
+
+    # Le plan IA ne couvre pas toujours les textes PDF natifs (titres, sous-titres,
+    # en-têtes, petits panneaux). Ils ne doivent pas rester des lignes orphelines :
+    # sans conteneur, le writer les place dans des bandes indépendantes et Word peut
+    # rogner leur hauteur. On reconstruit donc des blocs de lecture par continuité
+    # géométrique et cohérence typographique, sans inventer de texte.
+    for index, groupe in enumerate(_regrouper_lignes_sans_frame(lignes_sans_frame)):
+        if not groupe:
+            continue
+        role = _role_frame_inferre(groupe)
+        bbox = groupe[0].bbox
+        for ligne in groupe[1:]:
+            bbox = union(bbox, ligne.bbox)
+        marge = pt_vers_emu(1)
+        bbox = BBox(
+            max(0, bbox.x0 - marge),
+            max(0, bbox.y0 - marge),
+            bbox.x1 + marge,
+            bbox.y1 + marge,
+        )
+        frame_id = f"inferred:{index}:{role}:{bbox.x0}:{bbox.y0}:{bbox.x1}:{bbox.y1}"
+        for ligne in groupe:
+            ligne.layout_frame_id = frame_id
+            ligne.layout_frame_role = role
+            ligne.layout_frame_strategy = "word-text"
+            ligne.layout_frame_bbox = bbox
+    return _materialiser_vues_frames_texte(elements, source_lines)
+
+
+def _materialiser_vues_frames_texte(elements, source_lines):
+    """Keep derived frames on owners and restore their exact acquired rows."""
+    names = ("layout_frame_id", "layout_frame_role", "layout_frame_strategy", "layout_frame_bbox")
+    result = []
+    for element in elements:
+        if not any(id(line) in source_lines for line in getattr(element, "lignes", ())):
+            result.append(element)
+            continue
+        groups = []
+        for line in element.lignes:
+            layout = tuple(getattr(line, name) for name in names)
+            if not groups or groups[-1][0] != layout:
+                groups.append((layout, []))
+            groups[-1][1].append(source_lines.get(id(line), line))
+        for index, (layout, lines) in enumerate(groups):
+            owner = clone_element_with_metadata(element, lignes=lines, **dict(zip(names, layout)))
+            if len(groups) > 1:
+                owner.bbox = BBox(min(line.bbox.x0 for line in lines), min(line.bbox.y0 for line in lines),
+                                  max(line.bbox.x1 for line in lines), max(line.bbox.y1 for line in lines))
+                owner.geometry = None
+                owner.source_id = f"{element.source_id}:frame-view:{index}" if element.source_id else None
+                owner.source_ids = tuple(dict.fromkeys(
+                    ident for ident in (element.source_id, *(ident for line in lines for ident in element_source_ids(line)))
+                    if ident is not None
+                ))
+            if isinstance(owner, FlowParagraph):
+                owner.spans = [span for line in lines for span in line.spans]
+                owner.texte = " ".join("".join(span.texte for span in line.spans) for line in lines)
+                owner.source_line_ids = tuple(line.source_id for line in lines if line.source_id is not None)
+            result.append(owner)
+    return result
+
+
+def _regrouper_lignes_sans_frame(lignes: list[Line]) -> list[list[Line]]:
+    """Regroupe les lignes non couvertes par le plan en blocs de lecture locaux.
+
+    Le regroupement reste volontairement géométrique : il ne dépend ni de la langue
+    ni d'un vocabulaire particulier. Une ligne ne rejoint un bloc que si elle est
+    proche verticalement, partage une colonne horizontale et conserve une typographie
+    compatible. Les grands écarts, changements de colonne et changements de style
+    créent naturellement un nouveau conteneur.
+    """
+    options = AnalysisOptions(
+        extra={
+            "semantic_vertical_gap_factor": 2.4,
+            "semantic_column_overlap_min": 0.18,
+        }
+    )
+    return [
+        [item for item in group if isinstance(item, Line)]
+        for group in regrouper_paragraphes(lignes, options)
+        if any(isinstance(item, Line) for item in group)
+    ]
+
+
+def _style_ligne_texte(ligne: Line) -> tuple[float, bool, bool] | None:
+    span = next((span for span in ligne.spans if span.texte.strip()), None)
+    if span is None:
+        return None
+    return float(span.size_pt), bool(span.police.gras), bool(span.police.italique)
+
+
+def _role_frame_inferre(lignes: list[Line]) -> str:
+    styles = [_style_ligne_texte(ligne) for ligne in lignes]
+    styles = [style for style in styles if style is not None]
+    if not styles:
+        return "text-column"
+    taille_max = max(style[0] for style in styles)
+    texte = " ".join("".join(span.texte for span in ligne.spans).strip() for ligne in lignes)
+    prose = len(re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ]{2,}", texte)) >= 8
+    if taille_max >= 16 and len(lignes) <= 6:
+        return "heading"
+    if any(re.match(r"^\s*(?:[•▪◦*]|\d+[.)])\s+", "".join(span.texte for span in ligne.spans)) for ligne in lignes):
+        return "list"
+    if all(style[2] for style in styles) and taille_max <= 14 and len(lignes) <= 4 and not prose:
+        return "caption"
+    return "text-column"
 
 
 def _meilleur_frame_ligne(bbox: BBox, frames) -> tuple[int, object] | None:
     centre_x = (bbox.x0 + bbox.x1) // 2
     centre_y = (bbox.y0 + bbox.y1) // 2
     aire_ligne = max(bbox.largeur * bbox.hauteur, 1)
-    meilleur = None
-    meilleur_score = 0.0
+    candidats = []
     for frame_index, item in frames:
         frame = item.bbox
         contient = frame.x0 <= centre_x <= frame.x1 and frame.y0 <= centre_y <= frame.y1
@@ -851,16 +1576,28 @@ def _meilleur_frame_ligne(bbox: BBox, frames) -> tuple[int, object] | None:
         aire_frame = max(frame.largeur * frame.hauteur, 1)
         precision = min(1.0, aire_ligne / aire_frame)
         score = couverture + (0.75 if contient else 0.0) + role_bonus + precision * 0.08
-        if score > meilleur_score:
-            meilleur = (frame_index, item)
-            meilleur_score = score
-    return meilleur
+        candidats.append(
+            (contient, aire_frame, -couverture, -score, frame_index, item)
+        )
+    if not candidats:
+        return None
+    # Quand plusieurs cadres contiennent la meme ligne, le plus petit cadre est
+    # le conteneur semantique le plus precis. Cela evite qu'un cadre de colonne
+    # englobant absorbe un titre ou une legende detectee plus finement par l'IA.
+    contenus = [candidat for candidat in candidats if candidat[0]]
+    choix = min(contenus, key=lambda candidat: (candidat[1], candidat[2], candidat[4])) if contenus else min(
+        candidats,
+        key=lambda candidat: (candidat[3], candidat[1], candidat[4]),
+    )
+    return choix[4], choix[5]
 
 
 def _dedoublonner_textes_positionnes(page: Page) -> None:
-    candidats: list[tuple[int, TextBox, Line, str]] = []
+    capture_source_observations(page, page.elements)
+    text_types = (TextBox, FlowParagraph)
+    candidats: list[tuple[int, object, Line, str]] = []
     for index, element in enumerate(page.elements):
-        if not isinstance(element, TextBox) or len(element.lignes) != 1:
+        if not isinstance(element, text_types) or len(element.lignes) != 1:
             continue
         ligne = element.lignes[0]
         texte = _compact_textbox_line(ligne)
@@ -878,12 +1615,43 @@ def _dedoublonner_textes_positionnes(page: Page) -> None:
                 continue
             if not _lignes_dupliquees(ligne_a.bbox, ligne_b.bbox):
                 continue
+            if not _preuve_doublon_texte(ligne_a, ligne_b) or any(
+                getattr(element_a, name, None) != getattr(element_b, name, None)
+                for name in ("source_kind", "z_index", "opacity", "alpha", "clip_ids", "clip_bbox", "compositing")
+            ):
+                continue
             gagnant = _meilleur_texte_duplique(element_a, ligne_a, element_b, ligne_b)
+            perdant = element_b if gagnant is element_a else element_a
             supprimer.add(index_b if gagnant is element_a else index_a)
+            perdant.attributes.update({"duplicate_of": gagnant.source_id, "duplicate_verified": True})
+            gagnant.source_ids = tuple(dict.fromkeys((*element_source_ids(gagnant), *element_source_ids(perdant))))
+            page.discarded_elements.append(perdant)
+            record_source_transformation(page, [perdant], [gagnant], "duplicate-positioned-text",
+                                         duplicate_of=gagnant.source_id, duplicate_verified=True,
+                                         proof="identical-text-style-and-glyph-geometry")
+            expliquer_filtrage(
+                perdant,
+                "duplicate-positioned-text",
+                kept_id=str(getattr(gagnant, "source_id", None) or "unknown"),
+            )
             if gagnant is element_b:
                 break
     if supprimer:
         page.elements = [element for index, element in enumerate(page.elements) if index not in supprimer]
+
+
+def _preuve_doublon_texte(a: Line, b: Line) -> bool:
+    if a.bbox != b.bbox or a.angle_deg != b.angle_deg or a.quad != b.quad or a.baseline_points != b.baseline_points:
+        return False
+    fields = ("texte", "police", "size_pt", "couleur", "bbox", "quad", "angle_deg", "baseline_points",
+              "souligne", "barre", "surlignage", "espacement_twips", "invisible", "capitales", "exposant", "indice",
+              "source_kind", "z_index", "alpha", "opacity", "clip_ids", "clip_bbox", "compositing")
+    if any(getattr(a, name, None) != getattr(b, name, None) for name in fields[18:]):
+        return False
+    return len(a.spans) == len(b.spans) and all(
+        all(getattr(left, name, None) == getattr(right, name, None) for name in fields)
+        for left, right in zip(a.spans, b.spans)
+    )
 
 
 def _compact_textbox_line(ligne: Line) -> str:
@@ -1056,6 +1824,8 @@ def _remplir_page(
     layout_model_root,
     layout_device,
     verbose,
+    ocr_language="auto",
+    ocr_model_root=None,
 ):
     """Construit les éléments d'une page, dans l'ordre de superposition."""
     geometrie = PageGeometry.depuis_page(page_pdf)
@@ -1073,29 +1843,44 @@ def _remplir_page(
     analyse_layout = None
     page_layout_ai = None
     lignes_natives: list[BBox] = []
+    # Une page qui possède déjà des glyphes PDF ne doit pas être reconstruite par
+    # les tuiles IA : ces tuiles peuvent réinclure le texte natif dans leur bitmap.
+    page_pdf_natif_candidat = False
 
-    if text_mode == "rapidocr" and ocr_layout in {"hybrid", "word-native"}:
-        analyse_layout = analyser_page(page_pdf, geometrie=geometrie)
-        lignes_natives = analyse_layout.native_line_bboxes()
-        if layout_ai:
-            page_layout_ai = detecter_layout_ia(
-                page_pdf,
-                analyse_layout,
-                provider=layout_provider,
-                model=layout_model,
-                model_root=layout_model_root,
-                device=layout_device,
-            )
-            if verbose:
-                suffixe = f", avertissements={','.join(page_layout_ai.warnings)}" if page_layout_ai.warnings else ""
-                print(
-                    f"      layout IA: {page_layout_ai.status}, zones={len(page_layout_ai.zones)}{suffixe}",
-                    file=sys.stderr,
-                )
+    # L'analyse de structure est une étape obligatoire du pipeline universel.
+    # ``layout_ai`` reste dans la signature pour compatibilité avec les anciens
+    # appelants, mais ne peut plus supprimer cette étape : les modes spans,
+    # glyphs et OCR doivent partager le même repère sémantique de page.
+    analyse_layout = analyser_page(page_pdf, geometrie=geometrie)
+    lignes_natives = analyse_layout.native_line_bboxes()
+    page_pdf_natif_candidat = bool(lignes_natives)
+    page_layout_ai = detecter_layout_ia(
+        page_pdf,
+        analyse_layout,
+        provider=layout_provider,
+        model=layout_model,
+        model_root=layout_model_root,
+        device=layout_device,
+        required=False,
+    )
+    if page_layout_ai.warnings:
+        print(
+            "      avertissement layout IA: "
+            + ",".join(page_layout_ai.warnings)
+            + "; repli géométrique actif",
+            file=sys.stderr,
+        )
+    if verbose:
+        print(
+            f"      layout IA: {page_layout_ai.status}, zones={len(page_layout_ai.zones)}",
+            file=sys.stderr,
+        )
 
     if text_mode == "rapidocr" and ocr_layout in {"hybrid", "word-native"}:
         tableaux_bruts = extraire_tableaux(page_pdf, polices, geometrie=geometrie)
-        for tableau_listing in extraire_tableaux_listing(page_pdf, polices, geometrie=geometrie):
+        tableaux_listing = extraire_tableaux_listing(page_pdf, polices, geometrie=geometrie)
+        capture_source_observations(page_ir, [*tableaux_bruts, *tableaux_listing], source_kind="pdf-native")
+        for tableau_listing in tableaux_listing:
             if not _zone_deja_couverte(tableau_listing.bbox, [tableau.bbox for tableau in tableaux_bruts], seuil=0.55):
                 tableaux_bruts.append(tableau_listing)
         for tableau in tableaux_bruts:
@@ -1114,19 +1899,32 @@ def _remplir_page(
                 actif=page_layout_ai.status == "layout_ai_detected",
             )
         zones_tableaux = [tableau.bbox for tableau in tableaux_detectes]
+        _journaliser_elements_rejetes(page_ir, [*tableaux_bruts, *tableaux_listing], tableaux_detectes,
+                                     "historical-table-recognition-filter")
 
     formes_pdf = extraire_vectoriel(page_pdf, geometrie=geometrie)
+    capture_source_observations(page_ir, formes_pdf, source_kind="vector")
     formes_a_regrouper: list[ShapeEl] = []
     for forme in formes_pdf:
         if _forme_bordure_page_clusterisante(forme, page_ir):
             if text_mode != "rapidocr" or ocr_layout in {"hybrid", "word-native"}:
                 page_ir.elements.append(forme)
                 formes_vectorielles.append(forme)
+            else:
+                _journaliser_elements_rejetes(page_ir, [forme], [], "historical-page-border-filter")
             continue
         formes_a_regrouper.append(forme)
     for cluster in regrouper(formes_a_regrouper):
         boite_cluster = boite_du_cluster(cluster)
         if not _bbox_intersecte_page(boite_cluster, page_ir):
+            record_source_transformation(page_ir, cluster, [], "outside-visible-page",
+                                         outside_page={"source_bbox": _bbox_report(boite_cluster),
+                                                       "page_bbox": _bbox_report(BBox(0, 0, page_ir.largeur_emu, page_ir.hauteur_emu)),
+                                                       "intersection_area": 0})
+            continue
+        if page_pdf_natif_candidat:
+            page_ir.elements.extend(cluster)
+            formes_vectorielles.extend(cluster)
             continue
         if doit_rasteriser(cluster, degrades, seuil_raster):
             if _zone_visuelle_garde_texte_original(page_pdf, boite_cluster, page_ir, geometrie):
@@ -1141,6 +1939,7 @@ def _remplir_page(
             else:
                 raster = rasteriser_region(page_pdf, boite_cluster, document.media, dpi=dpi)
             page_ir.elements.append(raster)
+            _lier_composants_raster(page_ir, raster, cluster, "complex-vector-cluster", dpi=dpi)
             zones_rasterisees.append(raster.bbox)
             aire_cluster = max(raster.bbox.largeur, 0) * max(raster.bbox.hauteur, 0)
             if aire_cluster / aire_page <= 0.18:
@@ -1160,19 +1959,51 @@ def _remplir_page(
             ):
                 page_ir.elements.extend(cluster)
                 formes_vectorielles.extend(cluster)
+            else:
+                _journaliser_elements_rejetes(page_ir, cluster, [], "historical-vector-significance-filter")
             continue
         else:
             page_ir.elements.extend(cluster)
             formes_vectorielles.extend(cluster)
 
-    if text_mode == "rapidocr" and ocr_layout in {"reflow", "hybrid", "word-native"}:
+    # Les shadings sont des opérations de peinture locales, pas une propriété
+    # qui doit forcer tous les aplats vectoriels de la page à devenir des images.
+    # On les conserve comme petites couches raster indépendantes, sous le texte,
+    # tandis que les formes simples restent natives.
+    for zone_shading in extraire_zones_shading(doc, page_pdf, geometrie):
+        if _zone_deja_couverte(zone_shading, zones_rasterisees, seuil=0.92):
+            continue
+        page_ir.elements.append(
+            rasteriser_region(
+                page_pdf,
+                zone_shading,
+                document.media,
+                dpi=dpi,
+                purpose="shading",
+            )
+        )
+
+    if page_pdf_natif_candidat:
+        images = extraire_images(
+            page_pdf,
+            doc,
+            document.media,
+            geometrie=geometrie,
+        )
+        images_inline = extraire_images_inline(
+            page_pdf,
+            document.media,
+            deja_posees=images,
+            geometrie=geometrie,
+        )
+    elif text_mode == "rapidocr" and ocr_layout in {"reflow", "hybrid", "word-native"}:
         images = extraire_images_rasterisees(
             page_pdf,
             doc,
             document.media,
             dpi=dpi,
             geometrie=geometrie,
-            supprimer_texte_natif=ocr_layout == "word-native",
+            supprimer_texte_natif=ocr_layout == "word-native" and not page_pdf_natif_candidat,
         )
         images_inline = extraire_images_inline_rasterisees(
             page_pdf,
@@ -1180,7 +2011,7 @@ def _remplir_page(
             deja_posees=images,
             dpi=dpi,
             geometrie=geometrie,
-            supprimer_texte_natif=ocr_layout == "word-native",
+            supprimer_texte_natif=ocr_layout == "word-native" and not page_pdf_natif_candidat,
         )
     else:
         images = extraire_images(page_pdf, doc, document.media, geometrie=geometrie)
@@ -1190,6 +2021,7 @@ def _remplir_page(
             deja_posees=images,
             geometrie=geometrie,
         )
+    capture_source_observations(page_ir, [*images, *images_inline], source_kind="image")
     page_ir.elements.extend(images)
     page_ir.elements.extend(images_inline)
     zones_images_source = [image.bbox for image in images + images_inline]
@@ -1203,6 +2035,8 @@ def _remplir_page(
         zones_visuelles.append(zone)
         if not _zone_deja_couverte(zone, zones_rasterisees + zones_images_source, seuil=0.55):
             raster = rasteriser_region(page_pdf, zone, document.media, dpi=dpi)
+            sources = [tableau for tableau in tableaux_bruts if tableau.bbox == zone]
+            _lier_composants_raster(page_ir, raster, sources, "rejected-graph-table-raster", dpi=dpi)
             page_ir.elements.append(raster)
             zones_rasterisees.append(raster.bbox)
             rapport.clusters_rasterises += 1
@@ -1222,10 +2056,8 @@ def _remplir_page(
                 print(f"      tableaux Word: {len(tableaux)}", file=sys.stderr)
 
     comprehension = None
+    plan_layout = None
     if text_mode == "rapidocr" and ocr_layout in {"hybrid", "word-native"}:
-        if analyse_layout is None:
-            analyse_layout = analyser_page(page_pdf, geometrie=geometrie)
-            lignes_natives = analyse_layout.native_line_bboxes()
         if ocr_layout == "hybrid":
             carte_preview = construire_layout_map(
                 page_pdf,
@@ -1251,16 +2083,21 @@ def _remplir_page(
         zones_vectorielles_complexes = [
             item.bbox
             for item in plan_layout
-            if item.region.style_hints.get("source") == "vector-cluster"
+            if not page_pdf_natif_candidat
+            and item.region.style_hints.get("source") == "vector-cluster"
             and item.strategy == "raster-immutable"
+            and _zone_rasterisable(item.bbox, page_ir)
             and not _zone_deja_couverte(item.bbox, zones_rasterisees)
             and not _zone_deja_couverte(item.bbox, [tableau.bbox for tableau in tableaux], seuil=0.55)
             and not _zone_touche_tableau(item.bbox, tableaux)
         ]
         if zones_vectorielles_complexes:
-            page_ir.elements = _filtrer_formes_couvertes(
-                page_ir.elements,
+            sources_vectorielles = list(page_ir.elements)
+            _appliquer_filtre_page(
+                page_ir,
+                _filtrer_formes_couvertes,
                 zones_vectorielles_complexes,
+                reason="covered-by-vector-raster-zone",
             )
             formes_vectorielles = [
                 forme
@@ -1287,6 +2124,8 @@ def _remplir_page(
                         geometrie=geometrie,
                     )
                 page_ir.elements.append(raster)
+                components = [item for item in sources_vectorielles if isinstance(item, ShapeEl) and overlap_ratio(item.bbox, zone) == 1.0]
+                _lier_composants_raster(page_ir, raster, components, "layout-vector-cluster-raster", dpi=dpi)
                 zones_rasterisees.append(raster.bbox)
                 rapport.clusters_rasterises += 1
             if verbose:
@@ -1294,7 +2133,7 @@ def _remplir_page(
                     f"      zones vectorielles complexes rastérisées: {len(zones_vectorielles_complexes)}",
                     file=sys.stderr,
                 )
-        zones_visuelles_ia = _zones_visuelles_ia_a_rasteriser(
+        zones_visuelles_ia = [] if page_pdf_natif_candidat else _zones_visuelles_ia_a_rasteriser(
             plan_layout,
             zones_rasterisees + zones_images_source + [tableau.bbox for tableau in tableaux],
             page_ir,
@@ -1303,9 +2142,12 @@ def _remplir_page(
             zone for zone in zones_visuelles_ia if not _zone_touche_tableau(zone, tableaux)
         ]
         if zones_visuelles_ia:
-            page_ir.elements = _filtrer_elements_visuels_couverts(
-                page_ir.elements,
+            sources_visuelles = list(page_ir.elements)
+            _appliquer_filtre_page(
+                page_ir,
+                _filtrer_elements_visuels_couverts,
                 zones_visuelles_ia,
+                reason="covered-by-layout-ai-visual-zone",
             )
             formes_vectorielles = [
                 forme
@@ -1332,11 +2174,46 @@ def _remplir_page(
                         geometrie=geometrie,
                     )
                 page_ir.elements.append(raster)
+                components = [item for item in sources_visuelles if isinstance(item, (ShapeEl, ImageEl, RasterEl))
+                              and overlap_ratio(item.bbox, zone) == 1.0]
+                _lier_composants_raster(page_ir, raster, components, "layout-visual-region-raster", dpi=dpi)
                 zones_rasterisees.append(raster.bbox)
                 rapport.clusters_rasterises += 1
             if verbose:
                 print(
                     f"      zones IA visuelles rastérisées: {len(zones_visuelles_ia)}",
+                    file=sys.stderr,
+                )
+        zones_formules = _zones_formules_a_rasteriser(
+            plan_layout,
+            zones_images_source + [tableau.bbox for tableau in tableaux],
+            lignes_natives,
+            page_ir,
+        )
+        if zones_formules:
+            sources_formules = list(page_ir.elements)
+            _appliquer_filtre_page(
+                page_ir,
+                _filtrer_elements_visuels_couverts,
+                zones_formules,
+                reason="covered-by-formula-zone",
+            )
+            for zone in zones_formules:
+                raster = rasteriser_region(
+                    page_pdf,
+                    zone,
+                    document.media,
+                    dpi=dpi,
+                    purpose="formula",
+                )
+                page_ir.elements.append(raster)
+                components = [item for item in sources_formules if overlap_ratio(item.bbox, zone) == 1.0]
+                _lier_composants_raster(page_ir, raster, components, "layout-formula-raster", dpi=dpi)
+                zones_rasterisees.append(raster.bbox)
+                rapport.clusters_rasterises += 1
+            if verbose:
+                print(
+                    f"      zones formules rastérisées: {len(zones_formules)}",
                     file=sys.stderr,
                 )
         zones_images = zones_ocr_du_plan(plan_layout)
@@ -1347,8 +2224,120 @@ def _remplir_page(
                 lignes_natives,
             )
             zones_images = _filtrer_zones_lisibles_ocr(zones_images, zones_images_lisibles)
+        zones_ocr_interdites = zones_ocr_dur_du_plan(plan_layout)
         if verbose:
             print(f"      {comprehension.resume()}", file=sys.stderr)
+        if ocr_layout == "word-native" and _page_image_pleine_sans_texte_natif(
+            zones_images_source,
+            lignes_natives,
+            page_ir,
+        ):
+            ocr_visible = extraire_rapidocr(
+                page_pdf,
+                polices,
+                dpi=max(dpi, 300),
+                verbose=False,
+                granularite=ocr_granularity,
+                layout=ocr_layout,
+                zones_ignorees=[],
+                media=None,
+                layout_map=None,
+                geometrie=geometrie,
+                observation_page=page_ir,
+                language=ocr_language,
+                model_root=ocr_model_root,
+            )
+            # An English-only rescue would add Latin hallucinations to a
+            # multilingual scan. Keep that legacy supplement explicitly Latin.
+            ocr_visible += extraire_tesseract_lignes_absentes(
+                page_pdf,
+                polices,
+                ocr_visible,
+                dpi=max(dpi, 300),
+                geometrie=geometrie,
+            ) if ocr_language in {"en", "eng"} else []
+            capture_source_observations(page_ir, ocr_visible, source_kind="ocr")
+            lignes_visibles = _preparer_ocr_visible_page_image(ocr_visible)
+            _styliser_ocr_depuis_image_scanee(page_pdf, ocr_visible, geometrie)
+            nettoyes = nettoyer_tuiles_page_depuis_source(
+                page_pdf,
+                page_ir.elements,
+                ocr_visible,
+                document.media,
+                dpi=max(dpi, 300),
+                geometrie=geometrie,
+            )
+            nettoyes += nettoyer_images_fond_texte_positionne(
+                page_ir.elements,
+                ocr_visible,
+                document.media,
+            )
+            nettoyes += resserrer_ancres_visuelles(page_ir.elements, document.media)
+            page_ir.elements.extend(ocr_visible)
+            if verbose:
+                print(
+                    "      page image pleine: fond inpainté + "
+                    f"OCR Word visible={lignes_visibles}, image(s) nettoyée(s)={nettoyes}",
+                    file=sys.stderr,
+                )
+            return
+        if ocr_layout == "word-native" and _page_pdf_natif_mixe(
+            lignes_natives,
+            zones_images_source,
+            page_ir,
+        ):
+            textes_natifs = _extraire_texte_pdf_natif_word_native(
+                page_pdf,
+                polices,
+                plan_layout,
+                zones_images,
+                zones_textes_visuelles_natives,
+                page_ir,
+                document,
+                zones_ia=page_layout_ai.zones if page_layout_ai else None,
+                geometrie=geometrie,
+            )
+            page_ir.elements.extend(textes_natifs)
+            # Une page native mixte contient souvent du texte imprimé dans ses
+            # images. Le chemin natif ne peut pas le voir : on lance donc une
+            # OCR locale uniquement dans les images, en excluant les lignes PDF
+            # déjà récupérées pour éviter les doublons.
+            zones_natives = [ligne.bbox for element in textes_natifs for ligne in element.lignes]
+            # Les images source restent des objets visuels. L'OCR ne peut être
+            # lancé que sur les zones explicitement classées comme texte-image par
+            # le plan, jamais sur toute la page graphique.
+            zones_ocr_images = list(zones_images)
+            if zones_ocr_images:
+                textes_images = extraire_rapidocr(
+                    page_pdf,
+                    polices,
+                    dpi=max(dpi, 200),
+                    verbose=False,
+                    granularite=ocr_granularity,
+                    layout="word-native",
+                    zones_ignorees=zones_natives,
+                    layout_map=None,
+                    geometrie=geometrie,
+                    zones_cibles=zones_ocr_images,
+                    observation_page=page_ir,
+                    language=ocr_language,
+                    model_root=ocr_model_root,
+                )
+                page_ir.elements.extend(textes_images)
+            else:
+                textes_images = []
+            # The native-mixed path returns before the generic OCR cleanup.  It
+            # still needs the same duplicate/isolated-fragment pass, otherwise
+            # a second extraction of a caption can survive into the DOCX.
+            _dedoublonner_textes_positionnes(page_ir)
+            if verbose:
+                lignes_texte = sum(len(element.lignes) for element in textes_natifs)
+                print(
+                    "      page PDF native: texte PDF conservé + "
+                    f"OCR images={len(textes_images)}, lignes Word={lignes_texte}",
+                    file=sys.stderr,
+                )
+            return
 
     layout_map = None
     if text_mode == "rapidocr" and ocr_layout in {"hybrid", "word-native"}:
@@ -1369,7 +2358,14 @@ def _remplir_page(
         )
 
     if text_mode == "glyph-images":
-        page_ir.elements.extend(extraire_glyphes_images(page_pdf, document.media, dpi=dpi))
+        page_ir.elements.extend(
+            extraire_glyphes_images(
+                page_pdf,
+                document.media,
+                dpi=dpi,
+                geometrie=geometrie,
+            )
+        )
         return
 
     if text_mode == "rapidocr":
@@ -1380,31 +2376,52 @@ def _remplir_page(
             verbose=verbose,
             granularite=ocr_granularity,
             layout=ocr_layout,
-            zones_ignorees=zones_images,
+            zones_ignorees=zones_ocr_interdites,
             media=document.media,
             layout_map=layout_map,
             geometrie=geometrie,
+            observation_page=page_ir,
+            language=ocr_language,
+            model_root=ocr_model_root,
         )
+        capture_source_observations(page_ir, elements_ocr)
         if comprehension is not None:
+            elements_ocr_avant_plan = list(elements_ocr)
             elements_ocr = _attacher_frames_texte(elements_ocr, plan_layout)
             elements_ocr = filtrer_elements_selon_plan(
                 elements_ocr,
                 plan_layout,
                 preserver_texte_natif=ocr_layout == "word-native",
             )
+            _journaliser_elements_rejetes(
+                page_ir,
+                elements_ocr_avant_plan,
+                elements_ocr,
+                "filtered-by-layout-plan",
+            )
         if zones_textes_visuelles_natives and ocr_layout == "word-native":
+            elements_ocr_avant_zone = list(elements_ocr)
             elements_ocr = _filtrer_textes_intersectant_zones(elements_ocr, zones_textes_visuelles_natives)
+            _journaliser_elements_rejetes(
+                page_ir,
+                elements_ocr_avant_zone,
+                elements_ocr,
+                "text-intersects-native-visual-zone",
+            )
         if ocr_layout == "word-native":
             page_ir.elements.extend(
                 _fonds_synthetiques_texte_inverse(page_pdf, elements_ocr, page_ir, geometrie)
             )
             nettoyer_images_fond_texte_positionne(page_ir.elements, elements_ocr, document.media)
+            resserrer_ancres_visuelles(page_ir.elements, document.media)
         page_ir.elements.extend(elements_ocr)
         if zones_textes_visuelles_natives and ocr_layout == "word-native":
             layout_map_natif_visuel = layout_map_natif_visuel or construire_layout_map(
                 page_pdf,
                 geometrie=geometrie,
+                observation_page=page_ir,
             )
+            capture_source_observations(page_ir, textes_visuels, source_kind="pdf-native")
             textes_visuels = extraire_textes_natifs_zones(
                 page_pdf,
                 polices,
@@ -1417,9 +2434,45 @@ def _remplir_page(
             _dedoublonner_textes_positionnes(page_ir)
         return
 
-    blocs = extraire_texte_glyphes(page_pdf, polices) if text_mode == "glyphs" else extraire_texte(page_pdf, polices)
+    # Les modes spans/glyphs doivent eux aussi disposer d'une compréhension de
+    # page et d'un plan de cadres. Ils ne déclenchent pas les filtres OCR, mais
+    # leurs textes natifs reçoivent le même contexte spatial et sémantique.
+    if comprehension is None:
+        comprehension = comprendre_page(
+            largeur_emu=page_ir.largeur_emu,
+            hauteur_emu=page_ir.hauteur_emu,
+            tableaux=tableaux,
+            images=images + images_inline,
+            formes=formes_pdf,
+            zones_rasterisees=zones_rasterisees,
+            lignes_natives=lignes_natives,
+            zones_ia=page_layout_ai.zones if page_layout_ai else None,
+        )
+        plan_layout = planifier_regions(classer_regions(analyse_layout, comprehension))
+        rapport.diagnostics_layout.append(
+            _diagnostic_layout(
+                page_ir.index,
+                analyse_layout.resume(),
+                comprehension,
+                plan_layout,
+                page_layout_ai,
+            )
+        )
+
+    blocs = (
+        extraire_texte_glyphes(page_pdf, polices, geometrie=geometrie)
+        if text_mode == "glyphs"
+        else extraire_texte(page_pdf, polices, geometrie=geometrie)
+    )
+    capture_source_observations(page_ir, blocs, source_kind="pdf-native")
+    # Le chemin spans/glyphs ne passait historiquement jamais par le plan de
+    # lecture. Les zones IA restent pourtant utiles ici : elles déterminent le
+    # conteneur sémantique de chaque ligne sans convertir le texte en image.
+    # Le writer recevra donc les mêmes cadres que les chemins OCR.
+    if page_layout_ai is not None:
+        blocs = _attacher_frames_texte(blocs, plan_layout or [], page_layout_ai.zones)
     page_ir.elements.extend(blocs)
-    page_ir.elements.extend(appliquer_liens(page_pdf, blocs))
+    page_ir.elements.extend(appliquer_liens(page_pdf, blocs, geometrie=geometrie))
 
 
 def extraire(
@@ -1436,13 +2489,15 @@ def extraire(
     ocr_visible: bool = False,
     ocr_granularity: str = "word",
     ocr_layout: str = "blocks",
-    layout_ai: bool = False,
+    layout_ai: bool = True,
     layout_provider: str | None = None,
     layout_model: str | None = None,
     layout_model_root: str | None = None,
     layout_device: str | None = None,
     verbose: bool = False,
     rapport: Rapport | None = None,
+    ai_models_root=None,
+    ocr_language: str = "auto",
 ) -> Document:
     """Construit l'IR complet à partir d'un PDF.
 
@@ -1479,7 +2534,13 @@ def extraire(
                     f"le document en compte {doc.page_count}"
                 )
 
-        document = Document(polices=polices)
+        document = Document(polices=polices, source_pdf_id=sha256(Path(chemin_pdf).read_bytes()).hexdigest(),
+                            options_snapshot={"dpi": dpi, "text_mode": text_mode, "ocr_layout": ocr_layout,
+                                              "ocr_granularity": ocr_granularity, "rasteriser_pages": rasteriser_pages,
+                                              "layout_ai": layout_ai, "seuil_raster": seuil_raster})
+        document.options_snapshot.update({"ocr_language": ocr_language,
+                                          "ai_models_root": str(ai_models_root) if ai_models_root is not None else None})
+        document.scene_id = document.source_pdf_id
 
         for position, index in enumerate(indices, start=1):
             if verbose:
@@ -1500,17 +2561,35 @@ def extraire(
                 index=index,
                 largeur_emu=geometrie.largeur_emu,
                 hauteur_emu=geometrie.hauteur_emu,
+                coordinate_space=geometrie.repere,
+                orientation=geometrie.orientation,
+                format_name=geometrie.format_nom,
+                rotation_pdf=geometrie.rotation,
+                source_pdf_id=document.source_pdf_id,
+                scene_id=f"{document.source_pdf_id}:page:{index}",
+                options_snapshot=dict(document.options_snapshot),
+                native_width_pt=(
+                    geometrie.coordinate_system.media_width_pt
+                    if geometrie.coordinate_system is not None
+                    else None
+                ),
+                native_height_pt=(
+                    geometrie.coordinate_system.media_height_pt
+                    if geometrie.coordinate_system is not None
+                    else None
+                ),
             )
 
             if rasteriser_pages:
                 if verbose:
-                    print("    rasterisation pleine page", file=sys.stderr)
-                page_ir.elements.append(
-                    rasteriser_region(
+                    print("    rasterisation page segmentée", file=sys.stderr)
+                page_ir.elements.extend(
+                    rasteriser_regions_segmentees_sans_texte(
                         page_pdf,
                         BBox(0, 0, page_ir.largeur_emu, page_ir.hauteur_emu),
                         document.media,
                         dpi=dpi,
+                        geometrie=geometrie,
                     )
                 )
                 if ocr_layer:
@@ -1523,9 +2602,11 @@ def extraire(
                             langue=ocr_lang,
                             visible=ocr_visible,
                             verbose=verbose,
+                            observation_page=page_ir,
                         )
                     )
-                _quantifier_page(page_ir)
+                _securiser_elements_visuels_page(page_ir, document.media)
+                capture_source_observations(page_ir, page_ir.elements)
                 document.pages.append(page_ir)
                 continue
 
@@ -1550,18 +2631,31 @@ def extraire(
                     layout_model_root,
                     layout_device,
                     verbose,
+                    ocr_language=ocr_language,
+                    ocr_model_root=ai_models_root if ai_models_root is not None else layout_model_root,
                 )
             except Exception as erreur:  # noqa: BLE001 — une page ne fait jamais tout échouer
                 if strict:
                     raise
-                page_ir.elements = [
-                    rasteriser_region(
-                        page_pdf,
-                        BBox(0, 0, page_ir.largeur_emu, page_ir.hauteur_emu),
-                        document.media,
-                        dpi=dpi,
-                    )
-                ]
+                elements_avant_degradation = list(page_ir.elements)
+                capture_source_observations(page_ir, elements_avant_degradation)
+                page_ir.elements = rasteriser_regions_segmentees_sans_texte(
+                    page_pdf,
+                    BBox(0, 0, page_ir.largeur_emu, page_ir.hauteur_emu),
+                    document.media,
+                    dpi=dpi,
+                    geometrie=geometrie,
+                )
+                _journaliser_elements_rejetes(
+                    page_ir,
+                    elements_avant_degradation,
+                    page_ir.elements,
+                    "page-degraded-to-raster-fallback",
+                )
+                for raster in page_ir.elements:
+                    components = [item for item in elements_avant_degradation
+                                  if overlap_ratio(item.bbox, raster.bbox) == 1.0]
+                    _lier_composants_raster(page_ir, raster, components, f"page-extraction-error:{type(erreur).__name__}", dpi=dpi)
                 rapport.pages_degradees.append(
                     PageDegradee(index=index, motif=f"{type(erreur).__name__}: {erreur}")
                 )
@@ -1576,10 +2670,12 @@ def extraire(
                         langue=ocr_lang,
                         visible=ocr_visible,
                         verbose=verbose,
+                        observation_page=page_ir,
                     )
                 )
 
-            _quantifier_page(page_ir)
+            _securiser_elements_visuels_page(page_ir, document.media)
+            capture_source_observations(page_ir, page_ir.elements)
             document.pages.append(page_ir)
 
         rapport.pages_totales = len(document.pages)
@@ -1602,6 +2698,13 @@ def extraire(
             for span in ligne.spans
             if span.lien
         )
+
+        # Phase 0 : exposer une scène canonique d'observation après la construction
+        # historique de l'IR. Cette vue ne filtre ni ne remplace aucun élément et
+        # permet de comparer les prochaines phases à la sortie existante.
+        from pdfexact.scene import scene_from_legacy_document
+
+        document.scene = scene_from_legacy_document(document)
 
         return document
     finally:

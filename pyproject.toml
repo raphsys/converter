@@ -25,6 +25,10 @@ layout-ai = [
     "paddlepaddle==3.2.0",
     "paddlex[ocr]==3.3.11",
 ]
+local-comprehension = [
+    "ctranslate2==4.8.0",
+    "tokenizers==0.23.1",
+]
 
 [project.scripts]
 pdfexact = "pdfexact.cli:main"

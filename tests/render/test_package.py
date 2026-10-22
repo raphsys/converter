@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 
 import pytest
 
-from pdfexact.geometry import pt_vers_emu, quantifier_bbox
+from pdfexact.geometry import emu_vers_pt, pt_vers_emu, pt_vers_twips, quantifier_bbox
 from pdfexact.geometry import BBox
 from pdfexact.ir import (
     Document,
@@ -26,7 +26,13 @@ from pdfexact.ir import (
     TextBox,
 )
 from pdfexact.render.drawing import _hauteurs_lignes_table
-from pdfexact.render.docx_writer import _ajuster_spans_a_largeur
+from pdfexact.render.docx_writer import (
+    _ajuster_spans_a_largeur,
+    _fusionner_fragments_meme_ligne,
+    _grille_vertical_layout,
+    _ligne_ajustee_largeur,
+    _ordonner_bandeaux_sur_images,
+)
 from pdfexact.render.package import GestionnaireRelations, ecrire_docx
 from pdfexact.render.native_contract import corriger_document_word_native, inspecter_docx_word_native
 
@@ -56,6 +62,98 @@ def docx_deux_pages(tmp_path):
 def _lire(chemin, partie):
     with zipfile.ZipFile(chemin) as z:
         return z.read(partie)
+
+
+def test_bandeau_vectoriel_recouvrant_une_image_est_emis_apres_l_image():
+    image = ImageEl(BBox(0, pt_vers_emu(20), A4_LARGEUR, pt_vers_emu(300)), "photo")
+    bandeau = ShapeEl(
+        BBox(0, pt_vers_emu(20), A4_LARGEUR, pt_vers_emu(45)),
+        [],
+        "000000",
+        None,
+        0,
+    )
+    page = Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR)
+    resultat = _ordonner_bandeaux_sur_images([bandeau, image], page)
+    assert resultat[-1] is bandeau
+
+
+def test_fragments_de_regions_differentes_ne_sont_pas_fusionnes():
+    police = FontRef("Test", "Arial", False, False)
+    bbox_a = BBox(pt_vers_emu(40), pt_vers_emu(80), pt_vers_emu(150), pt_vers_emu(94))
+    bbox_b = BBox(pt_vers_emu(160), pt_vers_emu(80), pt_vers_emu(270), pt_vers_emu(94))
+    ligne_a = Line(
+        bbox=bbox_a,
+        spans=[Span("left region", police, 10, "000000", bbox=bbox_a)],
+        hauteur_ligne_emu=pt_vers_emu(14),
+        largeur_cible_emu=pt_vers_emu(110),
+    )
+    ligne_b = Line(
+        bbox=bbox_b,
+        spans=[Span("right region", police, 10, "000000", bbox=bbox_b)],
+        hauteur_ligne_emu=pt_vers_emu(14),
+        largeur_cible_emu=pt_vers_emu(110),
+    )
+    a = FlowParagraph(
+        bbox=bbox_a,
+        texte="left region",
+        police=police,
+        size_pt=10,
+        couleur="000000",
+        spans=list(ligne_a.spans),
+        lignes=[ligne_a],
+        layout_frame_id="left",
+        layout_frame_bbox=BBox(pt_vers_emu(40), pt_vers_emu(70), pt_vers_emu(150), pt_vers_emu(110)),
+    )
+    b = FlowParagraph(
+        bbox=bbox_b,
+        texte="right region",
+        police=police,
+        size_pt=10,
+        couleur="000000",
+        spans=list(ligne_b.spans),
+        lignes=[ligne_b],
+        layout_frame_id="right",
+        layout_frame_bbox=BBox(pt_vers_emu(160), pt_vers_emu(70), pt_vers_emu(270), pt_vers_emu(110)),
+    )
+
+    fragments = _fusionner_fragments_meme_ligne([(1, a), (1, b)])
+
+    assert len(fragments) == 2
+
+
+def test_grille_verticale_compresse_les_minima_qui_depassent_la_page():
+    police = FontRef("Test", "Arial", False, False)
+    paragraphes = []
+    for index in range(70):
+        y = 20 + index * 12
+        bbox = BBox(pt_vers_emu(40), pt_vers_emu(y), pt_vers_emu(280), pt_vers_emu(y + 18))
+        ligne = Line(
+            bbox=bbox,
+            spans=[Span(f"Line {index}", police, 18, "000000", bbox=bbox)],
+            hauteur_ligne_emu=pt_vers_emu(18),
+            largeur_cible_emu=pt_vers_emu(240),
+        )
+        paragraphes.append(
+            FlowParagraph(
+                bbox=bbox,
+                texte=f"Line {index}",
+                police=police,
+                size_pt=18,
+                couleur="000000",
+                spans=list(ligne.spans),
+                lignes=[ligne],
+                layout_frame_id=f"frame-{index}",
+                layout_frame_role="text-column",
+                layout_frame_bbox=bbox,
+            )
+        )
+    page = Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR)
+
+    _bornes, hauteurs, hauteur_grille, compactage = _grille_vertical_layout(paragraphes, page)
+
+    assert compactage
+    assert sum(hauteurs) <= pt_vers_twips(emu_vers_pt(hauteur_grille))
 
 
 def _env_libreoffice(tmp_path):
@@ -156,7 +254,7 @@ def test_les_ancres_sont_quantifiees_au_dixieme_de_millimetre(tmp_path):
     assert '<wp:posOffset>252000</wp:posOffset>' in xml
 
 
-def test_lajustement_largeur_ne_change_jamais_la_taille_de_police(monkeypatch):
+def test_lajustement_largeur_reduit_une_prose_trop_large(monkeypatch):
     police = FontRef("Wide-Regular", "Wide", False, False)
     spans = [Span("Texte tres long", police, 18.0, "000000")]
 
@@ -166,8 +264,39 @@ def test_lajustement_largeur_ne_change_jamais_la_taille_de_police(monkeypatch):
     monkeypatch.setattr("pdfexact.extract.fonts.mesurer_largeur_pt", faux_mesurer)
     ajustes = _ajuster_spans_a_largeur(spans, pt_vers_emu(20), {"Wide-Regular": object()}, compact=True)
 
-    assert ajustes[0].size_pt == 18.0
-    assert ajustes[0].espacement_twips < 0
+    assert ajustes[0].size_pt < 18.0
+    assert ajustes[0].espacement_twips == 0
+
+
+def test_lajustement_largeur_clampe_la_compression_existante(monkeypatch):
+    police = FontRef("Wide-Regular", "Wide", False, False)
+    spans = [Span("Compression", police, 30.0, "000000", espacement_twips=-120)]
+
+    def faux_mesurer(texte, _asset, size_pt):
+        return len(texte) * size_pt
+
+    monkeypatch.setattr("pdfexact.extract.fonts.mesurer_largeur_pt", faux_mesurer)
+    ajustes = _ajuster_spans_a_largeur(spans, pt_vers_emu(20), {"Wide-Regular": object()}, compact=True)
+
+    assert ajustes[0].espacement_twips == -24
+
+
+def test_ligne_paragraphe_sans_frame_ne_subit_pas_compactage_fort(monkeypatch):
+    police = FontRef("Wide-Regular", "Wide", False, False)
+    ligne = Line(
+        bbox=BBox(0, 0, pt_vers_emu(90), pt_vers_emu(12)),
+        spans=[Span("This is a normal paragraph line with several words.", police, 10.0, "000000")],
+        hauteur_ligne_emu=pt_vers_emu(12),
+        largeur_cible_emu=pt_vers_emu(90),
+    )
+
+    def faux_mesurer(texte, _asset, size_pt):
+        return len(texte) * size_pt
+
+    monkeypatch.setattr("pdfexact.extract.fonts.mesurer_largeur_pt", faux_mesurer)
+    ajustee = _ligne_ajustee_largeur(ligne, {"Wide-Regular": object()})
+
+    assert ajustee.spans[0].espacement_twips == 0
 
 
 def test_une_page_paysage_declare_son_orientation(tmp_path):
@@ -464,6 +593,56 @@ def test_tableau_ancre_ne_double_pas_son_decalage_x(tmp_path):
     xml = _lire(sortie, "word/document.xml").decode()
     assert "<wp:anchor" in xml
     assert '<w:tblInd w:w="0" w:type="dxa"/>' in xml
+
+
+def test_tableau_recouvrant_texte_positionne_devient_fond_et_grille(tmp_path):
+    police = FontRef("Test", "Arial", False, False)
+    table = TableEl(
+        bbox=BBox(pt_vers_emu(80), pt_vers_emu(120), pt_vers_emu(360), pt_vers_emu(210)),
+        rows=[
+            TableRow(
+                bbox=BBox(pt_vers_emu(80), pt_vers_emu(120), pt_vers_emu(360), pt_vers_emu(210)),
+                cells=[
+                    TableCell(
+                        bbox=BBox(pt_vers_emu(80), pt_vers_emu(120), pt_vers_emu(360), pt_vers_emu(210)),
+                        texte="",
+                        fond="FFF2CC",
+                    )
+                ],
+            )
+        ],
+        col_widths_emu=[pt_vers_emu(280)],
+        police=police,
+        size_pt=9,
+    )
+    lignes = []
+    for index, texte_ligne in enumerate(["Checkpoint 2", "The following equations"]):
+        bbox = BBox(
+            pt_vers_emu(100),
+            pt_vers_emu(132 + index * 14),
+            pt_vers_emu(300),
+            pt_vers_emu(144 + index * 14),
+        )
+        lignes.append(
+            Line(
+                bbox=bbox,
+                spans=[Span(texte_ligne, police, 9, "000000", bbox=bbox)],
+                hauteur_ligne_emu=bbox.hauteur,
+                largeur_cible_emu=bbox.largeur,
+            )
+        )
+    elements = [table, *(TextBox(ligne.bbox, [ligne]) for ligne in lignes)]
+    document = Document(
+        pages=[Page(index=0, largeur_emu=A4_LARGEUR, hauteur_emu=A4_HAUTEUR, elements=elements)]
+    )
+    sortie = tmp_path / "table_as_background.docx"
+
+    ecrire_docx(document, sortie)
+
+    xml = _lire(sortie, "word/document.xml").decode()
+    assert "<w:tbl>" not in xml
+    assert "Checkpoint 2" in xml
+    assert "The following equations" in xml
 
 
 def test_tableau_a_sous_lignes_chevauchantes_reste_dans_sa_bbox():
@@ -1015,12 +1194,10 @@ def test_paragraphe_word_native_reste_un_paragraphe_reel(tmp_path):
 
     xml = _lire(sortie, "word/document.xml").decode()
     assert "<w:framePr " not in xml
-    assert "<wp:anchor" in xml
-    assert "wps:txbx" in xml
-    assert 'wrap="square"' in xml
-    bbox = quantifier_bbox(paragraphe.bbox)
-    assert f"<wp:posOffset>{bbox.x0}</wp:posOffset>" in xml
-    assert f"<wp:posOffset>{bbox.y0}</wp:posOffset>" in xml
+    assert "<wp:anchor" not in xml
+    assert "wps:txbx" not in xml
+    assert "Texte positionne" in xml
+    assert '<w:ind w:left="1440"' in xml
 
 
 def test_paragraphe_word_native_n_ecrit_pas_approche_negative_wps(tmp_path):
@@ -1103,10 +1280,10 @@ def test_paragraphe_word_native_multiligne_reste_une_seule_zone(tmp_path):
     ecrire_docx(document, sortie)
 
     xml = _lire(sortie, "word/document.xml").decode()
-    assert xml.count("<wps:txbx>") == 1
-    assert xml.count("<wp:anchor") == 1
-    assert 'name="Paragraphe ' in xml
-    assert "<w:br/>" in xml
+    assert "<wps:txbx>" not in xml
+    assert "<wp:anchor" not in xml
+    # Les retours PDF ordinaires sont reflowes dans le meme paragraphe Word.
+    assert "<w:br/>" not in xml
 
 
 def test_paragraphe_word_native_preserve_les_decalages_de_lignes(tmp_path):
@@ -1142,8 +1319,8 @@ def test_paragraphe_word_native_preserve_les_decalages_de_lignes(tmp_path):
     ecrire_docx(document, sortie)
 
     xml = _lire(sortie, "word/document.xml").decode()
-    assert xml.count("<wps:txbx>") == 1
-    assert xml.count("<wp:anchor") == 1
+    assert "<wps:txbx>" not in xml
+    assert "<wp:anchor" not in xml
     assert '<w:tab w:val="left" w:pos="760"/>' in xml
     assert "<w:tab/>" in xml
 
@@ -1168,8 +1345,9 @@ def test_paragraphe_word_native_conserve_la_taille_pdf(tmp_path):
 
     xml = _lire(sortie, "word/document.xml").decode()
     assert '<w:sz w:val="36"/>' in xml
-    bbox = quantifier_bbox(paragraphe.bbox)
-    assert f'<wp:extent cx="{bbox.largeur}" cy="{bbox.hauteur}"/>' in xml
+    assert "<wps:txbx>" not in xml
+    assert "<wp:anchor" not in xml
+    assert '<w:ind w:left="2400"' in xml
 
 
 def test_paragraphe_word_native_ne_double_pas_les_espaces_pdf(tmp_path):
@@ -1195,7 +1373,7 @@ def test_paragraphe_word_native_ne_double_pas_les_espaces_pdf(tmp_path):
     xml = _lire(sortie, "word/document.xml").decode()
     assert 'w:before="360"' not in xml
     assert 'w:after="180"' not in xml
-    assert '<w:spacing w:before="0" w:after="0" w:line="280" w:lineRule="exact"/>' in xml
+    assert '<w:spacing w:before="2400" w:after="0" w:line="280" w:lineRule="exact"/>' in xml
 
 
 def test_paragraphe_word_native_compresse_pour_tenir_dans_la_bbox_pdf(tmp_path):
@@ -1227,10 +1405,9 @@ def test_paragraphe_word_native_compresse_pour_tenir_dans_la_bbox_pdf(tmp_path):
     ecrire_docx(document, sortie)
 
     xml = _lire(sortie, "word/document.xml").decode()
-    assert "<wp:anchor" in xml
-    assert "wps:txbx" in xml
-    bbox = quantifier_bbox(paragraphe.bbox)
-    assert f'<wp:extent cx="{bbox.largeur}" cy="{bbox.hauteur}"/>' in xml
+    assert "<wp:anchor" not in xml
+    assert "wps:txbx" not in xml
+    assert '<w:ind w:left="2400"' in xml
     assert "<w:framePr " not in xml
 
 
@@ -1295,7 +1472,7 @@ def test_contrat_word_native_detecte_les_faux_natfs(tmp_path):
     assert diagnostic.conforme
     assert diagnostic.paragraphes >= 1
     assert diagnostic.frames == 0
-    assert diagnostic.textboxes >= 1
+    assert diagnostic.textboxes == 0
 
 
 def test_image_croisant_un_paragraphe_word_native_passe_derriere(tmp_path):
@@ -1446,6 +1623,107 @@ def test_correcteur_word_native_fusionne_seulement_vrai_paragraphe_dans_frame(tm
     assert correction.lignes_converties == 3
     assert isinstance(document.pages[0].elements[0], FlowParagraph)
     assert diagnostic.conforme
+
+
+def test_correcteur_word_native_ne_duplique_pas_textbox_partiellement_convertie(tmp_path):
+    police = FontRef("TimesNewRomanPSMT", "Liberation Serif", False, False)
+    police_math = FontRef("CMSY10", "Latin Modern Math", False, False)
+    frame = BBox(pt_vers_emu(80), pt_vers_emu(100), pt_vers_emu(360), pt_vers_emu(180))
+    lignes = []
+    textes = [
+        "Speed is the magnitude of velocity; that is, speed is velocity",
+        "stripped of any indication of direction, either in words or signs.",
+        "The speedometer in a car measures speed, not velocity.",
+    ]
+    for index, texte in enumerate(textes):
+        y0 = 100 + index * 13
+        lignes.append(
+            Line(
+                bbox=BBox(pt_vers_emu(80), pt_vers_emu(y0), pt_vers_emu(350), pt_vers_emu(y0 + 11)),
+                spans=[Span(texte, police, 10, "000000")],
+                hauteur_ligne_emu=pt_vers_emu(13),
+                largeur_cible_emu=pt_vers_emu(270),
+                alignement="left",
+                layout_frame_id="0:text-column:frame",
+                layout_frame_role="text-column",
+                layout_frame_strategy="word-text",
+                layout_frame_bbox=frame,
+            )
+        )
+    lignes.append(
+        Line(
+            bbox=BBox(pt_vers_emu(80), pt_vers_emu(152), pt_vers_emu(170), pt_vers_emu(166)),
+            spans=[Span("v = dx / dt", police_math, 12, "000000")],
+            hauteur_ligne_emu=pt_vers_emu(14),
+            largeur_cible_emu=pt_vers_emu(90),
+            alignement="center",
+            layout_frame_id="0:text-column:frame",
+            layout_frame_role="text-column",
+            layout_frame_strategy="word-text",
+            layout_frame_bbox=frame,
+        )
+    )
+    document = Document(
+        pages=[
+            Page(
+                index=0,
+                largeur_emu=A4_LARGEUR,
+                hauteur_emu=A4_HAUTEUR,
+                elements=[TextBox(frame, lignes, layout_frame_id="0:text-column:frame", layout_frame_role="text-column")],
+            )
+        ]
+    )
+    sortie = tmp_path / "native_contract_partial_textbox.docx"
+
+    correction = corriger_document_word_native(document)
+    ecrire_docx(document, sortie)
+
+    xml = _lire(sortie, "word/document.xml").decode()
+    assert correction.textboxes_converties == 1
+    assert correction.lignes_converties == 3
+    assert xml.count("Speed is the magnitude") == 1
+    assert xml.count("stripped of any indication") == 1
+    assert xml.count("v = dx / dt") == 1
+
+
+def test_correcteur_word_native_ne_fusionne_pas_grand_titre_heading(tmp_path):
+    police = FontRef("FuturaStd-CondensedBold", "Nimbus Sans Narrow", True, False)
+    frame = BBox(pt_vers_emu(260), pt_vers_emu(160), pt_vers_emu(400), pt_vers_emu(250))
+    lignes = []
+    for index, texte in enumerate(("Compression", "du signal", "audiovisuel")):
+        y0 = 160 + index * 28
+        lignes.append(
+            Line(
+                bbox=BBox(pt_vers_emu(260), pt_vers_emu(y0), pt_vers_emu(400), pt_vers_emu(y0 + 24)),
+                spans=[Span(texte, police, 30, "000000", espacement_twips=-80)],
+                hauteur_ligne_emu=pt_vers_emu(28),
+                largeur_cible_emu=pt_vers_emu(140),
+                alignement="left",
+                layout_frame_id="0:heading:frame",
+                layout_frame_role="heading",
+                layout_frame_strategy="word-text",
+                layout_frame_bbox=frame,
+            )
+        )
+    document = Document(
+        pages=[
+            Page(
+                index=0,
+                largeur_emu=A4_LARGEUR,
+                hauteur_emu=A4_HAUTEUR,
+                elements=[
+                    TextBox(ligne.bbox, [ligne], layout_frame_id=ligne.layout_frame_id, layout_frame_role="heading")
+                    for ligne in lignes
+                ],
+            )
+        ]
+    )
+
+    correction = corriger_document_word_native(document)
+
+    assert correction.textboxes_converties == 0
+    assert correction.lignes_converties == 0
+    assert all(isinstance(element, TextBox) for element in document.pages[0].elements)
 
 
 def test_correcteur_word_native_fusionne_vrai_paragraphe_sans_frame(tmp_path):
@@ -1664,7 +1942,8 @@ def test_correcteur_word_native_fusionne_bloc_court_dans_frame_et_garde_vertical
     assert isinstance(document.pages[0].elements[0], FlowParagraph)
     assert document.pages[0].elements[0].alignement == "center"
     assert document.pages[0].elements[0].vertical_alignement == "center"
-    assert 'anchor="ctr"' in xml
+    assert '<w:textAlignment w:val="center"/>' in xml
+    assert "<wp:anchor" not in xml
     assert '<w:jc w:val="center"/>' in xml
 
 

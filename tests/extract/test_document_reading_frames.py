@@ -1,5 +1,9 @@
-from pdfexact.extract.document import _cadres_lecture_depuis_plan
+from pdfexact.extract import document as document_module
+from pdfexact.extract.document import _attacher_frames_texte, _cadres_lecture_depuis_plan, extraire
+from pdfexact.fontlib import construire, dossiers_par_defaut
 from pdfexact.geometry import BBox, pt_vers_emu
+from pdfexact.ir import FontRef, Line, Span, TextBox
+from pdfexact.layout.ai import LayoutAIPage, LayoutAIZone
 from pdfexact.layout.model import LayoutRegion
 from pdfexact.layout.planner import LayoutPlanItem
 
@@ -78,3 +82,70 @@ def test_les_textes_natifs_dans_les_visuels_restent_des_cadres_de_preservation()
 
     assert colonne in cadres
     assert label_dans_schema in cadres
+
+
+def test_attacher_frames_ia_couvre_les_lignes_natives_sans_plan_ocr():
+    police = FontRef("Test", "Arial", False, False)
+    ligne = Line(
+        _bbox(60, 120, 260, 134),
+        [Span("Texte natif", police, 11, "000000")],
+        pt_vers_emu(14),
+        pt_vers_emu(200),
+    )
+    bloc = TextBox(ligne.bbox, [ligne])
+    zone = LayoutAIZone(
+        zone_id="ai-text-1",
+        label="text",
+        role="text",
+        confidence=0.96,
+        bbox=_bbox(50, 100, 300, 160),
+        source="paddlex",
+        model_id="test",
+    )
+
+    result = _attacher_frames_texte([bloc], [], [zone])
+
+    assert result[0].layout_frame_role == "text-column"
+    assert result[0].lignes[0].layout_frame_id
+    assert result[0].lignes[0].layout_frame_bbox == zone.bbox
+
+
+def test_extraire_spans_execute_layout_ia_et_transmet_ses_zones(pdf_texte, monkeypatch):
+    zone = LayoutAIZone(
+        zone_id="ai-text-1",
+        label="text",
+        role="text",
+        confidence=0.96,
+        bbox=_bbox(40, 70, 300, 230),
+        source="test-provider",
+        model_id="test-model",
+    )
+    appels = []
+
+    def fake_layout(*args, **kwargs):
+        appels.append(kwargs)
+        return LayoutAIPage(
+            status="layout_ai_detected",
+            provider="test-provider",
+            model_id="test-model",
+            model_path=None,
+            zones=(zone,),
+        )
+
+    monkeypatch.setattr(document_module, "detecter_layout_ia", fake_layout)
+    document = extraire(
+        pdf_texte,
+        pages=[0],
+        bibliotheque=construire(dossiers=dossiers_par_defaut()),
+        text_mode="spans",
+        strict=True,
+    )
+
+    textes = [
+        element
+        for element in document.pages[0].elements
+        if isinstance(element, TextBox)
+    ]
+    assert appels and appels[0]["required"] is False
+    assert textes
+    assert any(element.layout_frame_id for element in textes)

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pdfexact.geometry import BBox, pt_vers_emu, se_chevauchent, union
+from pdfexact.analysis.geometry import bbox_area, center_in, intersection_area
+from pdfexact.analysis.provenance import expliquer_filtrage
 from pdfexact.ir import FlowParagraph, TextBox
 from pdfexact.layout.model import LayoutRegion, ProtectedZone
 from pdfexact.layout.understanding import EDITABLE_STRATEGIES, LAYOUT_PROTECTED_STRATEGIES, OCR_PROTECTED_STRATEGIES
@@ -66,6 +68,16 @@ def zones_ocr_du_plan(plan: list[LayoutPlanItem]) -> list[BBox]:
     return _fusionner_zones(zone.bbox for zone in zones_protegees_du_plan(plan) if zone.protect_ocr)
 
 
+def zones_ocr_dur_du_plan(plan: list[LayoutPlanItem]) -> list[BBox]:
+    """Zones où l'OCR est interdit, en laissant les images être sondées."""
+    return _fusionner_zones(
+        item.bbox
+        for item in plan
+        if item.strategy in OCR_PROTECTED_STRATEGIES
+        and item.strategy != "raster-image"
+    )
+
+
 def zones_layout_du_plan(plan: list[LayoutPlanItem]) -> list[BBox]:
     return _fusionner_zones(zone.bbox for zone in zones_protegees_du_plan(plan) if zone.protect_layout)
 
@@ -81,11 +93,11 @@ def filtrer_elements_selon_plan(
     if not zones:
         return elements
     zones_texte = _zones_texte_du_plan(plan)
-    zones_dures = _fusionner_zones(
+    zones_formules = _fusionner_zones(
         zone.bbox
         for zone in zones_protegees
         if zone.protect_ocr
-        and zone.kind in {"table", "real-table", "formula", "formula-or-complex-vector"}
+        and zone.kind in {"formula", "formula-or-complex-vector"}
     )
     filtres = []
     for element in elements:
@@ -97,20 +109,33 @@ def filtrer_elements_selon_plan(
             if _texte_dans_zone_autorisee(bbox, zones_texte):
                 filtres.append(element)
                 continue
-            if preserver_texte_natif and not _texte_dans_zone_protegee(bbox, zones_dures):
+            if preserver_texte_natif and not _texte_dans_zone_protegee(bbox, zones_formules):
                 filtres.append(element)
                 continue
+            expliquer_filtrage(element, "protected-by-layout-plan")
             continue
         filtres.append(element)
     return filtres
 
 
 def _zones_texte_du_plan(plan: list[LayoutPlanItem]) -> list[BBox]:
+    zones_protegees_images = [
+        item.bbox
+        for item in plan
+        if item.strategy == "raster-image"
+    ]
     return _fusionner_zones(
         item.bbox
         for item in plan
         if item.strategy == "word-text"
         and item.kind in {"text-column", "caption", "heading", "list", "ai-zone"}
+        and not (
+            item.region.style_hints.get("kind") == "ai-zone"
+            and any(
+                _intersection(item.bbox, zone) / max(_aire(item.bbox), 1) >= 0.50
+                for zone in zones_protegees_images
+            )
+        )
     )
 
 
@@ -162,23 +187,15 @@ def _texte_dans_zone_autorisee(bbox: BBox, zones: list[BBox]) -> bool:
 
 
 def _aire(bbox: BBox) -> int:
-    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+    return bbox_area(bbox)
 
 
 def _intersection(a: BBox, b: BBox) -> int:
-    if not se_chevauchent(a, b):
-        return 0
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return max(0, x1 - x0) * max(0, y1 - y0)
+    return intersection_area(a, b)
 
 
 def _centre_dans(bbox: BBox, zone: BBox) -> bool:
-    x = (bbox.x0 + bbox.x1) // 2
-    y = (bbox.y0 + bbox.y1) // 2
-    return zone.x0 <= x <= zone.x1 and zone.y0 <= y <= zone.y1
+    return center_in(bbox, zone)
 
 
 plan_regions = planifier_regions

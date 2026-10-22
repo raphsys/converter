@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pdfexact.geometry import BBox, pt_vers_emu, union
+from pdfexact.analysis.geometry import bbox_area, clip_bbox_nonempty
 from pdfexact.layout.model import LayoutPage, LayoutRegion
 
 if TYPE_CHECKING:
@@ -109,7 +110,7 @@ def _region_depuis_element(element) -> LayoutRegion:
 
 
 def _aire(bbox) -> int:
-    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+    return bbox_area(bbox)
 
 
 def detecter_regions_colonnes(
@@ -164,11 +165,7 @@ def detecter_regions_colonnes(
 
 
 def _clip_bbox(bbox: BBox, largeur: int, hauteur: int) -> BBox:
-    x0 = max(0, min(bbox.x0, largeur - 1))
-    y0 = max(0, min(bbox.y0, hauteur - 1))
-    x1 = max(x0 + 1, min(bbox.x1, largeur))
-    y1 = max(y0 + 1, min(bbox.y1, hauteur))
-    return BBox(x0, y0, x1, y1)
+    return clip_bbox_nonempty(bbox, largeur, hauteur)
 
 
 def _colonnes_separees(regions: list[BBox]) -> bool:

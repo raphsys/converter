@@ -1,13 +1,42 @@
+import pymupdf
+
 from pdfexact.geometry import BBox, pt_vers_emu
 from pdfexact.extract.layout_map import PageLayoutMap
 from pdfexact.ir import FontRef, ImageEl, ShapeEl, TableEl, TableRow, TableCell, TextBox, Line, Span
 from pdfexact.layout import LayoutAIZone, comprendre_page, filtrer_elements_proteges
-from pdfexact.layout.ai import _normaliser_detections
+from pdfexact.layout.ai import _normaliser_detections, _provider_auto, detecter_layout_ia
+from pdfexact.layout.analyzer import analyser_page
 from pdfexact.report import DiagnosticElement, DiagnosticLayout, Rapport
 
 
 def _bbox_pt(x0, y0, x1, y1):
     return BBox(pt_vers_emu(x0), pt_vers_emu(y0), pt_vers_emu(x1), pt_vers_emu(y1))
+
+
+def test_layout_ai_auto_choisit_le_runtime_depuis_lartefact_local(tmp_path):
+    poids = tmp_path / "layout.pt"
+    poids.write_bytes(b"local-test-weight")
+    assert _provider_auto(poids) == "ultralytics"
+    assert _provider_auto(tmp_path / "ppstructure") == "paddlex"
+
+
+def test_layout_ai_fournisseur_indisponible_replie_avec_un_avertissement(tmp_path):
+    document = pymupdf.open()
+    page = document.new_page(width=200, height=120)
+    page.insert_text((20, 24), "Fallback layout")
+    analyse = analyser_page(page)
+
+    resultat = detecter_layout_ia(
+        page,
+        analyse,
+        provider="layoutparser",
+        model_root=tmp_path,
+        required=False,
+    )
+
+    assert resultat.status == "layout_ai_fallback"
+    assert resultat.warnings == ("unsupported_provider:layoutparser",)
+    document.close()
 
 
 def test_comprehension_protege_tableaux_et_images():
@@ -163,6 +192,31 @@ def test_comprehension_utilise_zone_ia_caption_comme_texte_word():
     assert decision.strategy == "word-text"
     assert decision.editable
     assert page.zones_ocr == []
+
+
+def test_comprehension_ecarte_zone_ia_visuelle_composite_deja_decrite():
+    image = ImageEl(bbox=_bbox_pt(36, 24, 428, 452), media_ref="map")
+    composite = LayoutAIZone(
+        zone_id="composite",
+        label="image",
+        role="visual",
+        confidence=0.91,
+        bbox=_bbox_pt(34, 23, 576, 466),
+        source="paddlex",
+        model_id="test",
+    )
+
+    page = comprendre_page(
+        largeur_emu=pt_vers_emu(612),
+        hauteur_emu=pt_vers_emu(792),
+        tableaux=[],
+        images=[image],
+        formes=[],
+        zones_rasterisees=[],
+        zones_ia=[composite],
+    )
+
+    assert not any(element.source == "paddlex" for element in page.elements)
 
 
 def test_comprehension_protege_zone_vectorielle_complexe():

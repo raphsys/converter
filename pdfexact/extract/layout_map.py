@@ -19,6 +19,15 @@ from pdfexact.geometry import (
     se_chevauchent,
     union,
 )
+from pdfexact.analysis.geometry import (
+    bbox_area,
+    center_in,
+    axis_overlap_ratio,
+    clip_bbox_nonempty,
+    intersection_area,
+    intersection_over_min_area,
+    overlap_ratio,
+)
 
 
 @dataclass(frozen=True)
@@ -321,6 +330,10 @@ class PageLayoutMap:
             recouvrement = _ratio_intersection(bbox, item.bbox)
             recouvrement_y = _ratio_vertical(bbox, item.bbox)
             if recouvrement_y < 0.35:
+                continue
+            # Une OCR peut commencer au milieu d'une ligne native quand elle vient
+            # d'une autre colonne. Ne pas rapatrier alors le bord gauche natif.
+            if item.bbox.x0 < bbox.x0 - pt_vers_emu(20) and item.bbox.x1 <= bbox.x1 + pt_vers_emu(4):
                 continue
             distance_x = abs(((item.bbox.x0 + item.bbox.x1) / 2) - centre_x)
             proximite_x = 1.0 / (1.0 + distance_x / max(item.bbox.largeur, bbox.largeur, 1))
@@ -791,51 +804,31 @@ def _bbox_depuis_liste(quadruplet, geometrie: PageGeometry | None = None) -> BBo
 
 
 def _limiter_page(bbox: BBox, largeur_emu: int, hauteur_emu: int) -> BBox:
-    x0 = max(0, min(bbox.x0, largeur_emu - 1))
-    y0 = max(0, min(bbox.y0, hauteur_emu - 1))
-    x1 = max(x0 + 1, min(bbox.x1, largeur_emu))
-    y1 = max(y0 + 1, min(bbox.y1, hauteur_emu))
-    return BBox(x0, y0, x1, y1)
+    return clip_bbox_nonempty(bbox, largeur_emu, hauteur_emu)
 
 
 def _aire(bbox: BBox) -> int:
-    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+    return bbox_area(bbox)
 
 
 def _ratio_intersection(a: BBox, b: BBox) -> float:
-    if not se_chevauchent(a, b):
-        return 0.0
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return (max(0, x1 - x0) * max(0, y1 - y0)) / max(min(_aire(a), _aire(b)), 1)
+    return intersection_over_min_area(a, b)
 
 
 def _ratio_couverture(a: BBox, b: BBox) -> float:
-    if not se_chevauchent(a, b):
-        return 0.0
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return (max(0, x1 - x0) * max(0, y1 - y0)) / max(_aire(a), 1)
+    return overlap_ratio(a, b)
 
 
 def _ratio_vertical(a: BBox, b: BBox) -> float:
-    intersection = max(0, min(a.y1, b.y1) - max(a.y0, b.y0))
-    return intersection / max(min(a.hauteur, b.hauteur), 1)
+    return axis_overlap_ratio(a, b, "y")
 
 
 def _ratio_horizontal(a: BBox, b: BBox) -> float:
-    intersection = max(0, min(a.x1, b.x1) - max(a.x0, b.x0))
-    return intersection / max(min(a.largeur, b.largeur), 1)
+    return axis_overlap_ratio(a, b, "x")
 
 
 def _centre_dans(bbox: BBox, zone: BBox) -> bool:
-    x = (bbox.x0 + bbox.x1) // 2
-    y = (bbox.y0 + bbox.y1) // 2
-    return zone.x0 <= x <= zone.x1 and zone.y0 <= y <= zone.y1
+    return center_in(bbox, zone)
 
 
 def _compact(texte: str) -> str:

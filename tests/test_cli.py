@@ -106,7 +106,8 @@ def test_word_native_rapidocr_reste_page_exacte(pdf_texte, tmp_path):
     with zipfile.ZipFile(sortie) as z:
         document_xml = z.read("word/document.xml").decode()
     assert "<w:p>" in document_xml
-    assert "<wp:anchor" in document_xml
+    assert "<wp:anchor" not in document_xml
+    assert "wps:txbx" not in document_xml
     assert '<w:pgMar w:top="0"' in document_xml
 
 
@@ -133,7 +134,7 @@ def test_word_native_ecrit_le_diagnostic_de_contrat(pdf_texte, tmp_path):
     donnees = json.loads(rapport.read_text(encoding="utf-8"))
     assert donnees["diagnostic_word_native"]["conforme"] is True
     assert donnees["diagnostic_word_native"]["frames"] == 0
-    assert donnees["diagnostic_word_native"]["textboxes"] >= 1
+    assert donnees["diagnostic_word_native"]["textboxes"] == 0
 
 
 def test_le_profil_visual_exact_force_le_pipeline_fidele(pdf_texte, tmp_path, monkeypatch):

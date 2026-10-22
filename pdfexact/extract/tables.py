@@ -22,6 +22,8 @@ from pdfexact.geometry import (
     pt_vers_emu,
     pt_vers_twips,
 )
+from pdfexact.analysis.geometry import bbox_area, intersection_area
+from pdfexact.geometry import union as union_bbox
 from pdfexact.ir import FontRef, Span, TableBorder, TableCell, TableEl, TableRow
 
 
@@ -60,19 +62,15 @@ def _bbox_table_depuis_tuple(rect_tuple) -> BBox:
 
 
 def _intersection(a: BBox, b: BBox) -> int:
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return max(0, x1 - x0) * max(0, y1 - y0)
+    return intersection_area(a, b)
 
 
 def _aire(bbox: BBox) -> int:
-    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+    return bbox_area(bbox)
 
 
 def _union(a: BBox, b: BBox) -> BBox:
-    return BBox(min(a.x0, b.x0), min(a.y0, b.y0), max(a.x1, b.x1), max(a.y1, b.y1))
+    return union_bbox(a, b)
 
 
 def _bbox_dessin(dessin, geometrie: PageGeometry) -> BBox:

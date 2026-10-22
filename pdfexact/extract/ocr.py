@@ -4,9 +4,11 @@ Tesseract fournit les mots et leurs boîtes en pixels. On les convertit en coord
 PDF puis en EMU pour poser une couche texte au-dessus du rendu visuel exact.
 """
 import csv
+import math
 import re
 import subprocess
 import sys
+from copy import deepcopy
 from io import StringIO
 from functools import lru_cache
 from pathlib import Path
@@ -23,7 +25,12 @@ from pdfexact.extract.blocks import (
 from pdfexact.extract.styles import decorations_texte
 from pdfexact.fallback.rasterize import rasteriser_region
 from pdfexact.geometry import BBox, PageGeometry, emu_vers_pt, pt_vers_emu, pt_vers_twips, se_chevauchent
-from pdfexact.ir import FlowParagraph, FontRef, Line, Span, TextBox
+from pdfexact.analysis.geometry import rect_intersection_area, overlap_ratio
+from pdfexact.ir import FlowParagraph, FontRef, Line, Span, TextBox, RasterEl, element_source_ids, element_text
+from pdfexact.scene import capture_source_observations, ensure_source_identity, record_source_transformation
+from pdfexact.analysis.provenance import Evidence
+from pdfexact.extract.orientation import angle_depuis_points, classer_orientation
+from pdfexact.extract.ocr_routing import get_local_ocr, has_non_latin_letters, script_counts
 
 
 def _lancer_tesseract(image: Path, langue: str) -> list[dict]:
@@ -53,7 +60,8 @@ def _mots(rows: list[dict]):
 
 
 def extraire_ocr(
-    page, dpi: int = 300, langue: str = "eng", visible: bool = False, verbose: bool = False
+    page, dpi: int = 300, langue: str = "eng", visible: bool = False, verbose: bool = False,
+    observation_page=None,
 ):
     """Retourne des TextBox OCR positionnées par ligne."""
     with TemporaryDirectory(prefix="pdfexact-ocr-") as dossier:
@@ -63,6 +71,18 @@ def extraire_ocr(
         rows = _lancer_tesseract(image, langue)
 
     facteur = 72.0 / dpi
+    raw_lines = []
+    for row in rows:
+        if not (row.get("text") or "").strip():
+            continue
+        try:
+            left, top, width, height = (float(row[key]) * facteur for key in ("left", "top", "width", "height"))
+            score = float(row.get("conf", -1)) / 100.0
+        except (KeyError, TypeError, ValueError):
+            continue
+        raw_lines.append(OcrLine(row["text"], score, BBox(pt_vers_emu(left), pt_vers_emu(top),
+                                                        pt_vers_emu(left + width), pt_vers_emu(top + height))))
+    observations = _capture_ocr_lines(page, raw_lines, observation_page, "tesseract-word", language=langue)
     lignes: dict[tuple[str, str, str], list[tuple[dict, str, float]]] = {}
     for row, texte, conf in _mots(rows):
         cle = (row["block_num"], row["par_num"], row["line_num"])
@@ -94,25 +114,280 @@ def extraire_ocr(
             size_pt=size_pt,
             couleur="000000" if visible else "FFFFFF",
             invisible=not visible,
+            bbox=bbox,
+            source_kind="ocr",
+            language=langue,
+            confidence=min(conf for _row, _text, conf in valeurs) / 100.0,
         )
         ligne = Line(
             bbox=bbox,
             spans=[span],
             hauteur_ligne_emu=max(bbox.hauteur, 1),
             largeur_cible_emu=max(bbox.largeur, 1),
+            source_kind="ocr",
+            language=langue,
         )
-        blocs.append(TextBox(bbox=bbox, lignes=[ligne]))
+        blocs.append(TextBox(bbox=bbox, lignes=[ligne], source_kind="ocr", language=langue))
 
     if verbose:
         print(f"      OCR: {len(blocs)} ligne(s) positionnée(s)", file=sys.stderr)
-    return blocs
+    return _finaliser_source_ocr(page, blocs, observations, observation_page)
 
 
-@lru_cache(maxsize=1)
-def _rapidocr():
-    from rapidocr import RapidOCR
+def _capture_ocr_lines(page_pdf, lines, observation_page, engine, *, language="auto", routing_evidence=None):
+    observations = []
+    for index, source in enumerate(lines):
+        score = float(source.score) if source.score is not None else None
+        confidence = score if score is not None and 0 <= score <= 1 else None
+        quad = tuple((pt_vers_emu(x), pt_vers_emu(y)) for x, y in source.quad_points)
+        span = Span(source.texte, FontRef("", "", False, False), 0.0, "", bbox=source.bbox,
+                    source_kind="ocr", confidence=confidence, language=language, quad=quad,
+                    angle_deg=source.angle_deg, orientation=source.orientation,
+                    attributes={"engine": engine, "raw_score": score, "font_observed": False})
+        line = Line(source.bbox, [span], source.bbox.hauteur, source.bbox.largeur,
+                    source_kind="ocr", confidence=confidence, language=language, quad=quad,
+                    angle_deg=source.angle_deg, orientation=source.orientation)
+        observation = TextBox(source.bbox, [line], source_kind="ocr", confidence=confidence, language=language,
+                              attributes={"engine": engine, "raw_score": score, "observation_only": True})
+        counts = script_counts(source.texte)
+        for item in (span, line, observation):
+            item.attributes["observed_scripts"] = counts
+            if len(counts) == 1:
+                item.script = next(iter(counts))
+            if routing_evidence is not None and index < len(routing_evidence):
+                details = routing_evidence[index]
+                item.attributes["ocr_routing"] = details
+                if details.get("ambiguous"):
+                    item.confidence = None
+                item.evidence.append(Evidence("ocr-script-routing", "pdfexact.extract.ocr_routing",
+                                              confidence=None, details=tuple(details.items())))
+        ensure_source_identity(observation, getattr(page_pdf, "number", 0), source_kind="ocr",
+                               source_token=f"{engine}:{index}")
+        observations.append(observation)
+    if observation_page is not None:
+        capture_source_observations(observation_page, observations)
+    return observations
 
-    return RapidOCR()
+
+def _finaliser_source_ocr(page_pdf, outputs, observations, observation_page, *, dpi=None):
+    for output in outputs:
+        if getattr(output, "source_kind", None) == "pdf-native":
+            ensure_source_identity(output, getattr(page_pdf, "number", 0))
+            continue
+        matched = []
+        output_text = " ".join(element_text(output).split())
+        for source in observations:
+            source_text = " ".join(element_text(source).split())
+            inside = overlap_ratio(source.bbox, output.bbox) == 1.0
+            if isinstance(output, RasterEl):
+                equivalent = inside
+            else:
+                # Literal content and geometric containment are both needed.
+                equivalent = bool(source_text and inside and re.search(r"(?<!\w)" + re.escape(source_text) + r"(?!\w)", output_text))
+            if equivalent:
+                matched.append(source)
+        if not getattr(output, "source_kind", None):
+            output.source_kind = "inferred" if isinstance(output, RasterEl) else "ocr"
+        ensure_source_identity(output, getattr(page_pdf, "number", 0), source_kind=output.source_kind,
+                               source_token="ocr-output:" + "|".join(source.source_id for source in matched))
+        output.source_ids = tuple(dict.fromkeys((*element_source_ids(output),
+                                                *(source_id for source in matched for source_id in element_source_ids(source)))))
+        routing = [source.attributes["ocr_routing"] for source in matched if "ocr_routing" in source.attributes]
+        if routing:
+            output.attributes["ocr_routing"] = routing
+            output.evidence.append(Evidence("ocr-script-routing", "pdfexact.extract.ocr_routing", confidence=None,
+                                            details=(("regions", routing),)))
+            if any(region["ambiguous"] for region in routing):
+                output.confidence = None
+        if output.source_kind == "ocr":
+            for item in [output, *getattr(output, "lignes", []),
+                         *(span for line in getattr(output, "lignes", []) for span in line.spans)]:
+                text = (element_text(item) if item is output else
+                        (item.texte if isinstance(item, Span) else "".join(span.texte for span in item.spans)))
+                counts = script_counts(text)
+                item.attributes["observed_scripts"] = counts
+                if len(counts) == 1:
+                    item.script = next(iter(counts))
+        if isinstance(output, RasterEl):
+            output.source_component_ids = tuple(source.source_id for source in matched)
+            output.fallback_reason = output.fallback_reason or f"ocr-{output.purpose or 'visual'}-fallback"
+            output.attributes["source_component_ids"] = output.source_component_ids
+            output.attributes["replaces"] = output.source_component_ids
+            proof = {"reason": output.fallback_reason, "source_ids": output.source_component_ids, "output_id": output.source_id,
+                     "dpi": dpi, "capture_method": "source-page-region-render", "pixel_equivalence_verified": False}
+            output.evidence.append(Evidence("raster-replacement", "pdfexact.extract.ocr", confidence=None, details=tuple(proof.items())))
+        if observation_page is not None and matched:
+            record_source_transformation(observation_page, matched, [output], "ocr-source-adapter",
+                                         proof="literal-source-text-in-output-and-source-bbox-contained" if not isinstance(output, RasterEl)
+                                         else "source-bbox-contained-in-raster")
+    if observation_page is not None:
+        capture_source_observations(observation_page, outputs)
+    return outputs
+
+
+def _acquerir_sources_natives(page_pdf, polices, geometrie, observation_page):
+    from pdfexact.extract.text import extraire_texte
+
+    sources = extraire_texte(page_pdf, polices, geometrie)
+    if observation_page is not None:
+        capture_source_observations(observation_page, sources, source_kind="pdf-native")
+        sources = [deepcopy(observation_page.source_inventory[source.source_id]) for source in sources]
+    return sources
+
+
+def _sortie_sources_natives(page_pdf, sources, selected_line_ids, observations,
+                           observation_page, geometrie):
+    """Retain acquired native components; OCR correspondence is a separate proof."""
+    from pdfexact.analysis.ocr_correspondence import (
+        build_ocr_native_correspondence,
+        selection_event_details,
+    )
+
+    outputs = []
+    owners = {}
+    for source in sources:
+        selected = [line for line in source.lignes if line.source_id in selected_line_ids]
+        if not selected:
+            continue
+        output = deepcopy(source)
+        output.lignes = deepcopy(selected)
+        output.source_ids = tuple(dict.fromkeys((source.source_id, *(ident for line in selected
+                                                                    for ident in element_source_ids(line)))))
+        outputs.append(output)
+        owners.update((line.source_id, output) for line in selected)
+
+    binding = {"index": getattr(page_pdf, "number", 0),
+               "source_pdf_id": getattr(observation_page, "source_pdf_id", None),
+               "geometry": geometrie.snapshot()}
+    if observation_page is not None:
+        observation_page.ocr_correspondence_page_binding = deepcopy(binding)
+    for observation in observations:
+        proof = None
+        reasons = []
+        if observation_page is None:
+            reasons.append("missing-observation-page")
+        else:
+            proof, reasons = build_ocr_native_correspondence(
+                observation, None, observation_page.source_inventory, page_binding=binding,
+            )
+        line_id = proof["native_ref"]["line_id"] if proof is not None else None
+        if proof is not None and line_id in owners:
+            owner = owners[line_id]
+            record_source_transformation(
+                observation_page, [observation], [owner], "ocr-native-selection",
+                **selection_event_details(proof),
+            )
+            owner.evidence.append(Evidence(
+                "ocr-native-source-match", "pdfexact.extract.ocr", confidence=None,
+                details=(("proof", deepcopy(proof)),),
+            ))
+        else:
+            if proof is not None:
+                reasons.append("unselected-native-components")
+            evidence = Evidence(
+                "ocr-native-source-conflict", "pdfexact.extract.ocr", confidence=None,
+                details=(("observation_id", observation.source_id),
+                         ("reasons", tuple(dict.fromkeys(reasons)) or ("no-native-correspondence",))),
+            )
+            if observation_page is not None:
+                observation_page.diagnostics.append(evidence)
+            else:
+                for output in outputs:
+                    output.evidence.append(evidence)
+    return _finaliser_source_ocr(page_pdf, outputs, observations, observation_page)
+
+
+def extraire_tesseract_lignes_absentes(
+    page,
+    polices: dict,
+    elements_existants: list,
+    dpi: int = 300,
+    geometrie: PageGeometry | None = None,
+):
+    """Récupère les petites lignes ratées par RapidOCR, sous forme native.
+
+    Cette passe ne remplace jamais RapidOCR : elle ajoute seulement une ligne dont la
+    bande verticale et la boîte ne recouvrent aucun texte déjà reconnu. Elle est donc
+    adaptée aux pages scannées denses, où les ISBN, crédits ou petits sous-titres sont
+    parfois absents de la détection principale.
+    """
+    try:
+        candidats = extraire_ocr(page, dpi=dpi, langue="eng", visible=True)
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+        return []
+    existantes = []
+    for element in elements_existants:
+        for ligne in getattr(element, "lignes", []):
+            if any(span.texte.strip() for span in ligne.spans):
+                existantes.append(ligne.bbox)
+
+    def deja_reconnue(bbox: BBox) -> bool:
+        for autre in existantes:
+            hauteur = max(min(bbox.hauteur, autre.hauteur), 1)
+            recouvrement_y = max(0, min(bbox.y1, autre.y1) - max(bbox.y0, autre.y0)) / hauteur
+            recouvrement = _intersection(
+                (bbox.x0, bbox.y0, bbox.x1, bbox.y1),
+                (autre.x0, autre.y0, autre.x1, autre.y1),
+            ) / max(min(bbox.largeur * bbox.hauteur, autre.largeur * autre.hauteur), 1)
+            centre_x = (bbox.x0 + bbox.x1) / 2
+            autre_centre_x = (autre.x0 + autre.x1) / 2
+            if recouvrement >= 0.20 or (
+                recouvrement_y >= 0.45
+                and abs(centre_x - autre_centre_x) <= pt_vers_emu(22)
+            ):
+                return True
+        return False
+
+    ajoutes = []
+    for element in candidats:
+        if len(element.lignes) != 1:
+            continue
+        ligne = element.lignes[0]
+        texte = " ".join(span.texte.strip() for span in ligne.spans if span.texte.strip())
+        if len(texte) < 2 or deja_reconnue(ligne.bbox):
+            continue
+        police, taille, couleur, decoration = _trace_style(
+            page, polices, ligne.bbox, 12700.0, geometrie
+        )
+        span = Span(
+            texte=texte,
+            police=police,
+            size_pt=taille,
+            couleur=couleur or "000000",
+            souligne=decoration.souligne,
+            barre=decoration.barre,
+            surlignage=decoration.surlignage,
+            bbox=ligne.bbox,
+        )
+        ligne_native = Line(
+            bbox=ligne.bbox,
+            spans=[span],
+            hauteur_ligne_emu=ligne.hauteur_ligne_emu,
+            largeur_cible_emu=ligne.largeur_cible_emu,
+            alignement="left",
+        )
+        ajoutes.append(
+            FlowParagraph(
+                bbox=ligne.bbox,
+                texte=texte,
+                police=police,
+                size_pt=taille,
+                couleur=couleur or "000000",
+                espace_apres_emu=0,
+                interligne_emu=ligne.hauteur_ligne_emu,
+                souligne=decoration.souligne,
+                barre=decoration.barre,
+                surlignage=decoration.surlignage,
+                spans=[span],
+                lignes=[ligne_native],
+            )
+        )
+        existantes.append(ligne.bbox)
+    return ajoutes
+
+
+def _rapidocr(language="auto", model_root=None):
+    return get_local_ocr(model_root=model_root, language=language)
 
 
 def _boite_rapidocr(points, facteur: float) -> BBox:
@@ -127,11 +402,7 @@ def _boite_rapidocr(points, facteur: float) -> BBox:
 
 
 def _intersection(a, b) -> float:
-    x0 = max(a[0], b[0])
-    y0 = max(a[1], b[1])
-    x1 = min(a[2], b[2])
-    y1 = min(a[3], b[3])
-    return max(0.0, x1 - x0) * max(0.0, y1 - y0)
+    return rect_intersection_area(a, b)
 
 
 def _bbox_trace_affiche(trace, geometrie: PageGeometry | None = None) -> tuple[float, float, float, float]:
@@ -172,9 +443,10 @@ def _trace_style(
     decoration = decorations_texte(page, bbox, geometrie)
 
     if meilleur is None:
+        taille_ocr = max(4.0, min(72.0, emu_vers_pt(bbox.hauteur) * 0.82))
         return (
-            FontRef("OCR", "Times New Roman", False, False),
-            10.0,
+            FontRef("OCR", "Arial", False, False),
+            round(taille_ocr, 2),
             "000000",
             decoration,
         )
@@ -367,8 +639,10 @@ def _normaliser_texte_ocr(texte: str) -> str:
     caractères grecs/cyrilliques isolés qui apparaissent dans des mots latins sur les
     PDF scientifiques scannés ou glyphiques.
     """
-    for source, cible in _REMPLACEMENTS_OCR:
-        texte = texte.replace(source, cible)
+    # Observed non-Latin characters are not Latin OCR spelling errors.
+    if not has_non_latin_letters(texte):
+        for source, cible in _REMPLACEMENTS_OCR:
+            texte = texte.replace(source, cible)
     texte = re.sub(r"\s+([,.;:])", r"\1", texte)
     texte = re.sub(r"([(\[])\s+", r"\1", texte)
     texte = re.sub(r"\s+([)\]])", r"\1", texte)
@@ -479,6 +753,8 @@ def _ligne_glyphe_symbole_non_reconnue(ligne: OcrLine, polices: dict | None) -> 
     texte = "".join(span.texte for span in spans_utiles).strip()
     if not texte:
         return False
+    if has_non_latin_letters(texte):
+        return False
     lettres = sum(1 for caractere in texte if caractere.isalpha())
     chiffres = sum(1 for caractere in texte if caractere.isdigit())
     signes = sum(1 for caractere in texte if not caractere.isalnum() and not caractere.isspace())
@@ -528,7 +804,22 @@ def _lignes_rapidocr(result, facteur: float) -> list[OcrLine]:
         texte = _normaliser_texte_ocr((texte or "").strip())
         if not texte:
             continue
-        lignes.append(OcrLine(texte=texte, score=score, bbox=_boite_rapidocr(points, facteur)))
+        points_source = tuple(
+            (float(point[0]) * facteur, float(point[1]) * facteur)
+            for point in points
+        )
+        orientation = classer_orientation(texte, angle_depuis_points(points_source))
+        lignes.append(
+            OcrLine(
+                texte=texte,
+                score=score,
+                bbox=_boite_rapidocr(points, facteur),
+                angle_deg=orientation.angle_deg,
+                orientation=orientation.kind,
+                quad_points=points_source,
+                semantic_role=orientation.semantic_role,
+            )
+        )
     return lignes
 
 
@@ -721,6 +1012,7 @@ def extraire_textes_natifs_zones(
     zones: list[BBox],
     layout_map,
     geometrie: PageGeometry | None = None,
+    observation_page=None,
 ) -> list[TextBox]:
     """Extrait le texte PDF natif situé dans des zones visuelles protégées.
 
@@ -731,15 +1023,20 @@ def extraire_textes_natifs_zones(
         return []
 
     geometrie = geometrie or PageGeometry.depuis_page(page)
+    # Les deux APIs PyMuPDF sont complémentaires : `dict` garde les lignes et les
+    # espaces, tandis que `texttrace` retrouve les glyphes que le regroupement PDF
+    # peut omettre (crédits verticaux, petites légendes, textes superposés). Ne jamais
+    # traiter la première source non vide comme une réponse complète.
     resultats_lignes = _extraire_lignes_natives_visuelles_dict(page, polices, zones, geometrie)
-    if resultats_lignes:
-        return resultats_lignes
-
     resultats_visibles = _extraire_textes_visibles_texttrace(page, polices, zones, geometrie)
-    if resultats_visibles:
-        return resultats_visibles
-
-    resultats: list[TextBox] = []
+    acquired = resultats_lignes + resultats_visibles
+    for index, element in enumerate(acquired):
+        ensure_source_identity(element, getattr(page, "number", 0), source_kind="pdf-native",
+                               source_token=f"native-visual-acquisition:{index}")
+    if observation_page is not None:
+        capture_source_observations(observation_page, acquired, source_kind="pdf-native")
+    resultats_natifs = _dedoublonner_textboxes_natifs(acquired)
+    resultats: list[TextBox] = list(resultats_natifs)
     vus: set[tuple[int, int, int, int, str]] = set()
     items = sorted(layout_map.lignes_natives(), key=lambda item: (item.bbox.y0, item.bbox.x0))
     for item in items:
@@ -788,8 +1085,21 @@ def extraire_textes_natifs_zones(
         _ajuster_largeur_ocr(ligne, polices)
         textbox = TextBox(bbox=bbox, lignes=[ligne])
         textbox.preserve_as_textbox = True
+        ensure_source_identity(textbox, getattr(page, "number", 0), source_kind="pdf-native",
+                               source_token=f"layout-native:{cle}")
         resultats.append(textbox)
-    return resultats
+    if observation_page is not None:
+        capture_source_observations(observation_page, resultats, source_kind="pdf-native")
+    outputs = _dedoublonner_textboxes_natifs(resultats)
+    if observation_page is not None:
+        for source in [*acquired, *resultats]:
+            if any(source is output for output in outputs):
+                continue
+            winner_id = source.attributes.get("duplicate_of")
+            winner = next((output for output in outputs if output.source_id == winner_id), None)
+            record_source_transformation(observation_page, [source], [winner] if winner else [], "native-visual-deduplication",
+                                         duplicate_of=winner_id, duplicate_verified=source.attributes.get("duplicate_verified", False))
+    return outputs
 
 
 def _extraire_lignes_natives_visuelles_dict(
@@ -855,7 +1165,9 @@ def _extraire_lignes_natives_visuelles_dict(
 
             if not spans or not boites:
                 continue
-            if not ligne_inverse and taille_max < 18.0:
+            # Les citations, crédits et légendes peuvent être petits et sombres.
+            # Le seuil historique de 18 pt supprimait ces textes récupérables.
+            if not ligne_inverse and taille_max < 4.0 and len("".join(span.texte for span in spans).strip()) < 2:
                 continue
 
             texte_ligne = _normaliser_texte_ocr("".join(span.texte for span in spans).strip())
@@ -898,12 +1210,24 @@ def _extraire_lignes_natives_visuelles_dict(
                 bbox.x1,
                 min(geometrie.hauteur_emu, bbox.y0 + hauteur_ligne),
             )
+            direction = ligne_pdf.get("dir") or (1.0, 0.0)
+            try:
+                angle = angle_depuis_points(
+                    ((0.0, 0.0), (float(direction[0]), float(-direction[1])))
+                )
+            except (TypeError, ValueError, IndexError):
+                angle = 0.0
+            orientation = classer_orientation(texte_ligne, angle)
             ligne = Line(
                 bbox=bbox_ligne,
                 spans=spans,
                 hauteur_ligne_emu=max(hauteur_ligne, 1),
                 largeur_cible_emu=max(bbox_ligne.largeur, 1),
                 alignement=_alignement_ligne(page, bbox_ligne, texte_ligne),
+                angle_deg=orientation.angle_deg,
+                orientation=orientation.kind,
+                semantic_role=orientation.semantic_role,
+                curved=orientation.curved,
             )
             _ajuster_largeur_ocr(ligne, polices)
             textbox = TextBox(bbox=bbox_ligne, lignes=[ligne])
@@ -953,7 +1277,14 @@ def _extraire_textes_visibles_texttrace(
         asset = polices[font_id]
         gras, italique = _style_depuis_nom(nom_police, int(trace.get("flags", 0) or 0))
         size_pt = round(float(trace.get("size", 10.0) or 10.0), 2)
-        for groupe in _groupes_caracteres_visibles(caracteres):
+        direction = trace.get("dir") or (1.0, 0.0)
+        try:
+            angle = angle_depuis_points(
+                ((0.0, 0.0), (float(direction[0]), float(-direction[1])))
+            )
+        except (TypeError, ValueError, IndexError):
+            angle = 0.0
+        for groupe in _groupes_caracteres_visibles(caracteres, angle):
             texte = "".join(car for car, _bbox in groupe)
             texte = _normaliser_texte_ocr(texte.strip())
             if not texte:
@@ -989,12 +1320,34 @@ def _extraire_textes_visibles_texttrace(
             )
             hauteur_ligne = max(bbox.hauteur, pt_vers_emu(size_pt * 1.12))
             bbox_ligne = BBox(bbox.x0, bbox.y0, bbox.x1, min(geometrie.hauteur_emu, bbox.y0 + hauteur_ligne))
+            direction = trace.get("dir") or (1.0, 0.0)
+            try:
+                angle = angle_depuis_points(((0.0, 0.0), (float(direction[0]), float(-direction[1]))))
+            except (TypeError, ValueError, IndexError):
+                angle = 0.0
+            points_base = tuple(
+                ((bbox_car.x0 + bbox_car.x1) / 2.0, (bbox_car.y0 + bbox_car.y1) / 2.0)
+                for _car, bbox_car in groupe
+                if _car.strip()
+            )
+            orientation = classer_orientation(
+                texte,
+                angle,
+                baseline_points=points_base,
+            )
             ligne = Line(
                 bbox=bbox_ligne,
                 spans=[span],
                 hauteur_ligne_emu=max(hauteur_ligne, 1),
                 largeur_cible_emu=max(bbox_ligne.largeur, 1),
                 alignement=_alignement_ligne(page, bbox_ligne, texte),
+                angle_deg=orientation.angle_deg,
+                orientation=orientation.kind,
+                baseline_points=tuple(
+                    (int(x), int(y)) for x, y in points_base
+                ),
+                semantic_role=orientation.semantic_role,
+                curved=orientation.curved,
             )
             _ajuster_largeur_ocr(ligne, polices)
             textbox = TextBox(bbox=bbox_ligne, lignes=[ligne])
@@ -1004,7 +1357,10 @@ def _extraire_textes_visibles_texttrace(
     return resultats
 
 
-def _groupes_caracteres_visibles(caracteres: list[tuple[str, BBox]]) -> list[list[tuple[str, BBox]]]:
+def _groupes_caracteres_visibles(
+    caracteres: list[tuple[str, BBox]],
+    angle_deg: float = 0.0,
+) -> list[list[tuple[str, BBox]]]:
     visibles = [(car, bbox) for car, bbox in caracteres if car.strip()]
     if not visibles:
         return []
@@ -1012,34 +1368,47 @@ def _groupes_caracteres_visibles(caracteres: list[tuple[str, BBox]]) -> list[lis
         pt_vers_emu(4),
         sorted((bbox.hauteur for _car, bbox in visibles))[len(visibles) // 2],
     )
+    angle_rad = math.radians(angle_deg)
+    ux, uy = math.cos(angle_rad), math.sin(angle_rad)
+    nx, ny = -uy, ux
+
+    def projections(bbox: BBox) -> tuple[float, float]:
+        centre_x = (bbox.x0 + bbox.x1) / 2.0
+        centre_y = (bbox.y0 + bbox.y1) / 2.0
+        return centre_x * ux + centre_y * uy, centre_x * nx + centre_y * ny
+
     lignes: list[list[tuple[str, BBox]]] = []
-    centres: list[int] = []
-    for item in sorted(caracteres, key=lambda item: ((item[1].y0 + item[1].y1) // 2, item[1].x0)):
+    centres: list[float] = []
+    for item in sorted(caracteres, key=lambda item: projections(item[1])[1]):
         car, bbox = item
         if not car.strip() and not lignes:
             continue
-        centre_y = (bbox.y0 + bbox.y1) // 2
+        _projection_base, projection_normal = projections(bbox)
         meilleur = None
         meilleur_delta = None
         for index, centre in enumerate(centres):
-            delta = abs(centre_y - centre)
+            delta = abs(projection_normal - centre)
             if delta <= hauteur_ref * 0.58 and (meilleur_delta is None or delta < meilleur_delta):
                 meilleur = index
                 meilleur_delta = delta
         if meilleur is None:
             lignes.append([item])
-            centres.append(centre_y)
+            centres.append(projection_normal)
             continue
         lignes[meilleur].append(item)
-        centres[meilleur] = int((centres[meilleur] * (len(lignes[meilleur]) - 1) + centre_y) / len(lignes[meilleur]))
+        centres[meilleur] = (
+            centres[meilleur] * (len(lignes[meilleur]) - 1) + projection_normal
+        ) / len(lignes[meilleur])
 
     groupes: list[list[tuple[str, BBox]]] = []
     seuil_gap = max(pt_vers_emu(12), int(hauteur_ref * 2.8))
     for ligne in lignes:
         courant: list[tuple[str, BBox]] = []
         precedent: BBox | None = None
-        for car, bbox in sorted(ligne, key=lambda item: item[1].x0):
-            if precedent is not None and bbox.x0 - precedent.x1 > seuil_gap and any(c.strip() for c, _b in courant):
+        for car, bbox in sorted(ligne, key=lambda item: projections(item[1])[0]):
+            projection_base = projections(bbox)[0]
+            precedent_base = projections(precedent)[0] if precedent is not None else None
+            if precedent is not None and projection_base - precedent_base > seuil_gap and any(c.strip() for c, _b in courant):
                 groupes.append(courant)
                 courant = []
             courant.append((car, bbox))
@@ -1048,6 +1417,13 @@ def _groupes_caracteres_visibles(caracteres: list[tuple[str, BBox]]) -> list[lis
         if courant and any(car.strip() for car, _bbox in courant):
             groupes.append(courant)
     return groupes
+
+
+def _dedoublonner_textboxes_natifs(textboxes: list[TextBox]) -> list[TextBox]:
+    """Fusionne les deux extractions natives sans éliminer les glyphes distincts."""
+    from pdfexact.extract.text import dedoublonner_textboxes_paragraphes
+
+    return dedoublonner_textboxes_paragraphes(textboxes)
 
 
 def _occlusions_opaques(page, geometrie: PageGeometry) -> list[tuple[int, BBox]]:
@@ -1633,6 +2009,10 @@ def _ligne_word_native(
         hauteur_ligne_emu=max(ligne.bbox.hauteur, pt_vers_emu(size_pt * 1.05)),
         largeur_cible_emu=ligne.bbox.largeur,
         alignement=_alignement_ligne(page, ligne.bbox, ligne.texte, lignes_triees, index_ligne),
+        angle_deg=ligne.angle_deg,
+        orientation=ligne.orientation,
+        baseline_points=tuple((pt_vers_emu(x), pt_vers_emu(y)) for x, y in ligne.quad_points),
+        semantic_role=ligne.semantic_role,
     )
     retrait_gauche, retrait_premiere = _retraits_liste_word_native(ligne, ligne.bbox)
     rendu.retrait_gauche_emu = max(0, retrait_gauche - ligne.bbox.x0)
@@ -1810,6 +2190,11 @@ def _paragraphes_word_native(
                 espacement_twips=espacement,
                 spans=spans,
                 lignes=lignes_rendu,
+                angle_deg=ligne.angle_deg,
+                orientation=ligne.orientation,
+                baseline_points=tuple((pt_vers_emu(x), pt_vers_emu(y)) for x, y in ligne.quad_points),
+                semantic_role=ligne.semantic_role,
+                curved=ligne.orientation == "curved",
             )
         )
     return paragraphes
@@ -1871,6 +2256,8 @@ def _ligne_figure_isolee(ligne: OcrLine) -> bool:
     texte = ligne.texte.strip()
     if not texte:
         return True
+    if has_non_latin_letters(texte):
+        return False
     spans_utiles = [span for span in ligne.spans if span.texte.strip()]
     if spans_utiles and any(span.bbox is not None for span in spans_utiles):
         return False
@@ -1883,8 +2270,11 @@ def _ligne_figure_isolee(ligne: OcrLine) -> bool:
     if len(texte) <= 3:
         return True
     lettres = sum(1 for c in texte if c.isalpha())
+    # Un mot court peut être un titre valide (Physics, Wiley, Mass, ...). Les faux
+    # positifs alphabétiques doivent être filtrés par le score OCR et le plan, pas par
+    # une longueur arbitraire qui supprimait les titres de couverture.
     if len(texte) <= 18 and lettres <= 8 and len(mots_alpha) <= 1:
-        return True
+        return not texte.isalpha()
     mots = texte.split()
     if len(mots) <= 2 and any(
         marqueur in texte.lower()
@@ -1924,10 +2314,19 @@ def _ajuster_largeur_ocr(ligne: Line, polices: dict) -> None:
     if mesuree_pt <= cible_sure_pt:
         return
 
+    police_source = polices.get(span.police.font_id)
+    if (
+        span.size_pt <= 18
+        and mesuree_pt > cible_sure_pt
+        and (police_source is None or police_source.reconnue)
+    ):
+        facteur = max(0.76, min(0.99, (cible_sure_pt / mesuree_pt) * 0.98))
+        span.size_pt = max(6.0, round(span.size_pt * facteur, 2))
+        mesuree_pt *= facteur
     caracteres = max(len(span.texte), 1)
-    span.espacement_twips = min(
-        0,
-        round(pt_vers_twips((cible_sure_pt - mesuree_pt) / caracteres)),
+    span.espacement_twips = max(
+        -4,
+        min(0, round(pt_vers_twips((cible_sure_pt - mesuree_pt) / caracteres))),
     )
 
 
@@ -1942,7 +2341,7 @@ def _textbox(
     geometrie: PageGeometry | None = None,
 ) -> TextBox:
     bbox = _limiter_bbox(page, bbox)
-    if layout_map is not None and not ligne_source.spans:
+    if layout_map is not None:
         bbox = layout_map.recaler_ligne_ocr(bbox, texte)
     police, size_pt, couleur, decoration = _trace_style(page, polices, bbox, facteur_emu, geometrie)
     hauteur_ligne = max(bbox.hauteur, pt_vers_emu(size_pt * 1.18))
@@ -1962,6 +2361,8 @@ def _textbox(
         hauteur_ligne_emu=max(hauteur_ligne, 1),
         largeur_cible_emu=max(bbox.largeur, 1),
         alignement=_alignement_ligne(page, bbox, texte),
+        angle_deg=0.0,
+        orientation="horizontal",
     )
     if ajuster_largeur:
         _ajuster_largeur_ocr(ligne, polices)
@@ -2018,13 +2419,31 @@ def _textbox_depuis_ligne_native(
             )
         ]
     hauteur_ligne = max(bbox.hauteur, pt_vers_emu(taille * 1.12))
-    bbox = BBox(bbox.x0, bbox.y0, bbox.x1, min(pt_vers_emu(page.rect.height), bbox.y0 + hauteur_ligne))
+    if ligne_source.orientation == "horizontal":
+        bbox = BBox(
+            bbox.x0,
+            bbox.y0,
+            bbox.x1,
+            min(pt_vers_emu(page.rect.height), bbox.y0 + hauteur_ligne),
+        )
+    else:
+        # RapidOCR peut fournir une bbox quadrilatere haute pour une legende
+        # verticale. Ne la reduisons pas a la hauteur d'un seul glyphe : cette
+        # emprise devient ensuite la taille du cadre Word ancre.
+        hauteur_ligne = max(bbox.hauteur, hauteur_ligne)
     ligne = Line(
         bbox=bbox,
         spans=spans,
         hauteur_ligne_emu=max(hauteur_ligne, 1),
         largeur_cible_emu=max(bbox.largeur, 1),
         alignement=_alignement_ligne(page, bbox, texte),
+        angle_deg=ligne_source.angle_deg,
+        orientation=ligne_source.orientation,
+        baseline_points=tuple(
+            (pt_vers_emu(x), pt_vers_emu(y)) for x, y in ligne_source.quad_points
+        ),
+        semantic_role=ligne_source.semantic_role,
+        curved=ligne_source.orientation == "curved",
     )
     _ajuster_largeur_ocr(ligne, polices)
     return TextBox(bbox=bbox, lignes=[ligne])
@@ -2041,6 +2460,10 @@ def extraire_rapidocr(
     media: dict | None = None,
     layout_map=None,
     geometrie: PageGeometry | None = None,
+    zones_cibles: list[BBox] | None = None,
+    observation_page=None,
+    language: str = "auto",
+    model_root=None,
 ):
     """Retourne du vrai texte Word visible, reconnu par RapidOCR et positionné."""
     zones_ignorees = zones_ignorees or []
@@ -2050,28 +2473,71 @@ def extraire_rapidocr(
         image = Path(dossier) / "page.png"
         pixmap = page.get_pixmap(dpi=dpi, alpha=False)
         pixmap.save(image)
-        result = _rapidocr()(
+        facteur = 72.0 / dpi
+        def accept_box(points):
+            bbox = _boite_rapidocr(points, facteur)
+            return (not zones_cibles or _bbox_dans_zones(bbox, zones_cibles)) and not _touche_zone_ignoree(bbox, zones_ignorees)
+
+        result = _rapidocr(language=language, model_root=model_root)(
             str(image),
             return_word_box=besoin_boites_mots,
             return_single_char_box=granularite == "char",
+            accept_box=accept_box,
         )
 
     facteur = 72.0 / dpi
     facteur_emu = 12700.0
     blocs = []
     lignes_ocr = []
+    raw_lines = [OcrLine(text or "", score, _boite_rapidocr(points, facteur),
+                         quad_points=tuple((float(x) * facteur, float(y) * facteur) for x, y in points))
+                 for text, score, points in zip(result.txts, result.scores, result.boxes)]
+    observations = _capture_ocr_lines(page, raw_lines, observation_page, "rapidocr-line", language=language,
+                                      routing_evidence=getattr(result, "routing_evidence", None))
+    if observation_page is not None:
+        observation_page.diagnostics.append(Evidence("ocr-routing-summary", "pdfexact.extract.ocr_routing",
+            confidence=None, details=(("language_request", language), ("auto_calibrated", False),
+                                     ("warnings", getattr(result, "routing_warnings", [])),
+                                     ("elapsed_seconds", getattr(result, "routing_elapsed_seconds", None)))))
     lignes_brutes = _lignes_rapidocr(result, facteur)
+    if zones_cibles:
+        lignes_brutes = [
+            ligne for ligne in lignes_brutes if _bbox_dans_zones(ligne.bbox, zones_cibles)
+        ]
     lignes_source = lignes_brutes
     lignes_natives_directes: list[OcrLine] = []
     lignes_mots_colonnes: list[OcrLine] = []
+    sources_natives = []
+    native_line_ids = {}
+    native_blank_ids = set()
     if page_exact_native and layout_map is not None:
-        lignes_natives_directes = _lignes_natives_hybrides(
-            layout_map,
-            zones_ignorees,
-            polices,
-            lignes_visuelles=layout != "word-native",
-            fusionner_fragments=layout != "word-native",
-        )
+        if layout == "word-native":
+            geometrie = geometrie or PageGeometry.depuis_page(page)
+            sources_natives = _acquerir_sources_natives(page, polices, geometrie, observation_page)
+            cadres = layout_map._cadres_lecture_taxonomie()
+            for source in sources_natives:
+                for line in source.lignes:
+                    proxy = OcrLine(element_text(line), line.confidence, line.bbox,
+                                    tuple(line.spans), line.angle_deg, line.orientation,
+                                    semantic_role=line.semantic_role)
+                    if not (_ligne_hors_zones_protegees(proxy, zones_ignorees)
+                            or (cadres and _ligne_dans_cadres_lecture(proxy, cadres, geometrie.hauteur_emu))):
+                        continue
+                    if zones_cibles and not _bbox_dans_zones(line.bbox, zones_cibles):
+                        continue
+                    if proxy.texte.strip():
+                        lignes_natives_directes.append(proxy)
+                        native_line_ids[id(proxy)] = line.source_id
+                    else:
+                        native_blank_ids.add(line.source_id)
+        else:
+            lignes_natives_directes = _lignes_natives_hybrides(
+                layout_map,
+                zones_ignorees,
+                polices,
+                lignes_visuelles=True,
+                fusionner_fragments=True,
+            )
         lignes_mots_colonnes = _reconstruire_lignes_depuis_mots_colonnes(
             _elements_mots_rapidocr(result, facteur),
             layout_map.cadres_lecture_natifs(),
@@ -2087,12 +2553,34 @@ def extraire_rapidocr(
         elif len(lignes_mots_colonnes) >= 4:
             lignes_source = lignes_mots_colonnes
 
+    if sources_natives and (lignes_source is lignes_natives_directes
+                            or (not lignes_source and native_blank_ids)):
+        selected_ids = {*native_blank_ids, *(native_line_ids[id(line)] for line in lignes_source)}
+        return _sortie_sources_natives(page, sources_natives, selected_ids, observations,
+                                      observation_page, geometrie)
+
+    if zones_cibles:
+        lignes_source = [
+            ligne for ligne in lignes_source if _bbox_dans_zones(ligne.bbox, zones_cibles)
+        ]
+
     for ligne in lignes_source:
         bbox = _limiter_bbox(page, ligne.bbox)
         if page_exact_native and layout_map is not None and not ligne.spans:
             bbox = layout_map.contraindre_bbox_texte(bbox, ligne.texte)
         texte = _normaliser_marqueur_colonne_droite(page, bbox, ligne.texte)
-        lignes_ocr.append(OcrLine(texte, ligne.score, bbox, ligne.spans))
+        lignes_ocr.append(
+            OcrLine(
+                texte,
+                ligne.score,
+                bbox,
+                ligne.spans,
+                ligne.angle_deg,
+                ligne.orientation,
+                ligne.quad_points,
+                ligne.semantic_role,
+            )
+        )
     zones_formules = [
         ligne.bbox
         for ligne in lignes_ocr
@@ -2106,8 +2594,10 @@ def extraire_rapidocr(
         if not _touche_zone_ignoree(zone, zones_ignorees)
     ]
     if media is not None:
-        for zone in zones_formules + zones_symboles:
-            blocs.append(rasteriser_region(page, zone, media, dpi=dpi))
+        for zone in zones_formules:
+            blocs.append(rasteriser_region(page, zone, media, dpi=dpi, purpose="formula"))
+        for zone in zones_symboles:
+            blocs.append(rasteriser_region(page, zone, media, dpi=dpi, purpose="symbol"))
     zones_ignorees = zones_ignorees + zones_formules + zones_symboles
     cadres_lecture = (
         layout_map.cadres_lecture_natifs()
@@ -2147,15 +2637,14 @@ def extraire_rapidocr(
         ]
         if layout == "word-native":
             blocs.extend(
-                _textbox_depuis_ligne_native(
+                _paragraphes_word_native_par_cadres(
                     page,
                     polices,
-                    ligne,
+                    lignes_texte,
                     facteur_emu,
-                    layout_map=layout_map,
-                    geometrie=geometrie,
+                    cadres_lecture,
+                    geometrie,
                 )
-                for ligne in lignes_texte
             )
         else:
             blocs.extend(_paragraphes_reflow(page, polices, lignes_texte, facteur_emu, geometrie))
@@ -2163,14 +2652,14 @@ def extraire_rapidocr(
         if verbose:
             objets_word = len([b for b in blocs if isinstance(b, FlowParagraph)])
             if layout == "word-native":
-                objets_word = len([b for b in blocs if isinstance(b, TextBox)])
-            print(
-                f"      RapidOCR: {len(lignes_texte)} ligne(s) -> "
-                f"{objets_word} {'ligne(s) Word positionnée(s)' if layout == 'word-native' else 'paragraphe(s) Word'}"
+                objets_word = len([b for b in blocs if isinstance(b, FlowParagraph)])
+                print(
+                    f"      RapidOCR: {len(lignes_texte)} ligne(s) -> "
+                f"{objets_word} paragraphe(s) Word natif(s)"
                 f" ({layout}), formules={len(zones_formules)}",
                 file=sys.stderr,
             )
-        return blocs
+        return _finaliser_source_ocr(page, blocs, observations, observation_page, dpi=dpi)
 
     blocs_page = (
         detecter_blocs_page(
@@ -2196,6 +2685,9 @@ def extraire_rapidocr(
             bbox = _limiter_bbox(page, _boite_rapidocr(points, facteur))
             texte = _normaliser_marqueur_colonne_droite(page, bbox, texte)
             elements.append((texte, score, bbox))
+    word_observations = _capture_ocr_lines(page, [OcrLine(text, score, bbox) for text, score, bbox in elements],
+                                          observation_page, "rapidocr-item")
+    observations.extend(word_observations)
     elements = _dedoublonner_elements_ocr(_corriger_elements_ocr(elements))
 
     ignores = 0
@@ -2221,7 +2713,8 @@ def extraire_rapidocr(
                     and (
                         layout_map.touche_visuel(bbox)
                         or layout_map.contredit_texte_natif(bbox, texte)
-                        or (len(texte.strip()) <= 8 and layout_map.proche_petit_visuel(bbox))
+                        or (len(texte.strip()) <= 8 and not has_non_latin_letters(texte)
+                            and layout_map.proche_petit_visuel(bbox))
                     )
                 )
                 if _touche_zone_ignoree(bbox, zones_ignorees) or filtre_visuel:
@@ -2295,7 +2788,7 @@ def extraire_rapidocr(
             f"{details_blocs}{suffixe}",
             file=sys.stderr,
         )
-    return blocs
+    return _finaliser_source_ocr(page, blocs, observations, observation_page, dpi=dpi)
 
 
 def _choisir_lignes_word_native(

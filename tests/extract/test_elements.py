@@ -159,8 +159,9 @@ def test_un_petit_cluster_sans_degrade_nest_pas_rasterise():
     assert not doit_rasteriser([_forme(0, 0, 10, 10)], False, seuil=300)
 
 
-def test_un_degrade_sur_la_page_force_le_repli():
-    assert doit_rasteriser([_forme(0, 0, 10, 10)], True, seuil=300)
+def test_un_degrade_sur_la_page_ne_force_pas_un_cluster_simple():
+    """Un shading local ne doit pas rasteriser un cluster indépendant."""
+    assert not doit_rasteriser([_forme(0, 0, 10, 10)], True, seuil=300)
 
 
 def test_un_cluster_trop_dense_est_rasterise():
@@ -245,6 +246,20 @@ def test_un_lien_sans_texte_devient_une_zone(tmp_path):
 
     assert blocs == []
     assert len(zones) == 1 and zones[0].uri == "https://exemple.test/zone"
+
+
+def test_une_ligne_native_verticale_conserve_sa_bbox_complete():
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((100, 300), "Photo by Author", fontsize=6, rotate=90, fontname="helv")
+    try:
+        blocs = extraire_texte(page, collecter_polices(doc))
+    finally:
+        doc.close()
+
+    ligne = blocs[0].lignes[0]
+    assert ligne.orientation == "vertical"
+    assert ligne.bbox.hauteur > ligne.bbox.largeur * 4
 
 
 def test_un_lien_interne_porte_la_page_cible(tmp_path):

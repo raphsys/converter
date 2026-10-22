@@ -12,6 +12,7 @@ import pymupdf
 
 from pdfexact.extract.text import _couleur_hexa
 from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, emu_vers_pt
+from pdfexact.analysis.geometry import intersection_area
 
 
 @dataclass(frozen=True)
@@ -32,11 +33,7 @@ _HIGHLIGHT_WORD = {
 
 
 def _intersection(a: BBox, b: BBox) -> int:
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return max(0, x1 - x0) * max(0, y1 - y0)
+    return intersection_area(a, b)
 
 
 def _bbox_dessin(dessin, geometrie: PageGeometry | None = None) -> BBox:
@@ -51,6 +48,7 @@ def _couleur_highlight(valeur) -> str | None:
 
 def decorations_texte(page, bbox: BBox, geometrie: PageGeometry | None = None) -> TextDecoration:
     """Infère souligné, barré et surlignage depuis les dessins proches."""
+    geometrie = geometrie or PageGeometry.depuis_page(page)
     souligne = False
     barre = False
     surlignage = None

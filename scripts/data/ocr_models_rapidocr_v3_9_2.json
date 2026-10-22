@@ -1,0 +1,24 @@
+{
+  "schema": "pdfexact.ocr-provisioning.v1",
+  "release": "v3.9.2",
+  "catalog_url": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/python/rapidocr/default_models.yaml",
+  "license": "Apache-2.0",
+  "license_url": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/LICENSE",
+  "coverage_url": "https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.en.md",
+  "v6_coverage_url": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/python/rapidocr/utils/model_resolver.py",
+  "base_url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/",
+  "coverage_note": "Language identifiers follow the upstream catalog, not necessarily ISO. Lists are explicit, never a claim of universal coverage. No language-quality guarantee follows from a synthetic CPU probe.",
+  "models": [
+    {"id":"PP-OCRv6_det_small","task":"det","ocr_version":"PP-OCRv6","model_type":"small","lang_type":"multi","scripts":[],"languages":[],"sha256":"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"},
+    {"id":"PP-OCRv6_rec_small","task":"rec","ocr_version":"PP-OCRv6","model_type":"small","lang_type":"multi","scripts":["Latn","Hani","Hira","Kana"],"languages":["ch","chinese_cht","en","japan","af","az","bs","ca","cs","cy","da","de","es","et","eu","fi","fr","ga","gl","hr","hu","id","is","it","ku","la","lb","lt","lv","mi","ms","mt","nl","no","oc","pl","pt","qu","rm","ro","rs_latin","sk","sl","sq","sv","sw","tl","tr","uz","vi","french","german"],"sha256":"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"},
+    {"id":"ch_ppocr_mobile_v2.0_cls_mobile","task":"cls","ocr_version":"PP-OCRv4","model_type":"mobile","lang_type":"ch","scripts":[],"languages":[],"sha256":"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"},
+    {"id":"cyrillic_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"cyrillic","scripts":["Cyrl"],"languages":["ru","be","uk","rs_cyrillic","bg","mn","ab","ady","kbd","av","dar","inh","ce","lki","lez","tab","kk","ky","tg","mk","tt","cv","ba","mhr","mo","udm","kv","os","bua","xal","tyv","sah","kaa","en"],"sha256":"90f761b4bfcce0c8c561c0cb5c887b0971d3ec01c32164bdf7374a35b0982711"},
+    {"id":"korean_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"korean","scripts":["Hang"],"languages":["korean","en"],"sha256":"cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b"},
+    {"id":"arabic_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"arabic","scripts":["Arab"],"languages":["ar","fa","ug","ur","ps","ku","sd","bal","en"],"sha256":"c1192e632d0baa9146ae5b756a0e635e3dc63c1733737ebfd1629e87144e9295"},
+    {"id":"devanagari_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"devanagari","scripts":["Deva"],"languages":["hi","mr","ne","bh","mai","ang","bho","mah","sck","new","gom","sa","bgc","en"],"coverage_note":"Upstream language names and abbreviation table disagree for ang/mah/sck; use script-level coverage, not an ISO guarantee for those entries.","sha256":"d6f0a906580e3fa6b324a318718f1f31f268b6ea8ef985f91c2012a37f52c91e"},
+    {"id":"th_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"th","scripts":["Thai"],"languages":["th","en"],"sha256":"de541dd83161c241ff426f7ecfd602a0ba77d686cf3ab9a6c255ea82fd08006e"},
+    {"id":"el_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"el","scripts":["Grek"],"languages":["el","en"],"sha256":"b4368bccd557123c702b7549fee6cd1e94b581337d1c9b65310f109131542b7f"},
+    {"id":"ta_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"ta","scripts":["Taml"],"languages":["ta","en"],"sha256":"a42448808b7dea87597336f12438935f40353f1949e8360acd9e06b4da21bfe1"},
+    {"id":"te_PP-OCRv5_rec_mobile","task":"rec","ocr_version":"PP-OCRv5","model_type":"mobile","lang_type":"te","scripts":["Telu"],"languages":["te","en"],"sha256":"a3690451b50028a09a3316a1274f7c05728151ea3f8fd392696397a7fefcbd92"}
+  ]
+}

@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from pdfexact.geometry import BBox, pt_vers_emu, se_chevauchent, union
+from pdfexact.analysis.geometry import bbox_area, center_in, clip_bbox_nonempty, intersection_area, overlap_ratio
+from pdfexact.analysis.provenance import expliquer_filtrage
 from pdfexact.ir import FlowParagraph, ImageEl, RasterEl, ShapeEl, TableEl, TextBox
 from pdfexact.layout.classifier import detecter_regions_colonnes
 from pdfexact.layout.ai import LayoutAIZone
@@ -19,8 +21,8 @@ from pdfexact.layout.ai import LayoutAIZone
 OCR_PROTECTED_STRATEGIES = frozenset(
     {
         "word-table",
-        "raster-image",
         "raster-immutable",
+        "raster-image",
     }
 )
 LAYOUT_PROTECTED_STRATEGIES = OCR_PROTECTED_STRATEGIES
@@ -299,7 +301,19 @@ def comprendre_page(
             reasons=["dense-vector-cluster"],
         )
 
-    for zone_ia in zones_ia or ():
+    zones_ia_effectives = [
+        zone_ia
+        for zone_ia in zones_ia or ()
+        if not _zone_ia_deja_decrite_par_source(
+            zone_ia,
+            images,
+            zones_rasterisees,
+            formes,
+            largeur_emu,
+            hauteur_emu,
+        )
+    ]
+    for zone_ia in zones_ia_effectives:
         role, strategy, editable = _decision_zone_ia(zone_ia)
         if role == "ignore":
             continue
@@ -464,6 +478,7 @@ def filtrer_elements_proteges(elements: list, zones_protegees: list[BBox]) -> li
             filtres.append(element)
             continue
         if isinstance(element, (TextBox, FlowParagraph)) and _touche_zone(bbox, zones_protegees):
+            expliquer_filtrage(element, "protected-by-understanding-zone")
             continue
         filtres.append(element)
     return filtres
@@ -483,25 +498,61 @@ def filtrer_elements_selon_comprehension(
 
 
 def _aire(bbox: BBox) -> int:
-    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+    return bbox_area(bbox)
 
 
 def _intersection(a: BBox, b: BBox) -> int:
-    if not se_chevauchent(a, b):
-        return 0
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return max(0, x1 - x0) * max(0, y1 - y0)
+    return intersection_area(a, b)
+
+
+def _recouvrement_source(a: BBox, b: BBox) -> float:
+    return overlap_ratio(a, b)
+
+
+def _zone_ia_deja_decrite_par_source(
+    zone: LayoutAIZone,
+    images: list[ImageEl | RasterEl],
+    zones_rasterisees: list[BBox],
+    formes: list[ShapeEl],
+    largeur_emu: int,
+    hauteur_emu: int,
+) -> bool:
+    """Ignore une boîte IA visuelle qui englobe déjà des composants natifs."""
+    if zone.role not in {"visual", "figure", "image", "chart"}:
+        return False
+    aire_page = max(largeur_emu * hauteur_emu, 1)
+    aire_zone = max(_aire(zone.bbox), 1)
+    if aire_zone / aire_page < 0.08:
+        return False
+
+    # Une boîte IA plus large qu'une image PDF déjà extraite est une composition,
+    # pas une nouvelle image à rendre. Les petits écarts de détection sont tolérés.
+    composants = [image.bbox for image in images] + list(zones_rasterisees)
+    for composant in composants:
+        if (
+            _recouvrement_source(zone.bbox, composant) >= 0.55
+            and _recouvrement_source(composant, zone.bbox) >= 0.80
+        ):
+            return True
+
+    # Plusieurs grands dessins indépendants sont une seconde preuve de composition
+    # lorsque la page ne contient pas d'image raster source.
+    grandes_formes = [
+        forme.bbox
+        for forme in formes
+        if _aire(forme.bbox) / aire_page >= 0.01
+        and _recouvrement_source(forme.bbox, zone.bbox) >= 0.55
+    ]
+    preuves: list[BBox] = []
+    for forme in grandes_formes:
+        if any(_recouvrement_source(forme, preuve) >= 0.65 for preuve in preuves):
+            continue
+        preuves.append(forme)
+    return len(preuves) >= 2 and aire_zone / aire_page >= 0.15
 
 
 def _clip_bbox(bbox: BBox, largeur: int, hauteur: int) -> BBox:
-    x0 = max(0, min(bbox.x0, largeur - 1))
-    y0 = max(0, min(bbox.y0, hauteur - 1))
-    x1 = max(x0 + 1, min(bbox.x1, largeur))
-    y1 = max(y0 + 1, min(bbox.y1, hauteur))
-    return BBox(x0, y0, x1, y1)
+    return clip_bbox_nonempty(bbox, largeur, hauteur)
 
 
 def _fusionner_zones(zones: Iterable[BBox]) -> list[BBox]:
@@ -532,9 +583,7 @@ def _touche_zone(bbox: BBox, zones: list[BBox], seuil: float = 0.12) -> bool:
 
 
 def _centre_dans(bbox: BBox, zone: BBox) -> bool:
-    x = (bbox.x0 + bbox.x1) // 2
-    y = (bbox.y0 + bbox.y1) // 2
-    return zone.x0 <= x <= zone.x1 and zone.y0 <= y <= zone.y1
+    return center_in(bbox, zone)
 
 
 def _lignes_dans_formes_simples(
@@ -705,7 +754,7 @@ def _forme_simple_texte(bbox: BBox, largeur_emu: int, hauteur_emu: int) -> bool:
 
 
 def _recouvrement_source(a: BBox, b: BBox) -> float:
-    return _intersection(a, b) / max(_aire(a), 1)
+    return overlap_ratio(a, b)
 
 
 def _table_dense(tableau: TableEl) -> bool:

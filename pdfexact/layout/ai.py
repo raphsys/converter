@@ -17,11 +17,16 @@ from typing import Any
 import pymupdf
 
 from pdfexact.geometry import BBox, PageGeometry, bbox_depuis_rect, pt_vers_emu
+from pdfexact.analysis.geometry import bbox_area, intersection_area
 from pdfexact.layout.model import LayoutPage
 
 DEFAULT_LAYOUT_PROVIDER = "paddlex"
 DEFAULT_LAYOUT_MODEL = "ppstructurev3/PP-DocLayout_plus-L"
-_MODEL_CACHE: dict[tuple[str, str], Any] = {}
+_MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
+
+
+class LayoutAIRequiredError(RuntimeError):
+    """Raised when a required layout-AI pass cannot produce a page plan."""
 
 TEXT_LABELS = {
     "text",
@@ -84,36 +89,74 @@ def detecter_layout_ia(
     model_root: str | Path | None = None,
     device: str | None = None,
     render_scale: float = 1.5,
+    required: bool = False,
 ) -> LayoutAIPage:
     provider = (provider or os.environ.get("PDFEXACT_LAYOUT_PROVIDER") or DEFAULT_LAYOUT_PROVIDER).strip().casefold()
     requested_model = model or os.environ.get("PDFEXACT_LAYOUT_MODEL") or DEFAULT_LAYOUT_MODEL
     root = _resolve_model_root(model_root)
     model_path = _resolve_model_path(root, requested_model)
+    if provider in {"auto", "vysi"}:
+        provider = _provider_auto(model_path)
     model_id = _model_id(model_path, root, requested_model)
 
     if provider in {"", "none", "off", "0", "false"}:
-        return _fallback(analyse, provider, model_id, model_path, "layout_ai_disabled")
-    if provider != "paddlex":
-        return _fallback(analyse, provider, model_id, model_path, f"unsupported_provider:{provider}")
-    if model_path is None or not model_path.is_dir():
-        return _fallback(analyse, provider, model_id, model_path, f"model_not_found:{requested_model}")
-    if not (_module_available("paddle") and _module_available("paddlex")):
-        return _fallback(analyse, provider, model_id, model_path, "paddle_or_paddlex_missing")
+        return _failure_or_fallback(
+            analyse, provider, model_id, model_path, "layout_ai_disabled", required
+        )
+    if provider not in {"paddlex", "ultralytics", "yolo"}:
+        return _failure_or_fallback(
+            analyse, provider, model_id, model_path, f"unsupported_provider:{provider}", required
+        )
+    if provider == "paddlex" and (model_path is None or not model_path.is_dir()):
+        return _failure_or_fallback(
+            analyse, provider, model_id, model_path, f"model_not_found:{requested_model}", required
+        )
+    if provider in {"ultralytics", "yolo"} and model_path is None:
+        return _failure_or_fallback(
+            analyse, provider, model_id, model_path, f"model_not_found:{requested_model}", required
+        )
+    if provider == "paddlex" and not (_module_available("paddle") and _module_available("paddlex")):
+        return _failure_or_fallback(
+            analyse, provider, model_id, model_path, "paddle_or_paddlex_missing", required
+        )
+    if provider in {"ultralytics", "yolo"} and not _module_available("ultralytics"):
+        return _failure_or_fallback(
+            analyse, provider, model_id, model_path, "ultralytics_missing", required
+        )
 
     try:
-        zones = _detecter_paddlex(
-            page,
-            provider=provider,
-            model_path=model_path,
-            model_id=model_id,
-            device=device,
-            render_scale=render_scale,
+        if provider == "paddlex":
+            zones = _detecter_paddlex(
+                page,
+                provider=provider,
+                model_path=model_path,
+                model_id=model_id,
+                device=device,
+                render_scale=render_scale,
+            )
+        else:
+            zones = _detecter_ultralytics(
+                page,
+                provider="ultralytics",
+                model_path=model_path,
+                model_id=model_id,
+                device=device,
+                render_scale=render_scale,
+            )
+    except Exception as exc:  # noqa: BLE001 - le mode requis doit rester explicite
+        return _failure_or_fallback(
+            analyse,
+            provider,
+            model_id,
+            model_path,
+            f"layout_ai_error:{type(exc).__name__}",
+            required,
         )
-    except Exception as exc:  # noqa: BLE001 - le fallback garde la conversion robuste
-        return _fallback(analyse, provider, model_id, model_path, f"layout_ai_error:{type(exc).__name__}")
 
     if not zones:
-        return _fallback(analyse, provider, model_id, model_path, "layout_ai_empty")
+        return _failure_or_fallback(
+            analyse, provider, model_id, model_path, "layout_ai_empty", required
+        )
     return LayoutAIPage(
         status="layout_ai_detected",
         provider=provider,
@@ -121,6 +164,22 @@ def detecter_layout_ia(
         model_path=str(model_path),
         zones=tuple(_dedoublonner(zones)),
     )
+
+
+def _failure_or_fallback(
+    analyse: LayoutPage,
+    provider: str,
+    model_id: str,
+    model_path: Path | None,
+    warning: str,
+    required: bool,
+) -> LayoutAIPage:
+    if required:
+        raise LayoutAIRequiredError(
+            f"layout IA requis mais indisponible: {warning}; "
+            f"provider={provider or 'unset'}, model={model_id}"
+        )
+    return _fallback(analyse, provider, model_id, model_path, warning)
 
 
 def _detecter_paddlex(
@@ -137,7 +196,7 @@ def _detecter_paddlex(
     from paddlex import create_model  # type: ignore[import-not-found]
 
     resolved_device = device or os.environ.get("PDFEXACT_LAYOUT_DEVICE", "cpu")
-    cache_key = (str(model_path), resolved_device)
+    cache_key = (provider, str(model_path), resolved_device)
     model = _MODEL_CACHE.get(cache_key)
     if model is None:
         model = create_model(
@@ -160,6 +219,89 @@ def _detecter_paddlex(
             image_width=float(pix.width),
             image_height=float(pix.height),
         )
+
+
+def _detecter_ultralytics(
+    page,
+    *,
+    provider: str,
+    model_path: Path,
+    model_id: str,
+    device: str | None,
+    render_scale: float,
+) -> list[LayoutAIZone]:
+    """Execute the VYSI Ultralytics route with explicit local weights only."""
+    if not model_path.is_file():
+        raise FileNotFoundError(f"Ultralytics weights must be a local file: {model_path}")
+    from ultralytics import YOLO  # type: ignore[import-not-found]
+
+    resolved_device = device or os.environ.get("PDFEXACT_LAYOUT_DEVICE", "cpu")
+    cache_key = (provider, str(model_path), resolved_device)
+    model = _MODEL_CACHE.get(cache_key)
+    if model is None:
+        model = YOLO(str(model_path))
+        _MODEL_CACHE[cache_key] = model
+    with TemporaryDirectory(prefix="pdfexact-layout-ai-") as dossier:
+        image_path = Path(dossier) / "page.png"
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(render_scale, render_scale), alpha=False)
+        pix.save(str(image_path))
+        results = model.predict(
+            source=str(image_path),
+            device=resolved_device,
+            verbose=False,
+            save=False,
+            stream=False,
+        )
+        detections: list[dict[str, Any]] = []
+        for result in results or ():
+            boxes = getattr(result, "boxes", None)
+            if boxes is None:
+                continue
+            coordinates = _to_list(getattr(boxes, "xyxy", None))
+            confidences = _to_list(getattr(boxes, "conf", None))
+            classes = _to_list(getattr(boxes, "cls", None))
+            names = getattr(result, "names", {})
+            for index, bbox in enumerate(coordinates or ()):
+                if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+                    continue
+                class_id = int(float(classes[index])) if index < len(classes or ()) else None
+                if isinstance(names, dict):
+                    label = str(names.get(class_id, class_id if class_id is not None else "unknown"))
+                else:
+                    label = str(class_id if class_id is not None else "unknown")
+                detections.append(
+                    {
+                        "bbox": bbox,
+                        "label": label,
+                        "score": confidences[index] if index < len(confidences or ()) else None,
+                    }
+                )
+        return _normaliser_detections(
+            detections,
+            provider=provider,
+            model_id=model_id,
+            page_width_pt=float(page.rect.width),
+            page_height_pt=float(page.rect.height),
+            image_width=float(pix.width),
+            image_height=float(pix.height),
+        )
+
+
+def _to_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    detach = getattr(value, "detach", None)
+    if callable(detach):
+        value = detach()
+    cpu = getattr(value, "cpu", None)
+    if callable(cpu):
+        value = cpu()
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        value = tolist()
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return []
 
 
 def _normaliser_detections(
@@ -330,6 +472,14 @@ def _resolve_model_path(root: Path, requested: str) -> Path | None:
     return None
 
 
+def _provider_auto(model_path: Path | None) -> str:
+    """Choose a local runtime from the model artifact, never from the filename alone."""
+    if model_path is not None and model_path.is_file():
+        if model_path.suffix.casefold() in {".pt", ".onnx"}:
+            return "ultralytics"
+    return "paddlex"
+
+
 def _resolve_casefold(root: Path, relative: str) -> Path | None:
     current = root
     for part in Path(relative).parts:
@@ -374,15 +524,11 @@ def _clamp_pt(
 
 
 def _aire(bbox: BBox) -> int:
-    return max(0, bbox.largeur) * max(0, bbox.hauteur)
+    return bbox_area(bbox)
 
 
 def _intersection(a: BBox, b: BBox) -> int:
-    x0 = max(a.x0, b.x0)
-    y0 = max(a.y0, b.y0)
-    x1 = min(a.x1, b.x1)
-    y1 = min(a.y1, b.y1)
-    return max(0, x1 - x0) * max(0, y1 - y0)
+    return intersection_area(a, b)
 
 
 def _dedoublonner(zones: list[LayoutAIZone]) -> list[LayoutAIZone]:
