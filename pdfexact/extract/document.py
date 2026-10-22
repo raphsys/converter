@@ -1310,6 +1310,8 @@ def _attacher_frames_texte(elements: list, plan, zones_ia=None) -> list:
         frame_lignes = []
         lignes_non_attachees = []
         for ligne in lignes:
+            if ligne.semantic_role is None:
+                ligne.semantic_role = _role_semantique_zone(ligne.bbox, zones_ia)
             meilleur = _meilleur_frame_ligne(ligne.bbox, frames)
             if meilleur is None:
                 lignes_non_attachees.append(ligne)
@@ -1323,6 +1325,9 @@ def _attacher_frames_texte(elements: list, plan, zones_ia=None) -> list:
             ligne.layout_frame_bbox = item.bbox
             frame_lignes.append((frame_id, role, item.strategy, item.bbox))
         lignes_sans_frame.extend(lignes_non_attachees)
+        roles = {ligne.semantic_role for ligne in lignes}
+        if len(roles) == 1 and element.semantic_role is None:
+            element.semantic_role = roles.pop()
         if frame_lignes and len({frame[0] for frame in frame_lignes}) == 1 and not lignes_non_attachees:
             frame_id, role, strategy, bbox = frame_lignes[0]
             element.layout_frame_id = frame_id
@@ -1364,9 +1369,22 @@ def _attacher_frames_texte(elements: list, plan, zones_ia=None) -> list:
     return _materialiser_vues_frames_texte(elements, source_lines)
 
 
+def _role_semantique_zone(bbox, zones_ia):
+    """Semantic role of the layout-AI zone holding most of a line, if any."""
+    from pdfexact.layout.ai import role_semantique_etiquette
+
+    area = max(bbox.largeur * bbox.hauteur, 1)
+    best, best_ratio = None, 0.5
+    for zone in zones_ia or ():
+        ratio = intersection_area(bbox, zone.bbox) / area
+        if ratio > best_ratio:
+            best, best_ratio = zone, ratio
+    return role_semantique_etiquette(best.label) if best is not None else None
+
+
 def _materialiser_vues_frames_texte(elements, source_lines):
     """Keep derived frames on owners and restore their exact acquired rows."""
-    names = ("layout_frame_id", "layout_frame_role", "layout_frame_strategy", "layout_frame_bbox")
+    names = ("layout_frame_id", "layout_frame_role", "layout_frame_strategy", "layout_frame_bbox", "semantic_role")
     result = []
     for element in elements:
         if not any(id(line) in source_lines for line in getattr(element, "lignes", ())):

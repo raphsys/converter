@@ -32,6 +32,7 @@ TEXT_LABELS = {
     "text",
     "content",
     "title",
+    "doc_title",
     "paragraph_title",
     "figure_title",
     "table_title",
@@ -39,8 +40,54 @@ TEXT_LABELS = {
     "header",
     "footer",
     "reference",
+    "reference_content",
     "list",
+    "number",
+    "footnote",
+    "abstract",
+    "algorithm",
+    "aside_text",
+    "formula_number",
 }
+
+# Single source of the semantic role a layout label gives to the text it holds.
+# Existing role names are reused where they drive behaviour (titles, captions,
+# headers, footers, body continuity); the others name what the model saw.
+_ROLES_SEMANTIQUES = {
+    "text": "body",
+    "doc_title": "title",
+    "title": "title",
+    "paragraph_title": "heading",
+    "header": "header",
+    "footer": "footer",
+    "figure_title": "caption",
+    "table_title": "caption",
+    "caption": "caption",
+    "content": "table-of-contents",
+    "reference": "reference",
+    "reference_content": "reference",
+    "footnote": "footnote",
+    "number": "page-number",
+    "abstract": "abstract",
+    "aside_text": "aside",
+    "algorithm": "algorithm",
+    "formula_number": "formula-number",
+    "list": "list",
+}
+
+
+def role_semantique_etiquette(label: str) -> str | None:
+    """Semantic role of the text held by a layout zone, None for visual zones."""
+    return _ROLES_SEMANTIQUES.get(str(label).strip().casefold().replace(" ", "_").replace("-", "_"))
+
+
+def _options_cpu_paddlex():
+    """CPU inference: oneDNN (MKLDNN) kernels when available, every core."""
+    from paddlex.inference.utils.misc import is_mkldnn_available
+    from paddlex.inference.utils.pp_option import PaddlePredictorOption
+
+    return PaddlePredictorOption(run_mode="mkldnn" if is_mkldnn_available() else "paddle",
+                                 cpu_threads=max(1, os.cpu_count() or 1))
 
 
 @dataclass(frozen=True)
@@ -203,6 +250,7 @@ def _detecter_paddlex(
             model_name=model_path.name,
             model_dir=str(model_path),
             device=resolved_device,
+            **({"pp_option": _options_cpu_paddlex()} if resolved_device == "cpu" else {}),
         )
         _MODEL_CACHE[cache_key] = model
     with TemporaryDirectory(prefix="pdfexact-layout-ai-") as dossier:
