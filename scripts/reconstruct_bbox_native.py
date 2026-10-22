@@ -11,6 +11,7 @@ import pymupdf
 from pdfexact.bboxes import annotate_pdf_bboxes, write_bbox_docx
 from pdfexact.extract.catalog import construire_catalogue, enregistrer_catalogue
 from pdfexact.extract.document import extraire
+from pdfexact.extract.ocr import lire_texte_des_images
 from pdfexact.extract.text import dedoublonner_textboxes_paragraphes
 from pdfexact.analysis.text_segmentation import segmenter_page_textes
 from pdfexact.fontlib import construire, dossiers_par_defaut
@@ -21,6 +22,7 @@ from pdfexact.layout.text_comprehension import (
     diagnostics_comprehension_texte,
 )
 from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehension_texte_ai
+from pdfexact.layout.vision import VisionSmolVLM, annoter_zones_visuelles
 from pdfexact.model_paths import resolve_ai_models_root
 from pdfexact.report import Rapport
 
@@ -181,6 +183,12 @@ def main() -> int:
     with contexte_comprehension_texte():
         document = _extraire_scene(args.source_pdf, selected_pages, args)
         _normaliser_texte(document)
+        vision = annoter_zones_visuelles(document, args.source_pdf, VisionSmolVLM(getattr(args, "ai_models_root", None)))
+        textes_images = lire_texte_des_images(
+            document, args.source_pdf, getattr(document, "polices", {}), dpi=args.dpi,
+            language=getattr(args, "ocr_language", "auto"),
+            model_root=resolve_ai_models_root(getattr(args, "ai_models_root", None)),
+        )
         _enregistrer_catalogue(document, args.source_pdf, args.docx_out.with_suffix(".extraction.json"))
         records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, document)
         write_bbox_docx(document, args.docx_out)
@@ -197,6 +205,15 @@ def main() -> int:
     # segmentation above came from geometric heuristics, not from the model.
     for event in diagnostics:
         print(f"comprehension_ia: status={event.get('status')} reason={event.get('reason')}")
+    vus: dict[str, int] = {}
+    for zone in vision:
+        key = zone["type"] if zone["status"] == "compris" else "non-compris"
+        vus[key] = vus.get(key, 0) + 1
+    print("vision_ia: " + (" ".join(f"{key}={value}" for key, value in sorted(vus.items())) or "aucune-zone"))
+    print(f"ocr_images: textes_lus={textes_images}")
+    for zone in vision:
+        if zone["status"] != "compris":
+            print(f"vision_ia: page={zone['page'] + 1} non-compris reason={zone['reason']}")
     return 0
 
 

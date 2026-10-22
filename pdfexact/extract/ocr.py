@@ -2357,6 +2357,39 @@ def _textbox(
 
 
 
+def lire_texte_des_images(document, source_pdf, polices, *, dpi=200, language="auto", model_root=None) -> int:
+    """Read the text printed inside visual zones (RapidOCR), native rows excluded.
+
+    Zones come from vision: text seen inside the image, or a zone vision could
+    not understand. The text read is real, positioned text marked as such.
+    """
+    import pymupdf
+    from pdfexact.layout.vision import zones_texte_image
+
+    pages = [(page, zones_texte_image(page)) for page in document.pages]
+    if not any(zones for _, zones in pages):
+        return 0
+    added = 0
+    with pymupdf.open(source_pdf) as pdf:
+        for page, zones in pages:
+            if not zones:
+                continue
+            page_pdf = pdf[page.index]
+            natives = [ligne.bbox for element in page.elements
+                       if getattr(element, "source_kind", None) != "ocr"
+                       for ligne in getattr(element, "lignes", ()) or ()]
+            textes = extraire_rapidocr(
+                page_pdf, polices, dpi=max(dpi, 200), granularite="line", layout="word-native",
+                zones_ignorees=natives, geometrie=PageGeometry.depuis_page(page_pdf), zones_cibles=zones,
+                observation_page=page, language=language, model_root=model_root,
+            )
+            for element in textes:
+                element.attributes["text_in_image"] = True
+            page.elements.extend(textes)
+            added += len(textes)
+    return added
+
+
 def extraire_rapidocr(
     page,
     polices: dict,

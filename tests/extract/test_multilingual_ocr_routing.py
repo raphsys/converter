@@ -253,3 +253,10 @@ def test_real_cpu_pdf_bitmap_acquisition():
                       "inventory": len(observed.source_inventory)}, ensure_ascii=False))
     assert not summary["warnings"]
     assert any(item.attributes.get("ocr_routing") for item in observed.source_inventory.values())
+
+
+def test_ocr_engine_uses_every_cpu_core(monkeypatch):
+    from pdfexact.extract import ocr_routing
+
+    monkeypatch.setattr(ocr_routing.os, "cpu_count", lambda: 8)
+    assert ocr_routing._threads_ocr() == 8

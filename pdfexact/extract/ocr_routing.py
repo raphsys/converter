@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 from threading import RLock
 import time
@@ -147,6 +148,11 @@ def validate_alphabet(model, metadata, output_classes=None) -> tuple[str, ...]:
     return characters
 
 
+def _threads_ocr() -> int:
+    """OCR runs alone at its stage: detection and recognition use every core."""
+    return max(1, os.cpu_count() or 1)
+
+
 def _preflight(model):
     import onnxruntime as ort
     options = ort.SessionOptions()
@@ -233,7 +239,7 @@ class LocalOcrRouter:
         baseline = next((model for model in self.rec_models if model.ocr_version == "PP-OCRv6"), self.rec_models[0])
         self.rec_models.remove(baseline)
         self.rec_models.insert(0, baseline)
-        params = {"EngineConfig.onnxruntime.intra_op_num_threads": 2,
+        params = {"EngineConfig.onnxruntime.intra_op_num_threads": _threads_ocr(),
                   "EngineConfig.onnxruntime.inter_op_num_threads": 1,
                   "Global.log_level": "error"}
         for accelerator in ("cuda", "dml", "cann", "coreml"):
