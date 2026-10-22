@@ -1428,6 +1428,9 @@ def _regrouper_lignes_sans_frame(lignes: list[Line]) -> list[list[Line]]:
         extra={
             "semantic_vertical_gap_factor": 2.4,
             "semantic_column_overlap_min": 0.18,
+            # Reading blocks only: comprehension decides paragraphs once per zone
+            # afterwards; asking the model for every row pair here was redundant.
+            "semantic_ai": False,
         }
     )
     return [

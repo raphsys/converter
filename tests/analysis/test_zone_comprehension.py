@@ -66,3 +66,14 @@ def test_a_single_line_zone_has_nothing_to_decide_and_is_not_sent_to_the_model()
         segmenter_page_textes(target)
     assert calls == []
     assert target.elements[0].presentation["comprehension_ia"] == "sans-objet"
+
+
+def test_geometric_pre_grouping_of_orphan_rows_never_asks_the_model():
+    from pdfexact.extract.document import _regrouper_lignes_sans_frame
+
+    rows = [element.lignes[0] for element in page().elements]
+    calls = []
+    with contexte_comprehension_texte():
+        configurer_fournisseur_comprehension_texte(lambda *args: calls.append(args))
+        groups = _regrouper_lignes_sans_frame(rows)
+    assert calls == [] and sum(len(group) for group in groups) == len(rows)

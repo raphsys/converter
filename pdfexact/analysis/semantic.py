@@ -516,6 +516,9 @@ def est_frontiere_de_paragraphe(previous, current, options: AnalysisOptions | No
     if (ambiguous_short_labels((text_of(previous), text_of(current)))
             and not (_role_of(previous) == _role_of(current) == "body")):
         return True
+    if _option(options, "semantic_ai", True) is False:
+        # Geometric pre-grouping: paragraphs are decided later, once per zone.
+        return False
     from pdfexact.layout.text_comprehension import comprendre_groupe_lignes
 
     context = contexte_lignes_texte((previous, current))
