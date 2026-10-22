@@ -10,6 +10,7 @@ import os
 import threading
 from dataclasses import replace
 from time import monotonic, sleep
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen as _urlopen
 
 from pdfexact.layout import text_comprehension_local as local
@@ -26,10 +27,37 @@ _dernier_appel = [0.0]
 USER_AGENT = "pdfexact/1.0"
 
 
+# A refused key, a forbidden access or an unknown model will fail every call
+# of the run: Groq is then switched off instead of being retried per zone.
+_DEFINITIVES = {401, 403, 404}
+_coupure = [None]
+
+
+class GroqErreur(Exception):
+    def __init__(self, raison):
+        super().__init__(raison)
+        self.raison = raison
+
+
+def coupure() -> str | None:
+    """Why Groq is switched off for this run, if it is."""
+    return _coupure[0]
+
+
 def raison_erreur(exc) -> str:
-    """Short, key-free reason of a failed call: the HTTP status when there is one."""
+    """Short, key-free reason of a failed call."""
+    if isinstance(exc, GroqErreur):
+        return exc.raison
     code = getattr(exc, "code", None)
     return f"HTTP {code}" if isinstance(code, int) else type(exc).__name__
+
+
+def _raison_http(exc) -> str:
+    try:
+        message = json.loads(exc.read()).get("error", {}).get("message")
+    except Exception:  # noqa: BLE001 - the body is optional diagnostic data
+        message = None
+    return (f"HTTP {exc.code}: {message}" if message else f"HTTP {exc.code}")[:200]
 
 
 def cle() -> str | None:
@@ -45,13 +73,21 @@ def appeler(api_key, model, messages, *, json_mode=False, timeout=30.0, urlopen=
                       headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}",
                                # The API firewall rejects Python's default agent (403, code 1010).
                                "User-Agent": USER_AGENT})
+    if _coupure[0] is not None:
+        raise GroqErreur(f"groq-disabled: {_coupure[0]}")
     with _verrou:
         attente = _dernier_appel[0] + min_interval - monotonic()
         if attente > 0:
             sleep(attente)
         _dernier_appel[0] = monotonic()
-    with (urlopen or _urlopen)(request, timeout=timeout) as response:
-        return json.loads(response.read())["choices"][0]["message"]["content"]
+    try:
+        with (urlopen or _urlopen)(request, timeout=timeout) as response:
+            return json.loads(response.read())["choices"][0]["message"]["content"]
+    except HTTPError as exc:
+        raison = _raison_http(exc)
+        if exc.code in _DEFINITIVES:
+            _coupure[0] = raison
+        raise GroqErreur(raison) from exc
 
 
 class GroqTexte:

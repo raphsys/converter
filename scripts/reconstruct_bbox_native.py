@@ -203,6 +203,12 @@ def main() -> int:
     print(f"catalogue={args.docx_out.with_suffix('.extraction.json')}")
     # What the comprehension AI actually did: a fallback here means the
     # segmentation above came from geometric heuristics, not from the model.
+    from pdfexact.layout.groq import cle, coupure
+
+    if cle() is None:
+        print("groq: aucune cle GROQ_API_KEY - comprehension locale seule, images non comprises")
+    elif coupure():
+        print(f"groq: desactive pour ce run - {coupure()}")
     for event in diagnostics:
         print(f"comprehension_ia: status={event.get('status')} reason={event.get('reason')}")
     statuts: dict[str, int] = {}

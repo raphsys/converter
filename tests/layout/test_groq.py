@@ -90,4 +90,37 @@ def test_http_errors_are_recorded_with_their_status_code():
 
     client = groq.GroqTexte("k", urlopen=urlopen, min_interval=0)
     assert client("page-segmentation", LINES, None, CONTEXT) is None
-    assert client.diagnostics["status"] == "provider-error" and client.diagnostics["reason"] == "HTTP 429"
+    assert client.diagnostics["status"] == "provider-error" and client.diagnostics["reason"].startswith("HTTP 429")
+
+
+def _http_error(code, message):
+    from urllib.error import HTTPError
+
+    body = json.dumps({"error": {"message": message, "code": "model_not_found"}}).encode()
+    return HTTPError(groq.GROQ_URL, code, "error", {}, io.BytesIO(body))
+
+
+def test_a_definitive_error_shows_groqs_message_and_stops_further_calls(monkeypatch):
+    monkeypatch.setattr(groq, "_coupure", [None])
+    calls = []
+
+    def urlopen(request, timeout):
+        calls.append(1)
+        raise _http_error(404, "The model `old-model` does not exist")
+
+    client = groq.GroqTexte("k", urlopen=urlopen, min_interval=0)
+    assert client("page-segmentation", LINES, None, CONTEXT) is None
+    assert client.diagnostics["reason"] == "HTTP 404: The model `old-model` does not exist"
+    assert client("page-segmentation", LINES, None, CONTEXT) is None
+    assert calls == [1] and groq.coupure() == "HTTP 404: The model `old-model` does not exist"
+
+
+def test_a_transient_error_does_not_stop_groq(monkeypatch):
+    monkeypatch.setattr(groq, "_coupure", [None])
+
+    def urlopen(request, timeout):
+        raise _http_error(429, "Rate limit reached")
+
+    client = groq.GroqTexte("k", urlopen=urlopen, min_interval=0)
+    client("page-segmentation", LINES, None, CONTEXT)
+    assert groq.coupure() is None
