@@ -30,8 +30,11 @@ def creer_fournisseur_comprehension_texte_ai(
     if not endpoint:
         # Comprehension is mandatory: the local model's decisions are applied.
         from pdfexact.layout import text_comprehension_local as local
+        from pdfexact.layout.confirmation_groq import FournisseurConfirme, creer_confirmation_groq
 
-        return local.creer_fournisseur_comprehension_texte_local(model_root=model_root, timeout=local_timeout)
+        provider = local.creer_fournisseur_comprehension_texte_local(model_root=model_root, timeout=local_timeout)
+        confirmation = creer_confirmation_groq()
+        return FournisseurConfirme(provider, confirmation) if confirmation is not None else provider
 
     def refuse(status, kind, lines, reason, context):
         provider.diagnostics = {"status": status, "reason": reason}

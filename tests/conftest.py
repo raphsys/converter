@@ -13,6 +13,8 @@ def sans_modele_comprehension_reel(monkeypatch, tmp_path_factory):
     explicit model root or configures a fake one.
     """
     monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_MODEL_ROOT", str(tmp_path_factory.mktemp("aucun-modele")))
+    # No test may reach the real Groq API.
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
 
 @pytest.fixture

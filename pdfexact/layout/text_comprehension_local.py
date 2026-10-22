@@ -172,11 +172,23 @@ def _segmenter_par_fenetres(appeler, trop_grand, kind, lines, role, context):
     )
 
 
-def _prompt(kind, payload):
-    prompt = f"<|im_start|>system\n{_SYSTEM} {_TASKS[kind]}<|im_end|>\n"
+def _messages(kind, payload):
+    """The comprehension conversation: instructions, examples, then the document."""
+    messages = [{"role": "system", "content": f"{_SYSTEM} {_TASKS[kind]}"}]
     for document, decision in _examples(kind):
-        prompt += f"<|im_start|>user\n{_document_json(document)}<|im_end|>\n"
-        prompt += f"<|im_start|>assistant\n{json.dumps(decision)}<|im_end|>\n"
+        messages.append({"role": "user", "content": _document_json(document)})
+        messages.append({"role": "assistant", "content": json.dumps(decision)})
+    messages.append({"role": "user", "content": _document_json(_document_demande(kind, payload))})
+    return messages
+
+
+def _prompt(kind, payload):
+    """The same conversation in the ChatML form of the local Qwen model."""
+    return "".join(f"<|im_start|>{message['role']}\n{message['content']}<|im_end|>\n"
+                   for message in _messages(kind, payload)) + "<|im_start|>assistant\n"
+
+
+def _document_demande(kind, payload):
     document = {"lines": payload["lines"], "layout": {"frame_role": payload["frame_role"], "metadata": payload["metadata"]}}
     document["line_count"] = len(payload["lines"])
     if kind in {"page-segmentation", "paragraph-reflow"}:
@@ -189,7 +201,7 @@ def _prompt(kind, payload):
             for index, (left, right) in enumerate(zip(lines, lines[1:]))
             if hard_line_break(left, right) or cjk_join_without_space(left, right)
         ]
-    return prompt + f"<|im_start|>user\n{_document_json(document)}<|im_end|>\n<|im_start|>assistant\n"
+    return document
 
 
 def resolve_local_model_path(model_root=None) -> Path:
