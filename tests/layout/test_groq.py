@@ -69,3 +69,25 @@ def test_no_decision_when_neither_model_decides():
 def test_no_key_means_no_groq(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     assert groq.creer_groq_texte() is None
+
+
+def test_requests_carry_an_explicit_user_agent_so_the_api_firewall_accepts_them():
+    sent = {}
+
+    def urlopen(request, timeout):
+        sent.update(dict(request.header_items()))
+        return answer(["break"])
+
+    groq.GroqTexte("k", urlopen=urlopen, min_interval=0)("page-segmentation", LINES, None, CONTEXT)
+    assert sent.get("User-agent", "").startswith("pdfexact/")
+
+
+def test_http_errors_are_recorded_with_their_status_code():
+    from urllib.error import HTTPError
+
+    def urlopen(request, timeout):
+        raise HTTPError(groq.GROQ_URL, 429, "Too Many Requests", {}, io.BytesIO(b"rate limit"))
+
+    client = groq.GroqTexte("k", urlopen=urlopen, min_interval=0)
+    assert client("page-segmentation", LINES, None, CONTEXT) is None
+    assert client.diagnostics["status"] == "provider-error" and client.diagnostics["reason"] == "HTTP 429"

@@ -23,6 +23,15 @@ _verrou = threading.Lock()
 _dernier_appel = [0.0]
 
 
+USER_AGENT = "pdfexact/1.0"
+
+
+def raison_erreur(exc) -> str:
+    """Short, key-free reason of a failed call: the HTTP status when there is one."""
+    code = getattr(exc, "code", None)
+    return f"HTTP {code}" if isinstance(code, int) else type(exc).__name__
+
+
 def cle() -> str | None:
     return os.environ.get("GROQ_API_KEY", "").strip() or None
 
@@ -33,7 +42,9 @@ def appeler(api_key, model, messages, *, json_mode=False, timeout=30.0, urlopen=
     if json_mode:
         body["response_format"] = {"type": "json_object"}
     request = Request(GROQ_URL, data=json.dumps(body).encode("utf-8"), method="POST",
-                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"})
+                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}",
+                               # The API firewall rejects Python's default agent (403, code 1010).
+                               "User-Agent": USER_AGENT})
     with _verrou:
         attente = _dernier_appel[0] + min_interval - monotonic()
         if attente > 0:
@@ -61,7 +72,7 @@ class GroqTexte:
             content = appeler(self._api_key, self.model, local._messages(kind, payload), json_mode=True,
                               urlopen=self._urlopen, min_interval=self.min_interval)
         except Exception as exc:  # noqa: BLE001 - network or API error: no decision, recorded
-            self.diagnostics = {"status": "provider-error", "provider": "groq", "reason": type(exc).__name__}
+            self.diagnostics = {"status": "provider-error", "provider": "groq", "reason": raison_erreur(exc)}
             return None
         try:
             decision = local._decoder_reponse_locale(content, kind, lines, context)

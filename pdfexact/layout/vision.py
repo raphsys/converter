@@ -118,7 +118,7 @@ def annoter_zones_visuelles(document, source_pdf, vision) -> list[dict]:
                             vus[key] = ({**result, "status": "compris", "model": modele} if result
                                         else {"status": "non-compris", "reason": f"unreadable-answer:{answer[:80]}", "model": modele})
                         except Exception as exc:  # noqa: BLE001 - the zone is marked, the run goes on
-                            vus[key] = {"status": "non-compris", "reason": f"{type(exc).__name__}: {exc}"[:200], "model": modele}
+                            vus[key] = {"status": "non-compris", "reason": groq.raison_erreur(exc), "model": modele}
                 element.attributes["vision"] = dict(vus[key])
                 rapports.append({"page": page.index, **vus[key]})
     return rapports
