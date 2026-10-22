@@ -1,5 +1,4 @@
-"""SmolVLM zone vision: deterministic parts tested without loading the model."""
-import numpy as np
+"""Zone vision by Groq: deterministic parts tested without any network call."""
 import pytest
 from PIL import Image
 
@@ -8,29 +7,10 @@ from pdfexact.ir import ImageEl, Page, RasterEl
 from pdfexact.layout import vision
 
 
-def test_image_is_resized_padded_normalised_and_masked():
-    pixels, mask = vision._pretraiter(Image.new("RGB", (1024, 256), (255, 255, 255)))
-    assert pixels.shape == (1, 1, 3, 512, 512) and pixels.dtype == np.float32
-    assert mask.shape == (1, 1, 512, 512) and mask.dtype == np.bool_
-    # Longest edge 1024 -> 512, so the real image fills 512 x 128 rows; the rest is padding.
-    assert mask[0, 0, :128].all() and not mask[0, 0, 128:].any()
-    assert np.allclose(pixels[0, 0, :, :128], 1.0) and np.allclose(pixels[0, 0, :, 128:], 0.0)
 
 
-def test_prompt_holds_exactly_sixty_four_image_tokens_framed_like_idefics3():
-    text = vision._prompt("Question?")
-    assert text.startswith("<|im_start|>User:<fake_token_around_image><global-img>")
-    assert text.count("<image>") == 64
-    assert text.endswith("Question?<end_of_utterance>\nAssistant:")
 
 
-def test_image_features_replace_the_image_token_embeddings_in_order():
-    ids = np.array([[1, 7, vision.IMAGE_TOKEN, vision.IMAGE_TOKEN, 9]])
-    embeds = np.zeros((1, 5, 3), dtype=np.float32)
-    features = np.array([[[1, 1, 1], [2, 2, 2]]], dtype=np.float32)
-    merged = vision._fusionner(ids, embeds, features)
-    assert merged[0, 2].tolist() == [1, 1, 1] and merged[0, 3].tolist() == [2, 2, 2]
-    assert merged[0, 0].tolist() == [0, 0, 0]
 
 
 @pytest.mark.parametrize(("answer", "expected"), [
@@ -101,3 +81,34 @@ def test_ocr_reads_only_the_selected_zones_and_marks_text_in_image(monkeypatch, 
     assert added == 1 and read in page.elements
     assert calls["zones_cibles"] == [zone.bbox] and calls["zones_ignorees"] == [native_box]
     assert read.attributes["text_in_image"] is True
+
+
+def test_groq_vision_sends_the_zone_image_and_the_question():
+    import io as stdio
+    import json
+
+    sent = {}
+
+    def urlopen(request, timeout):
+        sent.update(json.loads(request.data))
+        return stdio.BytesIO(json.dumps({"choices": [{"message": {"content": "chart, yes"}}]}).encode())
+
+    answer = vision.VisionGroq("k", model="vision-model", urlopen=urlopen, min_interval=0).repondre(Image.new("RGB", (40, 30)))
+    assert answer == "chart, yes" and sent["model"] == "vision-model"
+    parts = sent["messages"][0]["content"]
+    assert parts[0] == {"type": "text", "text": vision.QUESTION}
+    assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def test_without_groq_key_every_visual_zone_is_marked_not_understood(tmp_path):
+    import pymupdf
+
+    source = tmp_path / "p.pdf"
+    with pymupdf.open() as pdf:
+        pdf.new_page(width=612, height=792)
+        pdf.save(source)
+    zone = ImageEl(BBox(u(72), u(72), u(300), u(250)), "media-1")
+    document = type("Doc", (), {"pages": [Page(0, u(612), u(792), [zone])]})()
+    assert vision.annoter_zones_visuelles(document, source, None) == [
+        {"page": 0, "status": "non-compris", "reason": "no-groq-key", "model": None}]
+    assert zone.attributes["vision"]["status"] == "non-compris"

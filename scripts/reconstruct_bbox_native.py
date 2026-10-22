@@ -22,7 +22,7 @@ from pdfexact.layout.text_comprehension import (
     diagnostics_comprehension_texte,
 )
 from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehension_texte_ai
-from pdfexact.layout.vision import VisionSmolVLM, annoter_zones_visuelles
+from pdfexact.layout.vision import annoter_zones_visuelles, creer_vision_groq
 from pdfexact.model_paths import resolve_ai_models_root
 from pdfexact.report import Rapport
 
@@ -183,7 +183,7 @@ def main() -> int:
     with contexte_comprehension_texte():
         document = _extraire_scene(args.source_pdf, selected_pages, args)
         _normaliser_texte(document)
-        vision = annoter_zones_visuelles(document, args.source_pdf, VisionSmolVLM(getattr(args, "ai_models_root", None)))
+        vision = annoter_zones_visuelles(document, args.source_pdf, creer_vision_groq())
         textes_images = lire_texte_des_images(
             document, args.source_pdf, getattr(document, "polices", {}), dpi=args.dpi,
             language=getattr(args, "ocr_language", "auto"),

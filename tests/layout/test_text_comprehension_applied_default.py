@@ -24,15 +24,15 @@ def test_local_generator_uses_every_cpu_core(monkeypatch):
     assert local._cpu_threads() >= 1
 
 
-def test_groq_key_wraps_the_local_model_with_confirmation(monkeypatch):
-    from pdfexact.layout import confirmation_groq
+def test_groq_key_makes_groq_decide_with_the_local_model_as_fallback(monkeypatch):
+    from pdfexact.layout import groq as groq_module
 
     monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     sentinel = object()
     monkeypatch.setattr(local, "creer_fournisseur_comprehension_texte_local", lambda **kwargs: sentinel)
     provider = ai.creer_fournisseur_comprehension_texte_ai()
-    assert isinstance(provider, confirmation_groq.FournisseurConfirme) and provider.local is sentinel
+    assert isinstance(provider, groq_module.GroqPuisLocal) and provider.local is sentinel
 
 
 def test_tests_never_see_a_real_groq_key():
