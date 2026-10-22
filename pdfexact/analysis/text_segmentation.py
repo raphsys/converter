@@ -166,6 +166,12 @@ def _groupes_ia(units, obstacles=(), protected=()):
 
     groupes_globaux, sans_decision = [], set()
     for zone, zone_units in par_zone.items():
+        if len(zone_units) == 1:
+            # One row has no boundary to decide: nothing for the model to understand.
+            # It keeps the per-source-block segmentation, like undecided rows.
+            zone_units[0].presentation["comprehension_ia"] = "sans-objet"
+            sans_decision.add(id(zone_units[0]))
+            continue
         groupes_locaux = _groupes_ia_local(zone_units, obstacles, protected)
         if groupes_locaux is None:
             sans_decision.update(id(unit) for unit in zone_units)

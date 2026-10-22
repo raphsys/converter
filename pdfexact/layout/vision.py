@@ -29,7 +29,16 @@ QUESTION = (
 )
 # Below this size a zone holds no readable content (rules, bullets, specks).
 COTE_MIN_PT = 36.0
-_MODELE = "smolvlm-500m-int8"
+_MODELE = "smolvlm-500m-q4-int8"
+# Quantised graphs runnable by onnxruntime on CPU. The int8 vision graph uses a
+# signed ConvInteger that the CPU provider does not implement; its q4 variant
+# quantises the matrix products to 4 bits (MatMulNBits) and keeps the patch
+# convolution in float.
+FICHIERS_ONNX = {
+    "vision_encoder": "vision_encoder_q4.onnx",
+    "embed_tokens": "embed_tokens_int8.onnx",
+    "decoder_model_merged": "decoder_model_merged_int8.onnx",
+}
 
 
 def _pretraiter(image: Image.Image):
@@ -106,7 +115,7 @@ class VisionSmolVLM:
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
         def session(name):
-            return ort.InferenceSession(str(self.path / "onnx" / f"{name}_int8.onnx"), options,
+            return ort.InferenceSession(str(self.path / "onnx" / FICHIERS_ONNX[name]), options,
                                         providers=["CPUExecutionProvider"])
 
         text = json.loads((self.path / "config.json").read_text())["text_config"]

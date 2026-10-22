@@ -55,3 +55,14 @@ def test_every_paragraph_records_whether_comprehension_decided_it(provider, stat
         configurer_fournisseur_comprehension_texte(provider)
         segmenter_page_textes(target)
     assert {element.presentation["comprehension_ia"] for element in target.elements} == {status}
+
+
+def test_a_single_line_zone_has_nothing_to_decide_and_is_not_sent_to_the_model():
+    target = page()
+    target.elements = target.elements[:1]
+    calls = []
+    with contexte_comprehension_texte():
+        configurer_fournisseur_comprehension_texte(lambda *args: calls.append(args))
+        segmenter_page_textes(target)
+    assert calls == []
+    assert target.elements[0].presentation["comprehension_ia"] == "sans-objet"
