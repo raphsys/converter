@@ -149,33 +149,46 @@ def _fuser_groupe(group, *, validated_continuation=False):
     return base
 
 
-def _groupes_ia(units, obstacles=(), protected=()):
-    """Analyse chaque bloc source; un echec ne saute pas les blocs suivants."""
-    par_proprietaire: dict[str, list] = {}
-    for unit in units:
-        owner = str((getattr(unit, "presentation", {}) or {}).get("segmentation_owner", ""))
-        par_proprietaire.setdefault(owner, []).append(unit)
+def _owner(unit):
+    return str((getattr(unit, "presentation", {}) or {}).get("segmentation_owner", ""))
 
-    groupes_globaux = []
-    for owner_units in par_proprietaire.values():
-        owner_ids = {id(unit) for unit in owner_units}
-        neighbors = [unit for unit in units if id(unit) not in owner_ids]
-        groupes_locaux = _groupes_ia_local(owner_units, obstacles, protected, neighbors=neighbors)
+
+def _groupes_ia(units, obstacles=(), protected=()):
+    """Ask comprehension once per layout zone; a zone failure keeps the next ones.
+
+    A zone holds every row of a detected frame, whatever its source block: the
+    model decides paragraphs across blocks, and its groups are final. Without a
+    decision the zone falls back to geometric segmentation per source block.
+    """
+    par_zone: dict[str, list] = {}
+    for unit in units:
+        par_zone.setdefault(unit.layout_frame_id or f"owner:{_owner(unit)}", []).append(unit)
+
+    groupes_globaux, sans_decision = [], set()
+    for zone, zone_units in par_zone.items():
+        groupes_locaux = _groupes_ia_local(zone_units, obstacles, protected)
         if groupes_locaux is None:
-            groupes_locaux = _segment_units(owner_units, obstacles, protected=protected)
+            sans_decision.update(id(unit) for unit in zone_units)
+            continue
+        for groupe in groupes_locaux:
+            for unit in groupe:
+                unit.presentation["ai_zone"] = zone
         groupes_globaux.extend(groupes_locaux)
+    # Undecided rows keep the per-source-block fallback: a block spanning two
+    # zones is still segmented as one source.
+    restants = [unit for unit in units if id(unit) in sans_decision]
+    for owner in dict.fromkeys(_owner(unit) for unit in restants):
+        owner_units = [unit for unit in restants if _owner(unit) == owner]
+        groupes_globaux.extend(_segment_units(owner_units, obstacles, protected=protected))
     return groupes_globaux or None
 
 
-def _groupes_ia_local(units, obstacles=(), protected=(), *, neighbors=()):
+def _groupes_ia_local(units, obstacles=(), protected=()):
     if not units:
         return None
     metadata = contexte_lignes_texte(units, metadonnees={
         "obstacles": [[b.x0, b.y0, b.x1, b.y1] for b in obstacles],
     })
-    surrounding = [*neighbors, *protected]
-    if surrounding:
-        metadata["neighbors"] = contexte_lignes_texte(surrounding)["lines"]
     textes = [row["text"] for row in metadata["lines"]]
     decision = comprendre_segmentation_page(textes, metadonnees=metadata)
     if decision is None or not decision.line_groups:
@@ -381,6 +394,10 @@ def _join_source_fragments(groups, obstacles, protected=()):
         continuation = (
             previous is not None
             and not any(unit.presentation.get("paragraph_validated") for unit in candidates)
+            # Inside a zone judged by comprehension its paragraphs are final; the
+            # junction between two zones was never judged and keeps its proof rules.
+            and not (previous.presentation.get("ai_zone") is not None
+                     and previous.presentation.get("ai_zone") == first.presentation.get("ai_zone"))
             and previous.presentation["segmentation_owner"] != first.presentation["segmentation_owner"]
             and all(unit.presentation.get("source_visible_line_count") == 1 for unit in candidates)
             and ((previous.layout_frame_id and previous.layout_frame_id == first.layout_frame_id)

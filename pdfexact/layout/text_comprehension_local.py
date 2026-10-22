@@ -74,6 +74,104 @@ def _document_json(data):
     return json.dumps(data, ensure_ascii=False, allow_nan=False).replace("<", "\\u003c").replace(">", "\\u003e")
 
 
+_EMU_PAR_PT = 12700
+
+
+def _metadonnees_modele(context):
+    """What the model reads about the requested lines; validation keeps the full context.
+
+    Text is already in ``lines``; page-wide rows (``neighbors``) and identifiers
+    made every request exceed the token budget without informing the decision.
+    """
+    if not isinstance(context, dict):
+        return context
+    rows = context.get("lines") or []
+
+    def pt(values):
+        return [round(value / _EMU_PAR_PT, 1) for value in values]
+
+    lines = []
+    for row in rows:
+        style = row.get("dominant_style") or {}
+        item = {"i": row.get("index"), "bbox_pt": pt(row["bbox"]) if row.get("bbox") else None,
+                "size_pt": style.get("size_pt"), "bold": style.get("bold"), "italic": style.get("italic"),
+                "alignment": row.get("alignment"), "role": row.get("semantic_role") or row.get("layout_role"),
+                "blank_before": row.get("blank_separator_before"), "boundary_before": row.get("boundary_before"),
+                "boundary_after": row.get("boundary_after")}
+        lines.append({key: value for key, value in item.items() if value is not None and value is not False})
+    view = {"lines": lines, "page_index": context.get("page_index")}
+    boxes = [row["bbox"] for row in rows if row.get("bbox")]
+    if boxes:
+        top, bottom = min(box[1] for box in boxes), max(box[3] for box in boxes)
+        obstacles = [pt(box) for box in context.get("obstacles") or () if box[1] < bottom and box[3] > top]
+        if obstacles:
+            view["obstacles_pt"] = obstacles
+    return view
+
+
+def _fenetres(count, size):
+    """Contiguous windows sharing one line: every adjacent pair lies in exactly one window."""
+    size = max(size, 2)
+    if count <= size:
+        return [range(count)]
+    windows, start = [], 0
+    while True:
+        end = min(count, start + size)
+        windows.append(range(start, end))
+        if end == count:
+            return windows
+        start = end - 1
+
+
+def _recoudre_groupes(count, windows, groups_per_window):
+    """Join each adjacent pair as decided in its window, then rebuild the groups."""
+    joined = [False] * max(count - 1, 0)
+    for window, groups in zip(windows, groups_per_window):
+        owner = {local: number for number, group in enumerate(groups) for local in group}
+        for local in range(len(window) - 1):
+            joined[window[local]] = owner.get(local) == owner.get(local + 1)
+    result, current = [], [0]
+    for index in range(1, count):
+        if joined[index - 1]:
+            current.append(index)
+        else:
+            result.append(tuple(current))
+            current = [index]
+    result.append(tuple(current))
+    return tuple(result)
+
+
+def _sous_contexte(context, window):
+    """Context restricted to one window, rows renumbered from zero."""
+    if not isinstance(context, dict):
+        return context
+    rows = context.get("lines") or []
+    return {**context, "lines": [{**rows[source], "index": local} for local, source in enumerate(window)]}
+
+
+def _segmenter_par_fenetres(appeler, trop_grand, kind, lines, role, context):
+    """Split an oversized segmentation request instead of refusing it.
+
+    The window shrinks until its request fits; every window is decided by the
+    model and the decisions are sewn together. One undecided window fails all.
+    """
+    size = min(len(lines), 64)
+    while size > 2 and trop_grand(kind, lines[:size], role, _sous_contexte(context, range(size))):
+        size = max(2, size // 2)
+    windows = _fenetres(len(lines), size)
+    decisions = []
+    for window in windows:
+        decision = appeler(kind, tuple(lines[index] for index in window), role, _sous_contexte(context, window))
+        if decision is None or not decision.line_groups:
+            return None
+        decisions.append(decision)
+    return TextUnderstandingDecision(
+        kind=decisions[0].kind, action="segment-page", confidence=min(item.confidence for item in decisions),
+        evidence=("local-ct2-cpu", f"windows={len(windows)}"),
+        line_groups=_recoudre_groupes(len(lines), windows, [item.line_groups for item in decisions]),
+    )
+
+
 def _prompt(kind, payload):
     prompt = f"<|im_start|>system\n{_SYSTEM} {_TASKS[kind]}<|im_end|>\n"
     for document, decision in _examples(kind):
@@ -257,12 +355,33 @@ class LocalTextUnderstandingProvider:
         _signaler_diagnostic(status, kind, lines, f"local_cpu path={self.path}: {detail}", contexte=context)
         return None
 
+    @staticmethod
+    def _payload(kind, lines, role, context):
+        return {
+            "schema": "pdfexact.text_understanding.v1", "kind": kind,
+            "lines": [{"i": index, "text": text} for index, text in enumerate(lines)],
+            "frame_role": role, "metadata": _metadonnees_modele(context), "actions": _ACTIONS[kind],
+        }
+
+    def _trop_grand(self, kind, lines, role, context):
+        """Whether one request exceeds the model input budget (lines, characters, tokens)."""
+        if len(lines) > 64 or sum(len(line) for line in lines) > 16000:
+            return True
+        payload = self._payload(kind, lines, role, context)
+        if len(_document_json(payload)) > 24000:
+            return True
+        return len(self.tokenizer.encode(_prompt(kind, payload), add_special_tokens=False).tokens) > self.max_input_tokens
+
     def __call__(self, kind: str, lines: tuple[str, ...], role: str | None, context: TextUnderstandingContext) -> TextUnderstandingDecision | None:
         self.last_request = None
         for key in ("last_output", "elapsed_seconds", "reason"):
             self.diagnostics.pop(key, None)
-        if kind not in _ACTIONS or not lines or len(lines) > 64 or not all(isinstance(line, str) for line in lines):
-            return self._abstain("input-limit", kind, lines, context, "unsupported request or more than 64 lines")
+        if kind not in _ACTIONS or not lines or not all(isinstance(line, str) for line in lines):
+            return self._abstain("input-limit", kind, lines, context, "unsupported request")
+        if kind == "page-segmentation" and len(lines) > 2 and self._trop_grand(kind, lines, role, context):
+            return _segmenter_par_fenetres(self, self._trop_grand, kind, lines, role, context)
+        if len(lines) > 64:
+            return self._abstain("input-limit", kind, lines, context, "more than 64 lines")
         if sum(len(line) for line in lines) > 16000:
             return self._abstain("input-limit", kind, lines, context, "more than 16000 source characters; no truncation")
         started = monotonic()
@@ -270,11 +389,7 @@ class LocalTextUnderstandingProvider:
         if not self._lock.acquire(timeout=self.timeout):
             return self._abstain("timeout", kind, lines, context, "local provider busy")
         try:
-            payload = {
-                "schema": "pdfexact.text_understanding.v1", "kind": kind,
-                "lines": [{"i": index, "text": text} for index, text in enumerate(lines)],
-                "frame_role": role, "metadata": deepcopy(context), "actions": _ACTIONS[kind],
-            }
+            payload = self._payload(kind, lines, role, context)
             serialized = _document_json(payload)
             if len(serialized) > 24000:
                 return self._abstain("input-limit", kind, lines, context, "metadata/input exceeds 24000 characters; no truncation")
