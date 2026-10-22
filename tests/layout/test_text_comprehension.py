@@ -159,5 +159,7 @@ def test_segmentation_ia_ne_fusionne_pas_deux_bboxes_sources():
     finally:
         configurer_fournisseur_comprehension_texte(None)
 
-    assert appels == [("First paragraph",), ("Second paragraph",)]
+    # Each source block is a one-row zone: no boundary to decide, no model call.
+    assert appels == []
     assert len(page.elements) == 2
+    assert {element.presentation["comprehension_ia"] for element in page.elements} == {"sans-objet"}
