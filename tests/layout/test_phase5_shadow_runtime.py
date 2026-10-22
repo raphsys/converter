@@ -9,21 +9,12 @@ import pytest
 
 from pdfexact.layout import text_comprehension as comprehension
 from pdfexact.layout import text_comprehension_ai as ai
-from pdfexact.layout import text_comprehension_local as local
 
 
 ABSTENTION = {"kind": "unknown", "action": "abstain", "confidence": 0.0,
               "evidence": ["Source context does not establish a boundary."]}
 
 
-@pytest.mark.parametrize("kind", ["line", "group", "page-segmentation", "paragraph-reflow"])
-def test_explicit_abstention_is_distinct_and_preserves_raw_evidence(kind):
-    original = deepcopy(ABSTENTION)
-    decision = local._decoder_reponse_locale(json.dumps(original), kind, ("first", "second"), None)
-    assert decision.kind == "unknown" and decision.action == "abstain"
-    assert decision.evidence == tuple(original["evidence"])
-    assert not decision.ai_used and decision.fallback_used
-    assert original == ABSTENTION
 
 
 @pytest.mark.parametrize("change", [
@@ -96,36 +87,6 @@ def test_blank_lines_and_sparse_source_indices_remain_aligned(kind):
     assert original == before and context["lines"][0]["source_ids"] == ["source-7"]
 
 
-@pytest.fixture
-def synthetic_runtime(monkeypatch, tmp_path):
-    state = SimpleNamespace(raw=json.dumps(ABSTENTION), loads=0, calls=0, failure=None, token=True)
-    tokenizer = SimpleNamespace(
-        encode=lambda *_args, **_kwargs: SimpleNamespace(tokens=["input"] * 3),
-        token_to_id=lambda _token: 0, decode=lambda *_args, **_kwargs: state.raw,
-    )
-
-    class Generator:
-        def __init__(self, *_args, **_kwargs):
-            state.loads += 1
-            if state.failure == "load":
-                raise RuntimeError("synthetic load failure")
-
-        def generate_batch(self, *_args, **kwargs):
-            state.calls += 1
-            if state.failure == "before-first-token":
-                raise RuntimeError("synthetic runtime failure")
-            if state.token:
-                kwargs["callback"](SimpleNamespace(token="output"))
-            return [SimpleNamespace(sequences=[["output"]])]
-
-    monkeypatch.setattr(local, "_load_runtime", lambda: SimpleNamespace(Generator=Generator))
-    monkeypatch.setattr(local, "_inspect_bundle", lambda *_args: tokenizer)
-    monkeypatch.setattr(local, "_memory_preflight", lambda _path: {"synthetic": True})
-    payload = {"model_path": str(tmp_path), "kind": "group", "frame_role": "text-column",
-               "lines": [{"i": 0, "text": "A complete source sentence"},
-                         {"i": 1, "text": "continues without a break."}],
-               "metadata": None, "max_input_tokens": 10, "max_output_tokens": 32}
-    return state, payload
 
 
 

@@ -23,19 +23,11 @@ def creer_fournisseur_comprehension_texte_ai(
     *,
     url: str | None = None,
     timeout: float = 3.0,
-    model_root=None,
-    local_timeout: float = 30.0,
 ) -> TextUnderstandingProvider | None:
     endpoint = (url or "").strip() or os.environ.get("PDFEXACT_TEXT_UNDERSTANDING_URL", "").strip()
     if not endpoint:
-        # Comprehension is mandatory: the local model's decisions are applied.
-        from pdfexact.layout import text_comprehension_local as local
-        from pdfexact.layout.groq import GroqPuisLocal, creer_groq_texte
-
-        # Groq decides; the local model is the offline fallback.
-        provider = local.creer_fournisseur_comprehension_texte_local(model_root=model_root, timeout=local_timeout)
-        groq = creer_groq_texte()
-        return GroqPuisLocal(groq, provider) if groq is not None else provider
+        # No model: segmentation is geometric, every request is marked.
+        return None
 
     def refuse(status, kind, lines, reason, context):
         provider.diagnostics = {"status": status, "reason": reason}

@@ -90,7 +90,7 @@ def test_missing_provider_warns_once_and_resets_for_next_analysis(caplog):
     message = _warnings(caplog)[0]
     assert "status=missing-provider" in message
     assert "PDFEXACT_TEXT_UNDERSTANDING_URL" in message
-    assert "local" in message.lower()
+    assert "geometric" in message.lower()
     assert "fallback" in message.lower()
 
     comprehension.configurer_fournisseur_comprehension_texte(None)

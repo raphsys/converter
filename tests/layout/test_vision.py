@@ -1,4 +1,4 @@
-"""Zone vision by Groq: deterministic parts tested without any network call."""
+"""Zone vision: deterministic parts tested without any model."""
 import pytest
 from PIL import Image
 
@@ -83,24 +83,9 @@ def test_ocr_reads_only_the_selected_zones_and_marks_text_in_image(monkeypatch, 
     assert read.attributes["text_in_image"] is True
 
 
-def test_groq_vision_sends_the_zone_image_and_the_question():
-    import io as stdio
-    import json
-
-    sent = {}
-
-    def urlopen(request, timeout):
-        sent.update(json.loads(request.data))
-        return stdio.BytesIO(json.dumps({"choices": [{"message": {"content": "chart, yes"}}]}).encode())
-
-    answer = vision.VisionGroq("k", model="vision-model", urlopen=urlopen, min_interval=0).repondre(Image.new("RGB", (40, 30)))
-    assert answer == "chart, yes" and sent["model"] == "vision-model"
-    parts = sent["messages"][0]["content"]
-    assert parts[0] == {"type": "text", "text": vision.QUESTION}
-    assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
 
 
-def test_without_groq_key_every_visual_zone_is_marked_not_understood(tmp_path):
+def test_without_vision_model_every_visual_zone_is_marked_not_understood(tmp_path):
     import pymupdf
 
     source = tmp_path / "p.pdf"
@@ -110,5 +95,5 @@ def test_without_groq_key_every_visual_zone_is_marked_not_understood(tmp_path):
     zone = ImageEl(BBox(u(72), u(72), u(300), u(250)), "media-1")
     document = type("Doc", (), {"pages": [Page(0, u(612), u(792), [zone])]})()
     assert vision.annoter_zones_visuelles(document, source, None) == [
-        {"page": 0, "status": "non-compris", "reason": "no-groq-key", "model": None}]
+        {"page": 0, "status": "non-compris", "reason": "sans-modele-vision", "model": None}]
     assert zone.attributes["vision"]["status"] == "non-compris"

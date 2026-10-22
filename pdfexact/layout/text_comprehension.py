@@ -219,9 +219,8 @@ def contexte_lignes_texte(elements_or_lines, *, metadonnees=None) -> dict:
 
 
 _FOURNISSEUR_ABSENT = (
-    "no text-understanding provider/endpoint configured; set --text-understanding-url "
-    "or PDFEXACT_TEXT_UNDERSTANDING_URL, or a compatible local CPU bundle via "
-    "PDFEXACT_TEXT_UNDERSTANDING_MODEL_ROOT (runtime/tokenizer/model may be unavailable)"
+    "no text-understanding endpoint configured (--text-understanding-url or "
+    "PDFEXACT_TEXT_UNDERSTANDING_URL); segmentation is geometric"
 )
 
 

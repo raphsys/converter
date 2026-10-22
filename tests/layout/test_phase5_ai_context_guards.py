@@ -11,14 +11,11 @@ from pdfexact.geometry import BBox, pt_vers_emu as u
 from pdfexact.ir import FontRef, ImageEl, Line, Span, TextBox
 from pdfexact.layout import text_comprehension as comprehension
 from pdfexact.layout import text_comprehension_ai as ai
-from pdfexact.layout import text_comprehension_local as local
 
 
 @pytest.fixture(autouse=True)
 def isolated_analysis(monkeypatch, tmp_path):
     monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
-    monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_MODEL_ROOT", str(tmp_path / "absent"))
-    monkeypatch.setattr(local, "_load_runtime", lambda: pytest.fail("real runtime forbidden"))
     with comprehension.contexte_comprehension_texte():
         comprehension.configurer_fournisseur_comprehension_texte(None)
         yield

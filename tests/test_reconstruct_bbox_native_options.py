@@ -62,7 +62,6 @@ def test_user_main_propagates_language_roots_and_separate_opt_in(
     assert (Path(extraction["layout_model_root"]).resolve()
             if extraction["layout_model_root"] is not None else None) == (
                 tmp_path / layout_root if layout_root else None)
-    assert factory["model_root"] == (None if ocr_root == "env-models" else tmp_path / ocr_root)
     assert factory["url"] is None and factory["timeout"] == 3.0
     assert extraction["strict"] is True and extraction["layout_ai"] is True
     mode = "rapidocr" if "rapidocr" in flags else "spans"
@@ -76,7 +75,6 @@ def test_legacy_namespace_missing_new_options_is_compatible(pipeline):
                            layout_device=None)
     reconstruct._extraire_scene(Path("unused.pdf"), [0], args)
     assert pipeline["extract"]["ocr_language"] == "auto"
-    assert pipeline["factory"]["model_root"] is None
     assert pipeline["factory"]["timeout"] == .75
 
 
@@ -84,14 +82,10 @@ def test_legacy_namespace_missing_new_options_is_compatible(pipeline):
 def test_http_priority_survives_models_root(
     monkeypatch, tmp_path, pipeline, explicit_url
 ):
-    from pdfexact.layout import text_comprehension_local
     requests = []
     monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_URL", "http://environment.test/understand")
     monkeypatch.setattr(reconstruct, "creer_fournisseur_comprehension_texte_ai",
                         http.creer_fournisseur_comprehension_texte_ai)
-
-    def forbidden(*args, **kwargs):
-        pytest.fail("HTTP must take priority without initializing a local LLM")
 
     def respond(request, timeout):
         requests.append((request.full_url, timeout))
@@ -102,7 +96,6 @@ def test_http_priority_survives_models_root(
         assert decision.ai_used and not decision.fallback_used
         return SimpleNamespace(pages=[])
 
-    monkeypatch.setattr(text_comprehension_local, "creer_fournisseur_comprehension_texte_local", forbidden)
     monkeypatch.setattr(http, "urlopen", respond)
     monkeypatch.setattr(reconstruct, "extraire", extract)
     flags = ["--ai-models-root", str(tmp_path), "--text-understanding-timeout", "0.75"]

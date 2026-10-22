@@ -7,15 +7,11 @@ from PIL import Image
 
 @pytest.fixture(autouse=True)
 def sans_modele_comprehension_reel(monkeypatch, tmp_path_factory):
-    """Unit tests stay deterministic: no real comprehension model is loaded.
+    """Unit tests stay deterministic: no external comprehension endpoint.
 
-    Production always uses the local model; a test needing a provider passes an
-    explicit model root or configures a fake one.
+    A test needing a provider configures a fake one.
     """
-    monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_MODEL_ROOT", str(tmp_path_factory.mktemp("aucun-modele")))
-    # No test may reach the real Groq API, nor inherit another test's switch-off.
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.setattr("pdfexact.layout.groq._coupure", [None])
+    monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
 
 
 @pytest.fixture

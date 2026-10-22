@@ -1,4 +1,4 @@
-"""Zone vision by Groq: what each visual zone is and whether it holds text.
+"""Zone vision: what each visual zone is and whether it holds text.
 
 Each visual zone (image or raster) is classified by type and by whether it
 holds readable text: text inside images must be read (OCR) and translated,
@@ -7,15 +7,12 @@ guessed.
 """
 from __future__ import annotations
 
-import base64
-import io
 import re
 
 from PIL import Image
 
 from pdfexact.geometry import PageGeometry, emu_vers_pt, pt_vers_emu
 from pdfexact.ir import ImageEl, RasterEl
-from pdfexact.layout import groq
 
 TYPES = ("photo", "logo", "chart", "diagram", "map", "table", "text", "formula", "decoration")
 QUESTION = (
@@ -56,31 +53,6 @@ def zones_texte_image(page) -> list:
     return zones
 
 
-class VisionGroq:
-    """One Groq vision request per zone image."""
-
-    def __init__(self, api_key, *, model=None, urlopen=None, min_interval=groq.INTERVALLE_MIN_S):
-        self._api_key = api_key
-        self.model = model or groq.MODELE_VISION
-        self._urlopen = urlopen
-        self.min_interval = min_interval
-
-    def repondre(self, image: Image.Image, question: str = QUESTION) -> str:
-        buffer = io.BytesIO()
-        image.convert("RGB").save(buffer, format="PNG")
-        data = base64.b64encode(buffer.getvalue()).decode("ascii")
-        messages = [{"role": "user", "content": [
-            {"type": "text", "text": question},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{data}"}},
-        ]}]
-        return groq.appeler(self._api_key, self.model, messages, urlopen=self._urlopen, min_interval=self.min_interval)
-
-
-def creer_vision_groq():
-    key = groq.cle()
-    return VisionGroq(key) if key else None
-
-
 def _image_zone(pdf_page, element, geometry) -> Image.Image:
     import pymupdf
 
@@ -98,7 +70,7 @@ def annoter_zones_visuelles(document, source_pdf, vision) -> list[dict]:
     zones = [(page, zones_a_voir(page)) for page in document.pages]
     if not any(elements for _, elements in zones):
         return []
-    modele = f"groq:{vision.model}" if vision is not None else None
+    modele = getattr(vision, "model", None)
     rapports, vus = [], {}
     with pymupdf.open(source_pdf) as pdf:
         for page, elements in zones:
@@ -110,7 +82,7 @@ def annoter_zones_visuelles(document, source_pdf, vision) -> list[dict]:
                 key = (getattr(element, "media_ref", None), element.bbox)
                 if key not in vus:
                     if vision is None:
-                        vus[key] = {"status": "non-compris", "reason": "no-groq-key", "model": None}
+                        vus[key] = {"status": "non-compris", "reason": "sans-modele-vision", "model": None}
                     else:
                         try:
                             answer = vision.repondre(_image_zone(pdf_page, element, geometry))

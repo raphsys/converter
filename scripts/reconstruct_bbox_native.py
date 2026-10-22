@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 from pathlib import Path
+from time import perf_counter
 
 import pymupdf
 
@@ -22,7 +23,7 @@ from pdfexact.layout.text_comprehension import (
     diagnostics_comprehension_texte,
 )
 from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehension_texte_ai
-from pdfexact.layout.vision import annoter_zones_visuelles, creer_vision_groq
+from pdfexact.layout.vision import annoter_zones_visuelles
 from pdfexact.model_paths import resolve_ai_models_root
 from pdfexact.report import Rapport
 
@@ -52,9 +53,7 @@ def _extraire_scene(source_pdf: Path, pages: list[int] | None, args) -> Document
         creer_fournisseur_comprehension_texte_ai(
             url=args.text_understanding_url,
             timeout=args.text_understanding_timeout,
-            model_root=model_root if explicit_root is not None else None,
         ),
-        annoncer=True,
     )
     return extraire(
         source_pdf,
@@ -180,18 +179,31 @@ def main() -> int:
     args = parser.parse_args()
 
     selected_pages = _pages(args.pages)
+    durees: dict[str, float] = {}
+    debut = perf_counter()
+
+    def etape(nom: str) -> None:
+        nonlocal debut
+        durees[nom] = perf_counter() - debut
+        debut = perf_counter()
+
     with contexte_comprehension_texte():
         document = _extraire_scene(args.source_pdf, selected_pages, args)
+        etape("extraction+layout")
         _normaliser_texte(document)
-        vision = annoter_zones_visuelles(document, args.source_pdf, creer_vision_groq())
+        etape("segmentation+comprehension")
+        vision = annoter_zones_visuelles(document, args.source_pdf, None)
+        etape("vision")
         textes_images = lire_texte_des_images(
             document, args.source_pdf, getattr(document, "polices", {}), dpi=args.dpi,
             language=getattr(args, "ocr_language", "auto"),
             model_root=resolve_ai_models_root(getattr(args, "ai_models_root", None)),
         )
+        etape("ocr-images")
         _enregistrer_catalogue(document, args.source_pdf, args.docx_out.with_suffix(".extraction.json"))
         records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, document)
         write_bbox_docx(document, args.docx_out)
+        etape("sorties")
         diagnostics = diagnostics_comprehension_texte()
 
     by_kind: dict[str, int] = {}
@@ -203,12 +215,6 @@ def main() -> int:
     print(f"catalogue={args.docx_out.with_suffix('.extraction.json')}")
     # What the comprehension AI actually did: a fallback here means the
     # segmentation above came from geometric heuristics, not from the model.
-    from pdfexact.layout.groq import cle, coupure
-
-    if cle() is None:
-        print("groq: aucune cle GROQ_API_KEY - comprehension locale seule, images non comprises")
-    elif coupure():
-        print(f"groq: desactive pour ce run - {coupure()}")
     for event in diagnostics:
         print(f"comprehension_ia: status={event.get('status')} reason={event.get('reason')}")
     statuts: dict[str, int] = {}
@@ -227,6 +233,8 @@ def main() -> int:
     for zone in vision:
         if zone["status"] != "compris":
             print(f"vision_ia: page={zone['page'] + 1} non-compris reason={zone['reason']}")
+    print("durees: " + " ".join(f"{nom}={valeur:.1f}s" for nom, valeur in durees.items())
+          + f" total={sum(durees.values()):.1f}s")
     return 0
 
 
