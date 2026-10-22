@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from pdfexact.geometry import BBox, emu_vers_pt
-from pdfexact.ir import Document, FlowParagraph, Span, TextBox
+from pdfexact.ir import Document, FlowParagraph, ImageEl, RasterEl, Span, TextBox
 
 
 def _bbox(value: BBox | None) -> dict[str, Any] | None:
@@ -141,6 +141,7 @@ def _text_element(element, *, element_id: str, page_index: int, index: int) -> d
         "list_marker_bbox": _bbox(getattr(element, "list_marker_bbox", None)),
         "geometry": _text_geometry(element),
         "presentation": dict(getattr(element, "presentation", {}) or {}),
+        "text_in_image": bool((getattr(element, "attributes", None) or {}).get("text_in_image")),
         "lines": [
             _line(line, line_id=f"{element_id}-line-{line_index + 1}", element_bbox=element.bbox)
             for line_index, line in enumerate(lignes)
@@ -190,6 +191,13 @@ def construire_catalogue(
                 continue
             element_id = str(getattr(element, "source_id", None) or f"p{page.index + 1}-text-{index + 1}")
             elements.append(_text_element(element, element_id=element_id, page_index=page.index, index=index))
+        visuels = [
+            {"id": str(getattr(element, "source_id", None) or f"p{page.index + 1}-visual-{index + 1}"),
+             "kind": type(element).__name__, "element_index": index, "bbox": _bbox(element.bbox),
+             "media_ref": getattr(element, "media_ref", None),
+             "vision": dict((getattr(element, "attributes", None) or {}).get("vision") or {})}
+            for index, element in enumerate(page.elements) if isinstance(element, (ImageEl, RasterEl))
+        ]
         pages.append({
             "index": page.index,
             "page_number": page.index + 1,
@@ -199,6 +207,7 @@ def construire_catalogue(
             "height_pt": emu_vers_pt(page.hauteur_emu),
             "rotation_deg": int((page_rotations or {}).get(page.index, 0)),
             "text_elements": elements,
+            "visual_elements": visuels,
         })
     return {
         "schema": "pdfexact.text-extraction.v1",
@@ -217,6 +226,7 @@ def construire_catalogue(
             "text_elements": sum(len(page["text_elements"]) for page in pages),
             "lines": sum(len(element["lines"]) for page in pages for element in page["text_elements"]),
             "runs": sum(len(line["spans"]) for page in pages for element in page["text_elements"] for line in element["lines"]),
+            "visual_elements": sum(len(page["visual_elements"]) for page in pages),
         },
     }
 

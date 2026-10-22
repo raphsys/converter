@@ -169,10 +169,13 @@ def _groupes_ia(units, obstacles=(), protected=()):
         groupes_locaux = _groupes_ia_local(zone_units, obstacles, protected)
         if groupes_locaux is None:
             sans_decision.update(id(unit) for unit in zone_units)
+            for unit in zone_units:
+                unit.presentation["comprehension_ia"] = "non-compris"
             continue
         for groupe in groupes_locaux:
             for unit in groupe:
                 unit.presentation["ai_zone"] = zone
+                unit.presentation["comprehension_ia"] = "compris"
         groupes_globaux.extend(groupes_locaux)
     # Undecided rows keep the per-source-block fallback: a block spanning two
     # zones is still segmented as one source.

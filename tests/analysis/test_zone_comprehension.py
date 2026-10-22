@@ -42,3 +42,16 @@ def test_zone_is_one_request_and_its_groups_are_final(groups, paragraphs):
         segmenter_page_textes(target)
     assert [request for request in requests if request[0] == "page-segmentation"] == [("page-segmentation", TEXTS)]
     assert len(target.elements) == paragraphs
+
+
+@pytest.mark.parametrize(("provider", "status"), [
+    (lambda kind, lines, role, context: TextUnderstandingDecision(
+        "paragraph", "segment-page", 0.9, ("test",), line_groups=((0, 1, 2),)), "compris"),
+    (lambda kind, lines, role, context: None, "non-compris"),
+])
+def test_every_paragraph_records_whether_comprehension_decided_it(provider, status):
+    target = page()
+    with contexte_comprehension_texte():
+        configurer_fournisseur_comprehension_texte(provider)
+        segmenter_page_textes(target)
+    assert {element.presentation["comprehension_ia"] for element in target.elements} == {status}

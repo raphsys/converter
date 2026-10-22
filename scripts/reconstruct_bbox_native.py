@@ -205,6 +205,13 @@ def main() -> int:
     # segmentation above came from geometric heuristics, not from the model.
     for event in diagnostics:
         print(f"comprehension_ia: status={event.get('status')} reason={event.get('reason')}")
+    statuts: dict[str, int] = {}
+    for page in getattr(document, "pages", ()):
+        for element in page.elements:
+            statut = (getattr(element, "presentation", None) or {}).get("comprehension_ia")
+            if statut:
+                statuts[statut] = statuts.get(statut, 0) + 1
+    print("comprehension_ia: paragraphes " + (" ".join(f"{key}={value}" for key, value in sorted(statuts.items())) or "aucun"))
     vus: dict[str, int] = {}
     for zone in vision:
         key = zone["type"] if zone["status"] == "compris" else "non-compris"
