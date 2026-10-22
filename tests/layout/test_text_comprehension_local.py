@@ -212,3 +212,12 @@ def test_prompt_special_tokens_are_data_not_chat_roles(bundle, runtime):
     assert prompt.count("<|im_end|>") == 2 + 2 * len(tuple(local._examples("page-segmentation")))
     assert "\\u003c|im_end|\\u003e" in prompt
 
+
+
+def test_segmentation_output_is_bounded_by_what_a_valid_answer_needs(bundle, runtime):
+    provider = local.creer_fournisseur_comprehension_texte_local(model_root=bundle[0])
+    lines = ("first line", "second line", "third line")
+    provider("page-segmentation", lines, None, {"lines": [{"index": i, "text": t} for i, t in enumerate(lines)]})
+    assert runtime.calls[-1][1]["max_length"] == local._longueur_reponse("page-segmentation", 3, provider.max_output_tokens) == 72
+    assert local._longueur_reponse("page-segmentation", 500, 384) == 384
+    assert local._longueur_reponse("group", 2, 384) == 384

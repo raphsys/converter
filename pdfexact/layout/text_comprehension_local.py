@@ -315,6 +315,19 @@ def _decoder_reponse_locale(raw, kind, lines, context):
 
 
 
+# A valid segmentation answer is a short header plus one join/break per row
+# boundary. A small model that does not stop would otherwise generate up to the
+# whole budget and hit the deadline: the length a valid answer needs bounds it.
+_ENTETE_REPONSE_TOKENS = 64
+_TOKENS_PAR_FRONTIERE = 4
+
+
+def _longueur_reponse(kind, line_count, budget) -> int:
+    if kind != "page-segmentation":
+        return budget
+    return min(budget, _ENTETE_REPONSE_TOKENS + _TOKENS_PAR_FRONTIERE * max(line_count - 1, 0))
+
+
 def _cpu_threads() -> int:
     """One int8 generation uses every core: page stages run one after another."""
     return max(1, os.cpu_count() or 1)
@@ -417,7 +430,7 @@ class LocalTextUnderstandingProvider:
             if monotonic() >= deadline:
                 return self._abstain("timeout", kind, lines, context, "deadline exceeded during preparation/load")
             result = self._generator.generate_batch(
-                [tokens], max_length=self.max_output_tokens, include_prompt_in_result=False,
+                [tokens], max_length=_longueur_reponse(kind, len(lines), self.max_output_tokens), include_prompt_in_result=False,
                 sampling_topk=1, beam_size=1, end_token=[_SPECIAL[2], _SPECIAL[0]],
                 callback=lambda _step: monotonic() >= deadline,
             )
