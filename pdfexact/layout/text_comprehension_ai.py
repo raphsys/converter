@@ -25,16 +25,13 @@ def creer_fournisseur_comprehension_texte_ai(
     timeout: float = 3.0,
     model_root=None,
     local_timeout: float = 30.0,
-    experimental_local: bool = False,
 ) -> TextUnderstandingProvider | None:
     endpoint = (url or "").strip() or os.environ.get("PDFEXACT_TEXT_UNDERSTANDING_URL", "").strip()
     if not endpoint:
-        from pdfexact.layout.text_comprehension_local import (
-            creer_fournisseur_comprehension_texte_local, LocalCPUShadowProvider,
-        )
-        if not experimental_local:
-            return LocalCPUShadowProvider(model_root=model_root, timeout=local_timeout)
-        return creer_fournisseur_comprehension_texte_local(model_root=model_root, timeout=local_timeout)
+        # Comprehension is mandatory: the local model's decisions are applied.
+        from pdfexact.layout import text_comprehension_local as local
+
+        return local.creer_fournisseur_comprehension_texte_local(model_root=model_root, timeout=local_timeout)
 
     def refuse(status, kind, lines, reason, context):
         provider.diagnostics = {"status": status, "reason": reason}

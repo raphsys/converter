@@ -41,18 +41,17 @@ def pipeline(monkeypatch, tmp_path):
         yield calls
 
 
-@pytest.mark.parametrize("flags,language,ocr_root,layout_root,experimental", [
-    ([], "auto", "env-models", None, False),
-    (["--ocr-language", "ru+ja", "--ai-models-root", "common"], "ru+ja", "common", "common", False),
-    (["--ocr-lang", "ru+ja", "--ai-models-root", "common"], "ru+ja", "common", "common", False),
-    (["--layout-model-root", "legacy"], "auto", "legacy", "legacy", False),
-    (["--ai-models-root", "common", "--layout-model-root", "legacy"], "auto", "common", "legacy", False),
-    (["--ai-models-root", "common", "--experimental-local-text-understanding"], "auto", "common", "common", True),
-    (["--text-understanding-ai"], "auto", "env-models", None, False),
-    (["--text-mode", "rapidocr", "--ocr-language", "ru+ja"], "ru+ja", "env-models", None, False),
+@pytest.mark.parametrize("flags,language,ocr_root,layout_root", [
+    ([], "auto", "env-models", None),
+    (["--ocr-language", "ru+ja", "--ai-models-root", "common"], "ru+ja", "common", "common"),
+    (["--ocr-lang", "ru+ja", "--ai-models-root", "common"], "ru+ja", "common", "common"),
+    (["--layout-model-root", "legacy"], "auto", "legacy", "legacy"),
+    (["--ai-models-root", "common", "--layout-model-root", "legacy"], "auto", "common", "legacy"),
+    (["--text-understanding-ai"], "auto", "env-models", None),
+    (["--text-mode", "rapidocr", "--ocr-language", "ru+ja"], "ru+ja", "env-models", None),
 ])
 def test_user_main_propagates_language_roots_and_separate_opt_in(
-    monkeypatch, tmp_path, pipeline, flags, language, ocr_root, layout_root, experimental
+    monkeypatch, tmp_path, pipeline, flags, language, ocr_root, layout_root
 ):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", pipeline["argv"] + flags)
@@ -64,7 +63,6 @@ def test_user_main_propagates_language_roots_and_separate_opt_in(
             if extraction["layout_model_root"] is not None else None) == (
                 tmp_path / layout_root if layout_root else None)
     assert factory["model_root"] == (None if ocr_root == "env-models" else tmp_path / ocr_root)
-    assert factory["experimental_local"] is experimental
     assert factory["url"] is None and factory["timeout"] == 3.0
     assert extraction["strict"] is True and extraction["layout_ai"] is True
     mode = "rapidocr" if "rapidocr" in flags else "spans"
@@ -72,26 +70,19 @@ def test_user_main_propagates_language_roots_and_separate_opt_in(
     assert extraction["ocr_layout"] == ("word-native" if mode == "rapidocr" else "blocks")
 
 
-@pytest.mark.parametrize("opt_in", [None, False, True, "False", "True"])
-def test_legacy_namespace_missing_new_options_is_compatible_and_opt_in_is_boolean(
-    pipeline, opt_in
-):
+def test_legacy_namespace_missing_new_options_is_compatible(pipeline):
     args = SimpleNamespace(text_mode="spans", text_understanding_url=None, text_understanding_timeout=.75,
                            dpi=150, layout_provider=None, layout_model=None, layout_model_root=None,
                            layout_device=None)
-    if opt_in is not None:
-        args.experimental_local_text_understanding = opt_in
     reconstruct._extraire_scene(Path("unused.pdf"), [0], args)
     assert pipeline["extract"]["ocr_language"] == "auto"
     assert pipeline["factory"]["model_root"] is None
-    assert pipeline["factory"]["experimental_local"] is (opt_in is True)
     assert pipeline["factory"]["timeout"] == .75
 
 
-@pytest.mark.parametrize("opt_in", [False, True])
 @pytest.mark.parametrize("explicit_url", [False, True])
-def test_http_priority_survives_root_and_experimental_opt_in(
-    monkeypatch, tmp_path, pipeline, opt_in, explicit_url
+def test_http_priority_survives_models_root(
+    monkeypatch, tmp_path, pipeline, explicit_url
 ):
     from pdfexact.layout import text_comprehension_local
     requests = []
@@ -115,8 +106,6 @@ def test_http_priority_survives_root_and_experimental_opt_in(
     monkeypatch.setattr(http, "urlopen", respond)
     monkeypatch.setattr(reconstruct, "extraire", extract)
     flags = ["--ai-models-root", str(tmp_path), "--text-understanding-timeout", "0.75"]
-    if opt_in:
-        flags.append("--experimental-local-text-understanding")
     if explicit_url:
         flags += ["--text-understanding-url", "http://explicit.test/understand"]
     monkeypatch.setattr(sys, "argv", pipeline["argv"] + flags)
@@ -130,13 +119,7 @@ def test_user_help_exposes_the_options_without_loading_models():
     result = subprocess.run([sys.executable, "-B", str(root / "scripts/reconstruct_bbox_native.py"), "--help"],
                             cwd=root, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
-    for flag in ("--ocr-language", "--ai-models-root", "--experimental-local-text-understanding"):
+    for flag in ("--ocr-language", "--ai-models-root"):
         assert flag in result.stdout
 
 
-def test_experimental_flag_does_not_parse_a_false_string_as_true(monkeypatch, pipeline):
-    monkeypatch.setattr(sys, "argv", pipeline["argv"] + ["--experimental-local-text-understanding", "False"])
-    with pytest.raises(SystemExit) as error:
-        reconstruct.main()
-    assert error.value.code == 2
-    assert "factory" not in pipeline

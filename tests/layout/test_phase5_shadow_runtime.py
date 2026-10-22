@@ -128,73 +128,14 @@ def synthetic_runtime(monkeypatch, tmp_path):
     return state, payload
 
 
-def test_actual_runtime_milestones_are_separate_from_parsed_model_abstention(synthetic_runtime):
-    state, payload = synthetic_runtime
-    reports = []
-    result = local._sonde_shadow(payload, reports.append)
-    assert state.loads == state.calls == 1
-    assert result["status"] == "model-abstention"
-    assert result["runtime_attempt"] == "completed" and result["inference_completed"]
-    assert result["inference_invoked"] and result["first_token_observed"]
-    assert result["parsed_response"] == ABSTENTION
-    assert result["raw_response"] == json.dumps(ABSTENTION)
-    assert result["quality"] == "unqualified" and result["application"] == "not-applied"
-    assert reports[0]["inference_invoked"] is False
-    assert any(row["load_started"] and not row["load_completed"] for row in reports)
 
 
-@pytest.mark.parametrize("failure,attempt,stage,invoked", [
-    ("load", "load-failed", "model-load", False),
-    ("before-first-token", "failed-before-first-token", "before-first-token", True),
-])
-def test_load_and_failure_before_first_token_stay_distinct(synthetic_runtime, failure, attempt, stage, invoked):
-    state, payload = synthetic_runtime
-    state.failure = failure
-    result = local._sonde_shadow(payload, lambda _event: None)
-    assert result["runtime_attempt"] == attempt and result["failure_stage"] == stage
-    assert result["inference_invoked"] is invoked and not result["first_token_observed"]
-    assert not result["inference_completed"]
 
 
-@pytest.mark.parametrize("refusal", ["memory", "runtime", "bundle", "tokens"])
-def test_refusal_never_loads_weights_or_claims_inference(synthetic_runtime, monkeypatch, refusal):
-    state, payload = synthetic_runtime
-    if refusal == "tokens":
-        payload["max_input_tokens"] = 1
-    else:
-        name, exception = {
-            "memory": ("_memory_preflight", MemoryError("insufficient-memory")),
-            "runtime": ("_load_runtime", ImportError("absent")),
-            "bundle": ("_inspect_bundle", ValueError("incompatible-tokenizer")),
-        }[refusal]
-
-        def fail(*_args):
-            raise exception
-
-        monkeypatch.setattr(local, name, fail)
-    result = local._sonde_shadow(payload, lambda _event: None)
-    assert state.loads == state.calls == 0
-    assert not result["inference_invoked"] and not result["first_token_observed"]
-    assert result["runtime_attempt"] == "not-attempted" and result["reason"]
 
 
-def test_completed_invalid_response_is_not_credited_as_model_abstention(synthetic_runtime):
-    state, payload = synthetic_runtime
-    state.raw = "```json\n{}\n```"
-    result = local._sonde_shadow(payload, lambda _event: None)
-    assert result["runtime_attempt"] == "completed" and result["inference_completed"]
-    assert result["status"] == "invalid-response"
-    assert result["raw_response"] == state.raw
-    assert "parsed_response" not in result
 
 
-def test_output_budget_exhaustion_is_refused_without_partial_json_acceptance(synthetic_runtime):
-    _state, payload = synthetic_runtime
-    payload["max_output_tokens"] = 1
-    result = local._sonde_shadow(payload, lambda _event: None)
-    assert result["runtime_attempt"] == "completed" and result["inference_completed"]
-    assert result["status"] == "output-limit" and "output-token-limit" in result["reason"]
-    assert result["parse"]["status"] == "not-validated" and "parsed_response" not in result
 
 
 def test_projection_uses_known_owner_frame_but_never_owner_or_sibling_ids():

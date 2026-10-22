@@ -95,43 +95,16 @@ def test_http_has_priority_without_inspecting_local(monkeypatch):
 
 def test_factory_routes_root_to_local_without_http(bundle, runtime, monkeypatch):
     monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
-    provider = factory.creer_fournisseur_comprehension_texte_ai(model_root=bundle[0], timeout=2, local_timeout=4, experimental_local=True)
+    provider = factory.creer_fournisseur_comprehension_texte_ai(model_root=bundle[0], timeout=2, local_timeout=4)
     assert provider is not None and provider.timeout == 4
 
 
 def test_local_default_budget_is_distinct_from_http(bundle, runtime, monkeypatch):
     monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
-    provider = factory.creer_fournisseur_comprehension_texte_ai(model_root=bundle[0], experimental_local=True)
+    provider = factory.creer_fournisseur_comprehension_texte_ai(model_root=bundle[0])
     assert provider.timeout == 30.0
 
 
-def test_installed_bundle_is_disabled_by_default_without_loading_runtime(bundle, monkeypatch, caplog):
-    """The former disabled default now configures one non-applying shadow."""
-    from pdfexact.layout import text_comprehension as comprehension
-    monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
-    monkeypatch.setattr(local, "_load_runtime", lambda: pytest.fail("runtime loaded in parent"))
-    calls = []
-
-    def execute(payload, *, timeout):
-        calls.append((payload, timeout))
-        return {"status": "shadow-completed", "reason": "local-quality-unqualified",
-                "availability": "compatible", "runtime_attempt": "completed",
-                "inference_invoked": True, "first_token_observed": True, "generated_tokens": 12}
-
-    monkeypatch.setattr(local, "_executer_sonde_shadow_isolee", execute)
-    with caplog.at_level(logging.INFO), comprehension.contexte_comprehension_texte():
-        provider = factory.creer_fournisseur_comprehension_texte_ai(model_root=bundle[0])
-        assert provider.diagnostics["status"] == "shadow-pending"
-        assert not provider.diagnostics["inference_invoked"] and calls == []
-        comprehension.configurer_fournisseur_comprehension_texte(provider, annoncer=True)
-        decision = comprehension.comprendre_groupe_lignes(("Давление", "Температура"), frame_role="text-column")
-        comprehension.comprendre_groupe_lignes(("Another source line", "continues here"), frame_role="text-column")
-        assert len(calls) == 1
-        assert provider.diagnostics["quality"] == "unqualified"
-        assert provider.diagnostics["application"] == "not-applied"
-    assert decision.fallback_used and not decision.ai_used
-    assert "shadow-completed" in caplog.text and "local-quality-unqualified" in caplog.text
-    assert "missing-provider" not in caplog.text
 
 
 @pytest.mark.parametrize("file,key,value", [

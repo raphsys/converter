@@ -5,6 +5,16 @@ import pytest
 from PIL import Image
 
 
+@pytest.fixture(autouse=True)
+def sans_modele_comprehension_reel(monkeypatch, tmp_path_factory):
+    """Unit tests stay deterministic: no real comprehension model is loaded.
+
+    Production always uses the local model; a test needing a provider passes an
+    explicit model root or configures a fake one.
+    """
+    monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_MODEL_ROOT", str(tmp_path_factory.mktemp("aucun-modele")))
+
+
 @pytest.fixture
 def pdf_texte(tmp_path):
     """Une page A4, deux lignes de texte de polices et corps différents."""

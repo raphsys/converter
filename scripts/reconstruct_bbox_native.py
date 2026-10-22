@@ -51,7 +51,6 @@ def _extraire_scene(source_pdf: Path, pages: list[int] | None, args) -> Document
             url=args.text_understanding_url,
             timeout=args.text_understanding_timeout,
             model_root=model_root if explicit_root is not None else None,
-            experimental_local=getattr(args, "experimental_local_text_understanding", False) is True,
         ),
         annoncer=True,
     )
@@ -176,10 +175,6 @@ def main() -> int:
     )
     parser.add_argument("--text-understanding-url", default=None)
     parser.add_argument("--text-understanding-timeout", type=float, default=3.0)
-    parser.add_argument(
-        "--experimental-local-text-understanding", action="store_true",
-        help="active explicitement la comprehension Qwen locale experimentale",
-    )
     args = parser.parse_args()
 
     selected_pages = _pages(args.pages)
