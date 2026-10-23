@@ -4,7 +4,6 @@ This module accepts canonical scene records and legacy IR objects by duck typing
 It does not import Word, XML, or a document writer.
 """
 from __future__ import annotations
-from pdfexact.analysis.table_of_contents import fin_par_points_de_suite
 
 import re
 import unicodedata
@@ -440,8 +439,6 @@ def frontiere_de_paragraphe_source(
     previous_line = (getattr(previous, "lignes", None) or (previous,))[-1]
     current_line = (getattr(current, "lignes", None) or (current,))[0]
     if hard_line_break(_text_value(previous_line), _text_value(current_line)):
-        return True
-    if fin_par_points_de_suite(_text_value(previous_line)):
         return True
     known_obstacles = [*(previous_saved.get("obstacles") or ()), *(current_saved.get("obstacles") or ())]
     if known_obstacles and _obstacle_between(previous, current, known_obstacles):

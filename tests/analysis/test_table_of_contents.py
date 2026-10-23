@@ -1,117 +1,98 @@
-"""Every kind of table of contents: each entry is its own paragraph.
+"""Tables of contents: the layout AI says which zone is one, rows give entries.
 
-An entry is recognised by its page reference, wherever the document puts it:
-after leader dots, right-aligned after a blank, after a tab, or on the left.
-Without a leader, the reference must be set apart by a blank and aligned with
-the reference of another row, so justified prose ending on a number is kept.
+The layout model labels the zone (role "table-of-contents"); no layout of
+contents is listed here. Inside such a zone each row is an entry, unless it
+continues the previous row: that row carried no page reference while the
+zone's entries do carry references.
 """
-import pytest
-
 from pdfexact.analysis.text_segmentation import segmenter_page_textes
 from pdfexact.geometry import BBox, pt_vers_emu as u
 from pdfexact.ir import FontRef, Line, Page, Span, TextBox
 from pdfexact.layout.text_comprehension import configurer_fournisseur_comprehension_texte, contexte_comprehension_texte
 
-FONT = FontRef("f", "Arial", False, False)
-CHAR_PT = 5.0
+TOC = "table-of-contents"
 
 
-def _row(parts, y):
-    """parts: (text, x_pt) pieces of one row, each one span."""
-    spans = []
-    for text, x in parts:
-        bbox = BBox(u(x), u(y), u(x + CHAR_PT * len(text)), u(y + 10))
-        spans.append(Span(text, FONT, 10, "000000", bbox=bbox))
-    bbox = BBox(spans[0].bbox.x0, u(y), spans[-1].bbox.x1, u(y + 10))
-    return Line(bbox, spans, bbox.hauteur, bbox.largeur, layout_frame_id="zone-1",
-                layout_frame_role="text-column", layout_frame_strategy="word-text")
-
-
-def _paragraphs(rows):
-    lines = [_row(parts, 100 + 12 * index) for index, parts in enumerate(rows)]
-    bbox = BBox(min(line.bbox.x0 for line in lines), lines[0].bbox.y0,
-                max(line.bbox.x1 for line in lines), lines[-1].bbox.y1)
-    page = Page(0, u(612), u(792), [TextBox(bbox, lines, layout_frame_id="zone-1",
-                                            layout_frame_role="text-column", layout_frame_strategy="word-text")])
+def _paragraphs(texts, role=TOC):
+    lines = []
+    for index, text in enumerate(texts):
+        y = 100 + 12 * index
+        bbox = BBox(u(72), u(y), u(540), u(y + 10))
+        span = Span(text, FontRef("f", "Arial", False, False), 10, "000000", bbox=bbox)
+        lines.append(Line(bbox, [span], bbox.hauteur, bbox.largeur, layout_frame_id="zone-1",
+                          layout_frame_role="text-column", layout_frame_strategy="word-text",
+                          semantic_role=role))
+    bbox = BBox(u(72), lines[0].bbox.y0, u(540), lines[-1].bbox.y1)
+    page = Page(0, u(612), u(792), [TextBox(bbox, lines, layout_frame_id="zone-1", layout_frame_role="text-column",
+                                            layout_frame_strategy="word-text", semantic_role=role)])
     with contexte_comprehension_texte():
         configurer_fournisseur_comprehension_texte(None)
         segmenter_page_textes(page)
     return [len(element.lignes) for element in page.elements]
 
 
-def _right(title, number, x=72):
-    """Title on the left, page number right-aligned at 500 pt."""
-    return [(title, x), (number, 500 - CHAR_PT * len(number))]
-
-
-def test_leader_dots_entries():
+def test_each_row_ending_with_a_page_reference_is_an_entry():
     assert _paragraphs([
-        [("Table 1. Stream Gage Flood Stage and Discharges ..........11", 72)],
-        [("Table 2. Summary of Comparisons of HWM Elevations ........16", 72)],
-        [("Table 3. Coastal Flooding Type ...........................20", 72)],
-    ]) == [1, 1, 1]
+        "1 Introduction                                   1",
+        "2 Methods .............................. 4",
+        "Preface\tiv",
+        "Annex A                                     40–44",
+    ]) == [1, 1, 1, 1]
 
 
-def test_right_aligned_numbers_without_leaders():
-    assert _paragraphs([_right("1 Introduction", "1"), _right("2 Methods", "4"),
-                        _right("2.1 Field survey", "5"), _right("3 Results", "12")]) == [1, 1, 1, 1]
-
-
-def test_tab_separated_numbers_and_roman_numerals():
+def test_a_row_without_reference_continues_into_the_row_that_ends_the_entry():
     assert _paragraphs([
-        [("Preface\tiv", 72)], [("Foreword\tvii", 72)], [("Chapter 1\t1", 72)],
-    ]) == [1, 1, 1]
-
-
-def test_page_ranges():
-    assert _paragraphs([_right("Annex A", "40–44"), _right("Annex B", "45-52")]) == [1, 1]
-
-
-def test_page_numbers_on_the_left():
-    assert _paragraphs([
-        [("3", 72), ("Introduction", 110)], [("7", 72), ("Survey method", 110)],
-        [("12", 72), ("Results", 110)],
-    ]) == [1, 1, 1]
-
-
-def test_an_entry_whose_title_wraps_stays_one_paragraph():
-    assert _paragraphs([
-        [("Table 1. Stream Gage Flood Stage and Discharges for the", 72)],
-        _right("Coastal Counties of Mississippi", "11"),
-        _right("Table 2. Summary of Comparisons", "16"),
+        "Table 1. Stream Gage Flood Stage and Discharges for the",
+        "Coastal Counties of Mississippi ...................... 11",
+        "Table 2. Summary of Comparisons of HWM Elevations .... 16",
     ]) == [2, 1]
 
 
-def test_indented_levels_keep_one_entry_per_row():
-    assert _paragraphs([_right("1 Introduction", "1"), _right("1.1 Scope", "2", x=90),
-                        _right("1.2 Sources", "3", x=90)]) == [1, 1, 1]
-
-
-def test_justified_prose_ending_on_numbers_is_not_a_table_of_contents():
+def test_without_any_page_reference_each_row_is_an_entry():
     assert _paragraphs([
-        [("The survey teams recorded high water marks in 2005", 72)],
-        [("along the coast and found levels close to 12", 72)],
-        [("feet above the normal tide in the three counties.", 72)],
-    ]) == [3]
-
-
-def test_a_single_isolated_number_without_leader_is_not_enough():
-    assert _paragraphs([
-        [("The level reached", 72)], _right("then dropped to", "8"),
-        [("before the next tide came in.", 72)],
-    ]) == [3]
-
-
-def test_entries_without_page_numbers_are_told_by_a_repeated_label_and_a_changing_marker():
-    assert _paragraphs([
-        [("Appendix A. Field Data Collection Forms", 72)],
-        [("Appendix B. HWM Location Maps and Summary Table", 72)],
-        [("Appendix C. Survey Sheets from Hancock County", 72)],
+        "Appendix A. Field Data Collection Forms",
+        "Appendix B. HWM Location Maps and Summary Table",
+        "Introduction",
     ]) == [1, 1, 1]
 
 
-def test_a_label_repeated_with_the_same_marker_is_prose_not_entries():
+def test_rows_the_layout_ai_did_not_label_as_contents_are_not_split_as_entries():
     assert _paragraphs([
-        [("Figure 2 compares the levels measured by the two teams and", 72)],
-        [("Figure 2 also shows the stations of the three counties.", 72)],
-    ]) == [2]
+        "The survey teams recorded high water marks in the year",
+        "2005 along the coast and found levels close to 12",
+        "feet above the normal tide in the three counties.",
+    ], role="body") == [3]
+
+
+def test_a_wrapped_title_ending_on_a_word_or_a_number_is_not_mistaken_for_a_reference():
+    assert _paragraphs([
+        "Chapter 3. Results of the Survey of Phase 2",
+        "and Observations on Civil Works ............ 21",
+        "Part I. Conclusions of the Annex C",
+        "Recommendations .............................. 30",
+    ]) == [2, 2]
+
+
+def test_a_reference_in_its_own_span_counts_without_any_blank_in_the_text():
+    lines = []
+    for index, (title, number) in enumerate((("Introduction", "1"), ("Methods", "4"))):
+        y = 100 + 12 * index
+        spans = [Span(title, FontRef("f", "Arial", False, False), 10, "000000",
+                      bbox=BBox(u(72), u(y), u(160), u(y + 10))),
+                 Span(number, FontRef("f", "Arial", False, False), 10, "000000",
+                      bbox=BBox(u(530), u(y), u(540), u(y + 10)))]
+        bbox = BBox(u(72), u(y), u(540), u(y + 10))
+        lines.append(Line(bbox, spans, bbox.hauteur, bbox.largeur, layout_frame_id="zone-1",
+                          layout_frame_role="text-column", layout_frame_strategy="word-text", semantic_role=TOC))
+    lines.append(Line(BBox(u(72), u(124), u(300), u(134)),
+                      [Span("Results of the field survey", FontRef("f", "Arial", False, False), 10, "000000",
+                            bbox=BBox(u(72), u(124), u(300), u(134)))],
+                      u(10), u(228), layout_frame_id="zone-1", layout_frame_role="text-column",
+                      layout_frame_strategy="word-text", semantic_role=TOC))
+    page = Page(0, u(612), u(792), [TextBox(BBox(u(72), u(100), u(540), u(134)), lines, layout_frame_id="zone-1",
+                                            layout_frame_role="text-column", layout_frame_strategy="word-text",
+                                            semantic_role=TOC)])
+    with contexte_comprehension_texte():
+        configurer_fournisseur_comprehension_texte(None)
+        segmenter_page_textes(page)
+    assert [len(element.lignes) for element in page.elements][:2] == [1, 1]

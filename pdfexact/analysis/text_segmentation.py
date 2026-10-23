@@ -318,7 +318,7 @@ def _boundary(previous, current, step, obstacles, *, ai_confirmed=False, protect
         "".join(span.texte for span in current.lignes[0].spans),
     ):
         return "source-hard-break"
-    if previous.presentation.get("toc_entry") == "end" or current.presentation.get("toc_entry") == "start":
+    if previous.presentation.get("toc_entry") == "end":
         return "toc-entry"
     previous_frame = _hard_frame_id(previous) or last_frame_id
     current_frame = _hard_frame_id(current)
