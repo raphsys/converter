@@ -1,31 +1,13 @@
 #!/usr/bin/env python3
-"""Extrait, comprend et segmente un PDF, puis enregistre ses caracteristiques et ses bboxes."""
+"""Lanceur du pipeline : SEGMENTATION, puis catalogue, PDF annoté et DOCX des bboxes."""
 from __future__ import annotations
 
 import argparse
-from copy import deepcopy
 from pathlib import Path
 from time import perf_counter
 
-import pymupdf
-
 from pdfexact.bboxes import annotate_pdf_bboxes, write_bbox_docx
-from pdfexact.extract.catalog import construire_catalogue, enregistrer_catalogue
-from pdfexact.extract.document import extraire
-from pdfexact.extract.ocr import lire_texte_des_images
-from pdfexact.extract.text import dedoublonner_textboxes_paragraphes
-from pdfexact.analysis.text_segmentation import segmenter_page_textes
-from pdfexact.fontlib import construire, dossiers_par_defaut
-from pdfexact.ir import Document, FlowParagraph, TextBox
-from pdfexact.layout.text_comprehension import (
-    configurer_fournisseur_comprehension_texte,
-    contexte_comprehension_texte,
-    diagnostics_comprehension_texte,
-)
-from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehension_texte_ai
-from pdfexact.layout.vision import annoter_zones_visuelles
-from pdfexact.model_paths import resolve_ai_models_root
-from pdfexact.report import Rapport
+from pdfexact.segmentation import OptionsSegmentation, enregistrer_catalogue, segmenter
 
 
 def _pages(expression: str | None) -> list[int] | None:
@@ -42,114 +24,57 @@ def _pages(expression: str | None) -> list[int] | None:
     return selected
 
 
-def _extraire_scene(source_pdf: Path, pages: list[int] | None, args) -> Document:
-    """Etape 1 : extrait une seule scène complète conservée en mémoire."""
-    ocr_layout = "word-native" if args.text_mode == "rapidocr" else "blocks"
-    common_root = getattr(args, "ai_models_root", None)
-    layout_root = getattr(args, "layout_model_root", None)
-    explicit_root = common_root if common_root is not None else layout_root
-    model_root = resolve_ai_models_root(explicit_root)
-    configurer_fournisseur_comprehension_texte(
-        creer_fournisseur_comprehension_texte_ai(
-            url=args.text_understanding_url,
-            timeout=args.text_understanding_timeout,
-        ),
-    )
-    return extraire(
-        source_pdf,
-        pages=pages,
-        bibliotheque=construire(dossiers=dossiers_par_defaut()),
+def _options(args) -> OptionsSegmentation:
+    return OptionsSegmentation(
+        pages=_pages(args.pages),
         dpi=args.dpi,
-        strict=True,
         text_mode=args.text_mode,
-        ocr_granularity="line",
-        ocr_layout=ocr_layout,
-        # Le layout IA est une etape obligatoire de l'orchestrateur. Le flag
-        # historique est conserve pour compatibilite CLI, mais ne peut plus
-        # desactiver l'analyse de page.
-        layout_ai=True,
+        ocr_language=args.ocr_language,
+        ai_models_root=args.ai_models_root,
         layout_provider=args.layout_provider,
         layout_model=args.layout_model,
-        layout_model_root=layout_root if layout_root is not None else (model_root if common_root is not None else None),
+        layout_model_root=args.layout_model_root,
         layout_device=args.layout_device,
-        ai_models_root=model_root,
-        ocr_language=getattr(args, "ocr_language", "auto"),
-        rapport=Rapport(),
-        verbose=True,
+        text_understanding_url=args.text_understanding_url,
+        text_understanding_timeout=args.text_understanding_timeout,
     )
 
 
-def _normaliser_texte(document: Document) -> None:
-    """Etape 2 : normalise les textes dans le même Document, sans réextraire."""
-    for page in document.pages:
-        textes = [
-            element
-            for element in page.elements
-            if isinstance(element, (TextBox, FlowParagraph))
-        ]
-        if not textes:
-            continue
-        textes = dedoublonner_textboxes_paragraphes(textes)
-        for candidate in list(textes):
-            if len(candidate.lignes) != 1 or len(
-                "".join(span.texte for span in candidate.lignes[0].spans).strip()
-            ) != 1:
-                continue
-            for target in textes:
-                if target is candidate or not target.lignes:
-                    continue
-                overlap_x = min(candidate.bbox.x1, target.bbox.x1) - max(
-                    candidate.bbox.x0, target.bbox.x0
-                )
-                overlap_y = min(candidate.bbox.y1, target.bbox.y1) - max(
-                    candidate.bbox.y0, target.bbox.y0
-                )
-                if (
-                    overlap_x <= 0
-                    or overlap_y <= 0
-                    or candidate.bbox.hauteur < target.lignes[0].hauteur_ligne_emu * 2
-                ):
-                    continue
-                # Une lettrine reste un élément natif séparé : la ligne du
-                # paragraphe commence après elle et ne doit pas la déplacer.
-                if candidate.bbox.hauteur >= target.lignes[0].hauteur_ligne_emu * 2:
-                    continue
-                # Conserver le span du fragment avec sa police, sa taille et
-                # sa couleur. Le préfixer au span du corps perdrait son style.
-                target.lignes[0].spans[0:0] = [
-                    deepcopy(span) for span in candidate.lignes[0].spans
-                ]
-                textes.remove(candidate)
-                break
-        page.elements = [
-            element
-            for element in page.elements
-            if not isinstance(element, (TextBox, FlowParagraph))
-        ] + textes
-        segmenter_page_textes(page)
-
-
-def _enregistrer_catalogue(document: Document, source_pdf: Path, destination: Path) -> None:
-    """Etape 3 : persiste les éléments du même Document utilisé pour le rendu."""
-    with pymupdf.open(source_pdf) as pdf:
-        rotations = {
-            index: int(getattr(pdf[index], "rotation", 0) or 0)
-            for index in range(pdf.page_count)
-        }
-    enregistrer_catalogue(
-        construire_catalogue(
-            document,
-            source_pdf=source_pdf,
-            extraction_mode="scene-single-pass",
-            page_rotations=rotations,
-        ),
-        destination,
-    )
+def _rapporter(resultat, records, args) -> None:
+    by_kind: dict[str, int] = {}
+    for record in records:
+        by_kind[record.kind] = by_kind.get(record.kind, 0) + 1
+    print(f"bboxes={len(records)} " + " ".join(f"{key}={value}" for key, value in sorted(by_kind.items())))
+    print(f"pdf={args.pdf_out}")
+    print(f"docx={args.docx_out}")
+    print(f"catalogue={args.docx_out.with_suffix('.extraction.json')}")
+    # What the comprehension AI actually did: a fallback here means the
+    # segmentation above came from geometric heuristics, not from the model.
+    for event in resultat.diagnostics:
+        print(f"comprehension_ia: status={event.get('status')} reason={event.get('reason')}")
+    statuts: dict[str, int] = {}
+    for page in getattr(resultat.document, "pages", ()):
+        for element in page.elements:
+            statut = (getattr(element, "presentation", None) or {}).get("comprehension_ia")
+            if statut:
+                statuts[statut] = statuts.get(statut, 0) + 1
+    print("comprehension_ia: paragraphes " + (" ".join(f"{key}={value}" for key, value in sorted(statuts.items())) or "aucun"))
+    vus: dict[str, int] = {}
+    for zone in resultat.vision:
+        key = zone["type"] if zone["status"] == "compris" else "non-compris"
+        vus[key] = vus.get(key, 0) + 1
+    print("vision_ia: " + (" ".join(f"{key}={value}" for key, value in sorted(vus.items())) or "aucune-zone"))
+    print(f"ocr_images: textes_lus={resultat.textes_images}")
+    for zone in resultat.vision:
+        if zone["status"] != "compris":
+            print(f"vision_ia: page={zone['page'] + 1} non-compris reason={zone['reason']}")
+    print("durees: " + " ".join(f"{nom}={valeur:.1f}s" for nom, valeur in resultat.durees.items())
+          + f" total={sum(resultat.durees.values()):.1f}s")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Extrait le PDF, enregistre ses caracteristiques et produit le PDF et le DOCX des bboxes."
+        description="Segmente le PDF, enregistre ses caracteristiques et produit le PDF et le DOCX des bboxes."
     )
     parser.add_argument("source_pdf", type=Path)
     parser.add_argument("--pdf-out", type=Path, required=True)
@@ -178,63 +103,13 @@ def main() -> int:
     parser.add_argument("--text-understanding-timeout", type=float, default=3.0)
     args = parser.parse_args()
 
-    selected_pages = _pages(args.pages)
-    durees: dict[str, float] = {}
+    resultat = segmenter(args.source_pdf, _options(args))
     debut = perf_counter()
-
-    def etape(nom: str) -> None:
-        nonlocal debut
-        durees[nom] = perf_counter() - debut
-        debut = perf_counter()
-
-    with contexte_comprehension_texte():
-        document = _extraire_scene(args.source_pdf, selected_pages, args)
-        etape("extraction+layout")
-        _normaliser_texte(document)
-        etape("segmentation+comprehension")
-        vision = annoter_zones_visuelles(document, args.source_pdf, None)
-        etape("vision")
-        textes_images = lire_texte_des_images(
-            document, args.source_pdf, getattr(document, "polices", {}), dpi=args.dpi,
-            language=getattr(args, "ocr_language", "auto"),
-            model_root=resolve_ai_models_root(getattr(args, "ai_models_root", None)),
-        )
-        etape("ocr-images")
-        _enregistrer_catalogue(document, args.source_pdf, args.docx_out.with_suffix(".extraction.json"))
-        records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, document)
-        write_bbox_docx(document, args.docx_out)
-        etape("sorties")
-        diagnostics = diagnostics_comprehension_texte()
-
-    by_kind: dict[str, int] = {}
-    for record in records:
-        by_kind[record.kind] = by_kind.get(record.kind, 0) + 1
-    print(f"bboxes={len(records)} " + " ".join(f"{key}={value}" for key, value in sorted(by_kind.items())))
-    print(f"pdf={args.pdf_out}")
-    print(f"docx={args.docx_out}")
-    print(f"catalogue={args.docx_out.with_suffix('.extraction.json')}")
-    # What the comprehension AI actually did: a fallback here means the
-    # segmentation above came from geometric heuristics, not from the model.
-    for event in diagnostics:
-        print(f"comprehension_ia: status={event.get('status')} reason={event.get('reason')}")
-    statuts: dict[str, int] = {}
-    for page in getattr(document, "pages", ()):
-        for element in page.elements:
-            statut = (getattr(element, "presentation", None) or {}).get("comprehension_ia")
-            if statut:
-                statuts[statut] = statuts.get(statut, 0) + 1
-    print("comprehension_ia: paragraphes " + (" ".join(f"{key}={value}" for key, value in sorted(statuts.items())) or "aucun"))
-    vus: dict[str, int] = {}
-    for zone in vision:
-        key = zone["type"] if zone["status"] == "compris" else "non-compris"
-        vus[key] = vus.get(key, 0) + 1
-    print("vision_ia: " + (" ".join(f"{key}={value}" for key, value in sorted(vus.items())) or "aucune-zone"))
-    print(f"ocr_images: textes_lus={textes_images}")
-    for zone in vision:
-        if zone["status"] != "compris":
-            print(f"vision_ia: page={zone['page'] + 1} non-compris reason={zone['reason']}")
-    print("durees: " + " ".join(f"{nom}={valeur:.1f}s" for nom, valeur in durees.items())
-          + f" total={sum(durees.values()):.1f}s")
+    enregistrer_catalogue(resultat, args.source_pdf, args.docx_out.with_suffix(".extraction.json"))
+    records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, resultat.document)
+    write_bbox_docx(resultat.document, args.docx_out)
+    resultat.durees["sorties"] = perf_counter() - debut
+    _rapporter(resultat, records, args)
     return 0
 
 

@@ -10,13 +10,14 @@ import pytest
 
 from pdfexact.layout import text_comprehension as comprehension
 from pdfexact.layout import text_comprehension_ai as http
+from pdfexact.segmentation import OptionsSegmentation
+from pdfexact.segmentation import pipeline as segmentation
 from scripts import reconstruct_bbox_native as reconstruct
 
 
 @pytest.fixture(autouse=True)
 def isolate_provider(monkeypatch, tmp_path):
     monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
-    monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_MODEL_ROOT", str(tmp_path / "no-local-model"))
     comprehension.configurer_fournisseur_comprehension_texte(None)
     yield
     comprehension.configurer_fournisseur_comprehension_texte(None)
@@ -32,19 +33,16 @@ def _page():
     )
 
 
-@pytest.mark.parametrize("legacy_flag", [False, True])
 @pytest.mark.parametrize("endpoint_source", ["argument", "environment", "missing"])
 def test_script_initializes_understanding_without_opt_in(
-    monkeypatch, caplog, legacy_flag, endpoint_source
+    monkeypatch, caplog, endpoint_source
 ):
     endpoint = "http://semantic.test/understand"
     if endpoint_source == "environment":
         monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_URL", endpoint)
-    args = SimpleNamespace(
-        text_mode="spans", text_understanding_ai=legacy_flag,
-        text_understanding_url=endpoint if endpoint_source == "argument" else None,
-        text_understanding_timeout=0.75, dpi=150, layout_provider=None,
-        layout_model=None, layout_model_root=None, layout_device=None,
+    options = OptionsSegmentation(
+        pages=[0], text_understanding_url=endpoint if endpoint_source == "argument" else None,
+        text_understanding_timeout=0.75,
     )
     requests = []
 
@@ -68,11 +66,11 @@ def test_script_initializes_understanding_without_opt_in(
         lambda *_args: pytest.fail("stale provider was called")
     )
     monkeypatch.setattr(http, "urlopen", respond)
-    monkeypatch.setattr(reconstruct, "extraire", extract)
-    monkeypatch.setattr(reconstruct, "construire", lambda **_kwargs: None)
-    monkeypatch.setattr(reconstruct, "dossiers_par_defaut", lambda: [])
+    monkeypatch.setattr(segmentation, "extraire", extract)
+    monkeypatch.setattr(segmentation, "construire", lambda **_kwargs: None)
+    monkeypatch.setattr(segmentation, "dossiers_par_defaut", lambda: [])
 
-    assert reconstruct._extraire_scene(Path("unused.pdf"), [0], args) == "scene"
+    assert segmentation._extraire_scene(Path("unused.pdf"), options) == "scene"
     if endpoint_source == "missing":
         assert len(_warnings(caplog)) == 1
         assert "status=missing-provider" in _warnings(caplog)[0]
@@ -99,7 +97,7 @@ def test_missing_provider_warns_once_and_resets_for_next_analysis(caplog):
 
 
 @pytest.mark.parametrize("fail_during_normalization", [False, True])
-def test_script_provider_spans_pipeline_and_restores_caller(
+def test_segmentation_provider_spans_its_stages_and_restores_caller(
     monkeypatch, tmp_path, fail_during_normalization
 ):
     comprehension.configurer_fournisseur_comprehension_texte(
@@ -124,7 +122,7 @@ def test_script_provider_spans_pipeline_and_restores_caller(
             raise RuntimeError("normalization failed")
 
     def fill(*_args):
-        check_provider("rendering")
+        stages.append("rendering")
 
     monkeypatch.setattr(sys, "argv", [
         "reconstruct_bbox_native.py", "unused.pdf",
@@ -135,11 +133,11 @@ def test_script_provider_spans_pipeline_and_restores_caller(
     monkeypatch.setattr(http, "urlopen", lambda *_args, **_kwargs: io.BytesIO(
         b'{"kind":"http","action":"segment-page","confidence":0.9,"groups":[[0],[1]]}'
     ))
-    monkeypatch.setattr(reconstruct, "extraire", extract)
-    monkeypatch.setattr(reconstruct, "construire", lambda **_kwargs: None)
-    monkeypatch.setattr(reconstruct, "dossiers_par_defaut", lambda: [])
-    monkeypatch.setattr(reconstruct, "_normaliser_texte", normalize)
-    monkeypatch.setattr(reconstruct, "_enregistrer_catalogue", lambda *_args: None)
+    monkeypatch.setattr(segmentation, "extraire", extract)
+    monkeypatch.setattr(segmentation, "construire", lambda **_kwargs: None)
+    monkeypatch.setattr(segmentation, "dossiers_par_defaut", lambda: [])
+    monkeypatch.setattr(segmentation, "_normaliser_texte", normalize)
+    monkeypatch.setattr(reconstruct, "enregistrer_catalogue", lambda *_args: None)
     monkeypatch.setattr(reconstruct, "annotate_pdf_bboxes", lambda *_args: [])
     monkeypatch.setattr(reconstruct, "write_bbox_docx", fill)
 

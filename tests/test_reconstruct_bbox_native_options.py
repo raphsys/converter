@@ -9,6 +9,8 @@ import pytest
 
 from pdfexact.layout import text_comprehension as comprehension
 from pdfexact.layout import text_comprehension_ai as http
+from pdfexact.segmentation import OptionsSegmentation
+from pdfexact.segmentation import pipeline as segmentation
 from scripts import reconstruct_bbox_native as reconstruct
 
 
@@ -18,8 +20,8 @@ def pipeline(monkeypatch, tmp_path):
     monkeypatch.setenv("PDFEXACT_AI_MODELS_ROOT", str(tmp_path / "env-models"))
     monkeypatch.delenv("VYSI_AI_MODELS_ROOT", raising=False)
     monkeypatch.delenv("PDFEXACT_TEXT_UNDERSTANDING_URL", raising=False)
-    monkeypatch.setattr(reconstruct, "construire", lambda **kwargs: None)
-    monkeypatch.setattr(reconstruct, "dossiers_par_defaut", lambda: [])
+    monkeypatch.setattr(segmentation, "construire", lambda **kwargs: None)
+    monkeypatch.setattr(segmentation, "dossiers_par_defaut", lambda: [])
 
     def provider(**kwargs):
         calls["factory"] = kwargs
@@ -29,10 +31,10 @@ def pipeline(monkeypatch, tmp_path):
         calls["extract"] = kwargs
         return SimpleNamespace(pages=[])
 
-    monkeypatch.setattr(reconstruct, "creer_fournisseur_comprehension_texte_ai", provider)
-    monkeypatch.setattr(reconstruct, "extraire", extract)
-    monkeypatch.setattr(reconstruct, "_normaliser_texte", lambda document: None)
-    monkeypatch.setattr(reconstruct, "_enregistrer_catalogue", lambda *args: None)
+    monkeypatch.setattr(segmentation, "creer_fournisseur_comprehension_texte_ai", provider)
+    monkeypatch.setattr(segmentation, "extraire", extract)
+    monkeypatch.setattr(segmentation, "_normaliser_texte", lambda document: None)
+    monkeypatch.setattr(reconstruct, "enregistrer_catalogue", lambda *args: None)
     monkeypatch.setattr(reconstruct, "annotate_pdf_bboxes", lambda *args: [])
     monkeypatch.setattr(reconstruct, "write_bbox_docx", lambda *args: [])
     calls["argv"] = ["reconstruct_bbox_native.py", "unused.pdf", "--pdf-out", str(tmp_path / "bbox.pdf"),
@@ -69,11 +71,8 @@ def test_user_main_propagates_language_roots_and_separate_opt_in(
     assert extraction["ocr_layout"] == ("word-native" if mode == "rapidocr" else "blocks")
 
 
-def test_legacy_namespace_missing_new_options_is_compatible(pipeline):
-    args = SimpleNamespace(text_mode="spans", text_understanding_url=None, text_understanding_timeout=.75,
-                           dpi=150, layout_provider=None, layout_model=None, layout_model_root=None,
-                           layout_device=None)
-    reconstruct._extraire_scene(Path("unused.pdf"), [0], args)
+def test_segmentation_options_default_to_automatic_ocr_language(pipeline):
+    segmentation._extraire_scene(Path("unused.pdf"), OptionsSegmentation(pages=[0], text_understanding_timeout=.75))
     assert pipeline["extract"]["ocr_language"] == "auto"
     assert pipeline["factory"]["timeout"] == .75
 
@@ -84,7 +83,7 @@ def test_http_priority_survives_models_root(
 ):
     requests = []
     monkeypatch.setenv("PDFEXACT_TEXT_UNDERSTANDING_URL", "http://environment.test/understand")
-    monkeypatch.setattr(reconstruct, "creer_fournisseur_comprehension_texte_ai",
+    monkeypatch.setattr(segmentation, "creer_fournisseur_comprehension_texte_ai",
                         http.creer_fournisseur_comprehension_texte_ai)
 
     def respond(request, timeout):
@@ -97,7 +96,7 @@ def test_http_priority_survives_models_root(
         return SimpleNamespace(pages=[])
 
     monkeypatch.setattr(http, "urlopen", respond)
-    monkeypatch.setattr(reconstruct, "extraire", extract)
+    monkeypatch.setattr(segmentation, "extraire", extract)
     flags = ["--ai-models-root", str(tmp_path), "--text-understanding-timeout", "0.75"]
     if explicit_url:
         flags += ["--text-understanding-url", "http://explicit.test/understand"]
