@@ -24,8 +24,6 @@ def text_box(text="AB", *, z=0, color="123456"):
     return ir.TextBox(line.bbox, [line], z_index=z, source_kind="pdf-native", language="fr", script="Latn")
 
 
-
-
 def test_clone_keeps_dynamic_metadata_without_aliasing():
     source = text_box()
     source.dynamic_metadata = {"native": [0]}
@@ -134,15 +132,11 @@ def test_factory_preserves_zeroes_full_runs_metrics_clips_history_and_ids():
     assert json.loads(json.dumps(scene.snapshot()))["pages"][0]["elements"][0]["decision_history"] == box.decision_history
 
 
-
-
 def test_render_mode_export_is_the_owned_enum():
     from pdfexact.scene import RenderMode
     from pdfexact.analysis.decisions import RenderMode as OwnedRenderMode
 
     assert RenderMode is OwnedRenderMode
-
-
 
 
 def test_bboxless_span_is_registered_without_fabricated_geometry():
@@ -154,8 +148,6 @@ def test_bboxless_span_is_registered_without_fabricated_geometry():
     assert scene.registry.elements[span_id].bbox is None
     assert scene.registry.elements[span_id].attributes["observation_only"] is True
     assert span_id in doc.pages[0].source_inventory
-
-
 
 
 def test_raw_ocr_unmatched_observation_retained_without_invented_font_or_confidence():
@@ -267,29 +259,6 @@ def test_native_extraction_acquires_span_quad_baseline_glyphs_zero_z_and_opacity
         assert span.confidence is None
 
 
-def test_visual_segmentation_clones_all_metadata_and_preserves_raw_parent(monkeypatch):
-    from pdfexact.extract import document as extractor
-
-    source = ir.RasterEl(BBox(0, 0, 200, 200), "parent", z_index=0, source_kind="vector",
-                         source_component_ids=("source-shape",), fallback_reason="actual-complex-shape", opacity=0.0,
-                         clip_ids=("actual-clip",), parent_group_id="actual-group")
-    page = ir.Page(0, 200, 200, [source])
-    monkeypatch.setattr(extractor, "segmenter_elements_visuels_page", lambda *a: [
-        ir.RasterEl(BBox(0, 0, 100, 200), "left"), ir.RasterEl(BBox(100, 0, 200, 200), "right")])
-    extractor._securiser_elements_visuels_page(page, {})
-    assert len(page.elements) == 2
-    assert all(output.source_id != source.source_id for output in page.elements)
-    assert len({output.source_id for output in page.elements}) == 2
-    assert all(output.opacity == 0 and output.z_index == 0 for output in page.elements)
-    assert all(output.clip_ids == ("actual-clip",) and output.parent_group_id == "actual-group" for output in page.elements)
-    assert all("source-shape" in output.source_component_ids for output in page.elements)
-    assert page.source_inventory[source.source_id].bbox == BBox(0, 0, 200, 200)
-    assert source in page.discarded_elements
-    proof = next(event["proof"] for event in page.source_transformations if event["reason_code"] == "source-media-segmentation")
-    assert proof["capture_method"] == "source-media-pixel-crop"
-    assert proof["pixel_equivalence_verified"] is False
-
-
 def test_unknown_confidence_chooses_conservative_mode_without_fabricating_one():
     from pdfexact.analysis.decisions import decider_mode_universel
 
@@ -305,8 +274,6 @@ def test_required_span_public_aliases_accept_defaults_and_preserve_zero():
     span = ir.Span("x", font, 10, "000000", baseline=((0, 0), (1, 0)), z_order=0)
     assert span.baseline_points == ((0, 0), (1, 0))
     assert span.z_index == 0
-
-
 
 
 def test_legacy_local_line_aliases_are_acquisition_scoped_before_scene_registration():

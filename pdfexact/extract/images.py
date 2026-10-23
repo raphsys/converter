@@ -330,6 +330,12 @@ def _graphic_requires_raster(operation):
     if any(name == "begin_group" and (args[-1] != 1 or args[-2] != 0) for name, args in operation["stack"]):
         return True
     if operation["clips"] and not _rectangular_fill(operation):
+        if operation["kind"] == "stroke_path" and all(
+            name == "clip_path" and pymupdf.mupdf.fz_path_is_rect(args[0], args[2])
+            for name, args, _bounds in operation["clips"]
+        ):
+            # A rectangular clip only trims a stroke: the vector line stays faithful.
+            return False
         # A full rectangular clip enclosing the graphic changes nothing.
         bounds = operation["rect"]
         return not all(
@@ -550,8 +556,6 @@ def extraire_images_rasterisees(
     from pdfexact.fallback.rasterize import (
         rasteriser_region,
         rasteriser_region_sans_texte,
-        rasteriser_regions_segmentees,
-        rasteriser_regions_segmentees_sans_texte,
     )
 
     elements: list[ImageEl | RasterEl] = []
@@ -580,17 +584,9 @@ def extraire_images_rasterisees(
                     octets_test = None
                 if _image_ressemble_fragment_texte_octets(octets_test, boite, page, geometrie):
                     continue
+            # A full-page image is one element, rendered at a higher resolution.
             dpi_image = max(dpi, 300) if _est_image_page(boite, geometrie, page) else dpi
-            if _est_image_page(boite, geometrie, page):
-                if supprimer_texte_natif:
-                    elements.extend(
-                        rasteriser_regions_segmentees_sans_texte(
-                            page, boite, media, dpi=dpi_image, geometrie=geometrie
-                        )
-                    )
-                else:
-                    elements.extend(rasteriser_regions_segmentees(page, boite, media, dpi=dpi_image))
-            elif supprimer_texte_natif:
+            if supprimer_texte_natif:
                 elements.append(
                     rasteriser_region_sans_texte(
                         page, boite, media, dpi=dpi_image, geometrie=geometrie
@@ -807,8 +803,6 @@ def extraire_images_inline_rasterisees(
     from pdfexact.fallback.rasterize import (
         rasteriser_region,
         rasteriser_region_sans_texte,
-        rasteriser_regions_segmentees,
-        rasteriser_regions_segmentees_sans_texte,
     )
 
     elements: list[ImageEl] = []
@@ -852,22 +846,15 @@ def extraire_images_inline_rasterisees(
         if supprimer_texte_natif and _image_inline_ressemble_fragment_texte(bloc, boite, page, geometrie):
             continue
         vus.add(cle)
-        if _est_image_page(boite, geometrie, page):
-            if supprimer_texte_natif:
-                elements.extend(
-                    rasteriser_regions_segmentees_sans_texte(
-                        page, boite, media, dpi=max(dpi, 300), geometrie=geometrie
-                    )
-                )
-            else:
-                elements.extend(rasteriser_regions_segmentees(page, boite, media, dpi=max(dpi, 300)))
-        elif supprimer_texte_natif:
+        # A full-page image is one element, rendered at a higher resolution.
+        dpi_image = max(dpi, 300) if _est_image_page(boite, geometrie, page) else dpi
+        if supprimer_texte_natif:
             elements.append(
                 rasteriser_region_sans_texte(
-                    page, boite, media, dpi=dpi, geometrie=geometrie
+                    page, boite, media, dpi=dpi_image, geometrie=geometrie
                 )
             )
         else:
-            elements.append(rasteriser_region(page, boite, media, dpi=dpi))
+            elements.append(rasteriser_region(page, boite, media, dpi=dpi_image))
 
     return elements

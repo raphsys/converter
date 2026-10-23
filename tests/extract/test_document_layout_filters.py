@@ -1,11 +1,8 @@
 from pdfexact.extract.document import _cadres_lecture_depuis_plan, _extraire_texte_pdf_natif_word_native, _filtrer_textes_intersectant_zones, _filtrer_tableaux_contredits_par_ia, _filtrer_zones_lisibles_ocr, _forme_bordure_page_clusterisante, _page_image_pleine_sans_texte_natif, _page_pdf_natif_mixe, _preparer_ocr_visible_page_image, _tableau_ressemble_graphe, _zones_images_lisibles_ocr, _zones_visuelles_ia_a_rasteriser, _zone_rasterisable, _zone_touche_tableau
 from pdfexact.geometry import BBox, pt_vers_emu
-from io import BytesIO
 
-from PIL import Image
 
-from pdfexact.fallback.rasterize import bboxes_segmentees, segmenter_elements_visuels_page
-from pdfexact.ir import Document, FlowParagraph, FontRef, ImageEl, Line, MediaItem, Page, ShapeEl, Span, TableCell, TableEl, TableRow, TextBox
+from pdfexact.ir import Document, FlowParagraph, FontRef, Line, Page, ShapeEl, Span, TableCell, TableEl, TableRow, TextBox
 from pdfexact.layout.ai import LayoutAIZone
 from pdfexact.layout.model import LayoutRegion
 from pdfexact.layout.planner import LayoutPlanItem
@@ -13,8 +10,6 @@ from pdfexact.layout.planner import LayoutPlanItem
 
 def _bbox_pt(x0, y0, x1, y1):
     return BBox(pt_vers_emu(x0), pt_vers_emu(y0), pt_vers_emu(x1), pt_vers_emu(y1))
-
-
 
 
 def test_filtre_ocr_intersectant_zone_raster_integrale():
@@ -164,37 +159,6 @@ def test_page_image_pleine_reste_detectee_meme_avec_texte_natif():
     lignes_natives = [_bbox_pt(20, 20 + index * 12, 120, 35 + index * 12) for index in range(8)]
     assert not _page_image_pleine_sans_texte_natif([pleine_page], lignes_natives, page)
     assert _page_pdf_natif_mixe(lignes_natives, [pleine_page], page)
-
-
-def test_page_image_est_decoupee_en_tuiles_contigues():
-    page = _bbox_pt(0, 0, 310, 500)
-    tuiles = bboxes_segmentees(page)
-
-    assert len(tuiles) == 24
-    assert max(zone.largeur * zone.hauteur for zone in tuiles) < page.largeur * page.hauteur
-    assert min(zone.x0 for zone in tuiles) == page.x0
-    assert max(zone.x1 for zone in tuiles) == page.x1
-    assert min(zone.y0 for zone in tuiles) == page.y0
-    assert max(zone.y1 for zone in tuiles) == page.y1
-
-
-def test_garde_fou_ir_decoupe_un_visuel_pleine_page():
-    page = _bbox_pt(0, 0, 310, 500)
-    donnees = BytesIO()
-    Image.new("RGB", (120, 180), "white").save(donnees, format="PNG")
-    media = {"source": MediaItem("source", donnees.getvalue(), "png")}
-
-    elements = segmenter_elements_visuels_page(
-        [ImageEl(page, "source")],
-        media,
-        page.largeur,
-        page.hauteur,
-    )
-
-    assert len(elements) == 24
-    assert all(element.bbox != page for element in elements)
-
-
 
 
 def test_page_pdf_natif_conserve_texte_dans_zone_visuelle_sans_texte(monkeypatch):

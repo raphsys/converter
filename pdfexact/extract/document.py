@@ -38,14 +38,11 @@ from pdfexact.extract.vector import (
 from pdfexact.fallback.rasterize import (
     extraire_zones_shading,
     nettoyer_images_fond_texte_positionne,
-    nettoyer_tuiles_page_depuis_source,
+    nettoyer_image_page_depuis_source,
     page_a_des_degrades,
     rasteriser_region,
     rasteriser_region_sans_texte,
-    rasteriser_regions_segmentees_sans_texte,
     resserrer_ancres_visuelles,
-    segmenter_elements_visuels_page,
-    verify_media_crop_partition,
 )
 from pdfexact.geometry import (
     BBox,
@@ -255,8 +252,6 @@ def _page_image_pleine_sans_texte_natif(
         and x1 - x0 >= page.largeur_emu * 0.80
         and y1 - y0 >= page.hauteur_emu * 0.80
     )
-
-
 
 
 def _page_pdf_natif_mixe(
@@ -658,10 +653,6 @@ def _filtrer_elements_visuels_couverts(elements: list, zones: list[BBox]) -> lis
     return filtres
 
 
-
-
-
-
 def _bbox_texte_elementaires(element) -> list[BBox]:
     bboxes: list[BBox] = []
     if isinstance(element, (TextBox, FlowParagraph)):
@@ -1029,74 +1020,6 @@ def _fonds_synthetiques_texte_inverse(
         bbox, couleur = detecte
         fonds.append(ShapeEl(bbox=bbox, chemins=[], remplissage=couleur, contour=None, epaisseur_emu=0))
     return fonds
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def _securiser_elements_visuels_page(page: Page, media: dict) -> None:
-    avant = list(page.elements)
-    capture_source_observations(page, avant)
-    apres = []
-    for source in avant:
-        fragments = segmenter_elements_visuels_page([source], media, page.largeur_emu, page.hauteur_emu)
-        crop_proofs = [dict(evidence.details).get("proof")
-                       for fragment in fragments for evidence in getattr(fragment, "evidence", ())
-                       if isinstance(evidence, Evidence) and evidence.kind == "media-crop-partition"]
-        proof = next((proof for proof in crop_proofs if isinstance(proof, dict)
-                      and proof.get("source", {}).get("source_id") == source.source_id), None)
-        if proof is not None:
-            acquired = page.source_inventory[source.source_id]
-            errors = verify_media_crop_partition(acquired, fragments, media, proof)
-            if errors:
-                source.attributes["crop_unverified_reasons"] = errors
-                apres.append(source)
-                continue
-            apres.extend(fragments)
-            record_source_transformation(page, [source], fragments, "source-media-segmentation", proof=proof)
-            continue
-        if any(fragment is not source for fragment in fragments) and (
-            getattr(source, "quad", ()) or getattr(source, "transform", ()) or getattr(source, "clip_bbox", None) is not None
-        ):
-            source.attributes["crop_unverified_reasons"] = ["missing-producer-crop-proof"]
-            apres.append(source)
-            continue
-        outputs = []
-        for fragment in fragments:
-            if fragment is source:
-                outputs.append(source)
-                continue
-            output = clone_element_with_metadata(source, bbox=fragment.bbox, media_ref=fragment.media_ref)
-            digest = sha256(str((fragment.bbox.x0, fragment.bbox.y0, fragment.bbox.x1, fragment.bbox.y1)).encode()).hexdigest()[:16]
-            output.source_id = f"{source.source_id}:media-crop:{digest}"
-            output.source_ids = tuple(dict.fromkeys((output.source_id, *element_source_ids(source))))
-            output.attributes.update({"replaces": (source.source_id,), "transformation": "source-media-pixel-crop",
-                                      "source_media_ref": source.media_ref, "source_bbox": source.bbox,
-                                      "crop_unverified_reasons": ["missing-producer-crop-proof"]})
-            if isinstance(output, RasterEl):
-                output.source_component_ids = tuple(dict.fromkeys((source.source_id, *source.source_component_ids)))
-                output.fallback_reason = source.fallback_reason or "source-media-segmentation"
-            outputs.append(output)
-        apres.extend(outputs)
-        if any(output is not source for output in outputs):
-            record_source_transformation(page, [source], outputs, "source-media-segmentation",
-                                         proof={"capture_method": "source-media-pixel-crop", "source_media_ref": source.media_ref,
-                                                "output_ids": tuple(output.source_id for output in outputs),
-                                                "source_bbox": _bbox_report(source.bbox),
-                                                "output_bboxes": tuple(_bbox_report(output.bbox) for output in outputs),
-                                                "pixel_equivalence_verified": False,
-                                                "reasons": ["missing-producer-crop-proof"]})
-    _journaliser_elements_rejetes(page, avant, apres, "segmented-or-replaced-visual")
-    page.elements = apres
 
 
 def _lier_composants_raster(page: Page, raster: RasterEl, sources: list, reason: str, *, dpi: int) -> None:
@@ -2169,7 +2092,7 @@ def _remplir_page(
             capture_source_observations(page_ir, ocr_visible, source_kind="ocr")
             lignes_visibles = _preparer_ocr_visible_page_image(ocr_visible)
             _styliser_ocr_depuis_image_scanee(page_pdf, ocr_visible, geometrie)
-            nettoyes = nettoyer_tuiles_page_depuis_source(
+            nettoyes = nettoyer_image_page_depuis_source(
                 page_pdf,
                 page_ir.elements,
                 ocr_visible,
@@ -2493,8 +2416,8 @@ def extraire(
             if rasteriser_pages:
                 if verbose:
                     print("    rasterisation page segmentée", file=sys.stderr)
-                page_ir.elements.extend(
-                    rasteriser_regions_segmentees_sans_texte(
+                page_ir.elements.append(
+                    rasteriser_region_sans_texte(
                         page_pdf,
                         BBox(0, 0, page_ir.largeur_emu, page_ir.hauteur_emu),
                         document.media,
@@ -2515,7 +2438,6 @@ def extraire(
                             observation_page=page_ir,
                         )
                     )
-                _securiser_elements_visuels_page(page_ir, document.media)
                 capture_source_observations(page_ir, page_ir.elements)
                 document.pages.append(page_ir)
                 continue
@@ -2549,13 +2471,13 @@ def extraire(
                     raise
                 elements_avant_degradation = list(page_ir.elements)
                 capture_source_observations(page_ir, elements_avant_degradation)
-                page_ir.elements = rasteriser_regions_segmentees_sans_texte(
+                page_ir.elements = [rasteriser_region_sans_texte(
                     page_pdf,
                     BBox(0, 0, page_ir.largeur_emu, page_ir.hauteur_emu),
                     document.media,
                     dpi=dpi,
                     geometrie=geometrie,
-                )
+                )]
                 _journaliser_elements_rejetes(
                     page_ir,
                     elements_avant_degradation,
@@ -2584,7 +2506,6 @@ def extraire(
                     )
                 )
 
-            _securiser_elements_visuels_page(page_ir, document.media)
             capture_source_observations(page_ir, page_ir.elements)
             document.pages.append(page_ir)
 

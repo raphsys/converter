@@ -10,9 +10,7 @@ et cherchable, même au-dessus d'une zone d'image.
 import itertools
 import os
 import re
-from copy import deepcopy
 from functools import lru_cache
-from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 
@@ -20,8 +18,7 @@ import pymupdf
 from PIL import Image, ImageDraw
 
 from pdfexact.geometry import BBox, PageGeometry, emu_vers_pt, pt_vers_emu, se_chevauchent
-from pdfexact.ir import FlowParagraph, ImageEl, MediaItem, RasterEl, TextBox, clone_element_with_metadata, element_source_ids
-from pdfexact.analysis.provenance import Evidence
+from pdfexact.ir import FlowParagraph, ImageEl, MediaItem, RasterEl, TextBox
 
 _compteur = itertools.count(1)
 
@@ -134,6 +131,10 @@ def _bbox_contenu_vers_page(page, geometrie: PageGeometry, boite) -> BBox:
     )
 
 
+# Path-painting operators (and "n") end the current path.
+_FIN_DE_CHEMIN = {"n", "S", "s", "f", "F", "f*", "B", "B*", "b", "b*"}
+
+
 def extraire_zones_shading(doc, page, geometrie: PageGeometry) -> list[BBox]:
     """Retourne les zones effectivement peintes par les shadings PDF.
 
@@ -205,11 +206,17 @@ def extraire_zones_shading(doc, page, geometrie: PageGeometry) -> list[BBox]:
                 )
                 operandes.clear()
                 continue
-            if token == "W":
-                clipping = _bbox_union_points(chemin) or clipping
+            if token in {"W", "W*"}:
+                # A nested clip narrows the current one.
+                nouveau = _bbox_union_points(chemin)
+                if nouveau is not None and clipping is not None:
+                    nouveau = (max(nouveau[0], clipping[0]), max(nouveau[1], clipping[1]),
+                               min(nouveau[2], clipping[2]), min(nouveau[3], clipping[3]))
+                clipping = nouveau or clipping
                 operandes.clear()
                 continue
-            if token == "n":
+            if token in _FIN_DE_CHEMIN:
+                # A painted path is finished: it must not leak into the next clip.
                 chemin.clear()
                 operandes.clear()
                 continue
@@ -375,293 +382,6 @@ def rasteriser_region_sans_texte(
     return RasterEl(bbox=bbox_affiche, media_ref=media_ref)
 
 
-def bboxes_segmentees(bbox: BBox, colonnes: int = 4, lignes: int = 6) -> list[BBox]:
-    """Découpe une grande région en zones indépendantes avant rasterisation.
-
-    Une page-image ne doit jamais devenir un unique objet bitmap dans le DOCX. Les
-    tuiles restent contiguës, sans espace, et conservent la géométrie originale.
-    """
-    if colonnes < 2 or lignes < 2 or bbox.largeur <= 0 or bbox.hauteur <= 0:
-        return [bbox]
-    zones: list[BBox] = []
-    for indice_y in range(lignes):
-        y0 = bbox.y0 + (bbox.hauteur * indice_y) // lignes
-        y1 = bbox.y0 + (bbox.hauteur * (indice_y + 1)) // lignes
-        for indice_x in range(colonnes):
-            x0 = bbox.x0 + (bbox.largeur * indice_x) // colonnes
-            x1 = bbox.x0 + (bbox.largeur * (indice_x + 1)) // colonnes
-            if x1 > x0 and y1 > y0:
-                zones.append(BBox(x0, y0, x1, y1))
-    return zones
-
-
-def rasteriser_regions_segmentees_sans_texte(
-    page,
-    bbox: BBox,
-    media: dict,
-    dpi: int = 300,
-    geometrie: PageGeometry | None = None,
-) -> list[RasterEl]:
-    """Rend une grande image de page sous forme de plusieurs fonds contigus."""
-    return [
-        rasteriser_region_sans_texte(page, zone, media, dpi=dpi, geometrie=geometrie)
-        for zone in bboxes_segmentees(bbox)
-    ]
-
-
-def rasteriser_regions_segmentees(
-    page,
-    bbox: BBox,
-    media: dict,
-    dpi: int = 300,
-) -> list[RasterEl]:
-    """Rend une grande région sous forme de tuiles, texte inclus si nécessaire."""
-    return [
-        rasteriser_region(page, zone, media, dpi=dpi)
-        for zone in bboxes_segmentees(bbox)
-    ]
-
-
-def segmenter_elements_visuels_page(
-    elements: list,
-    media: dict,
-    largeur_page_emu: int,
-    hauteur_page_emu: int,
-) -> list:
-    """Dernier garde-fou IR contre un visuel couvrant toute la page.
-
-    Cette étape ne reclasse rien : elle découpe uniquement les ImageEl/RasterEl trop
-    grands, y compris ceux ajoutés par un nouveau fallback ou une future détection IA.
-    """
-    resultat: list = []
-    page_aire = max(largeur_page_emu * hauteur_page_emu, 1)
-    for element in elements:
-        if not isinstance(element, (ImageEl, RasterEl)) or not _visuel_couvre_page(
-            element.bbox, largeur_page_emu, hauteur_page_emu, page_aire
-        ):
-            resultat.append(element)
-            continue
-        item = media.get(element.media_ref)
-        tuiles = _decouper_media(element, item, media)
-        if not tuiles:
-            resultat.append(element)
-            continue
-        resultat.extend(tuiles)
-    return resultat
-
-
-def _visuel_couvre_page(bbox: BBox, largeur_page_emu: int, hauteur_page_emu: int, page_aire: int) -> bool:
-    return (
-        bbox.largeur >= largeur_page_emu * 0.80
-        and bbox.hauteur >= hauteur_page_emu * 0.80
-    ) or (bbox.largeur * bbox.hauteur / page_aire >= 0.72)
-
-
-def _decouper_media(element, item: MediaItem | None, media: dict) -> list:
-    if item is None:
-        element.attributes["crop_unverified_reasons"] = ["missing-source-media"]
-        return []
-    try:
-        with Image.open(BytesIO(item.donnees)) as decoded:
-            source_mode = decoded.mode
-            image = decoded.convert("RGBA")
-    except Exception:  # noqa: BLE001
-        element.attributes["crop_unverified_reasons"] = ["source-media-decode-failed"]
-        return []
-    reason = _crop_geometry_problem(element)
-    if reason:
-        element.attributes["crop_unverified_reasons"] = [reason]
-        return []
-    from pdfexact.scene import ensure_source_identity
-
-    ensure_source_identity(element, getattr(element, "source_page_index", 0))
-    source = {"source_id": element.source_id, "media_ref": item.media_ref, "payload": item.donnees,
-              "payload_sha256": sha256(item.donnees).hexdigest(), "rgba_sha256": sha256(image.tobytes()).hexdigest(),
-              "width": image.width, "height": image.height, "mode": source_mode, "geometry": _crop_geometry_snapshot(element)}
-    tuiles = []
-    entries = []
-    pixel_zones = bboxes_segmentees(BBox(0, 0, image.width, image.height), min(4, image.width), min(6, image.height))
-    for indice, pixel_zone in enumerate(pixel_zones, start=1):
-        bounds = (pixel_zone.x0, pixel_zone.y0, pixel_zone.x1, pixel_zone.y1)
-        crop = image.crop(bounds)
-        sortie = BytesIO()
-        crop.save(sortie, format="PNG")
-        payload = sortie.getvalue()
-        media_ref = f"{item.media_ref}_page_tile{indice}_{next(_compteur)}"
-        geometry = _media_crop_geometry(element, bounds, image.size)
-        tile = clone_element_with_metadata(element, bbox=geometry["bbox"], media_ref=media_ref)
-        for name in ("quad", "transform", "clip_bbox"):
-            if hasattr(element, name):
-                setattr(tile, name, geometry[name])
-        digest = sha256(str(bounds).encode()).hexdigest()[:16]
-        tile.source_id = f"{element.source_id}:media-crop:{digest}"
-        tile.source_ids = tuple(dict.fromkeys((tile.source_id, *element_source_ids(element))))
-        tile.attributes.update({"crop_parent_id": element.source_id, "replaces": (element.source_id,),
-                                "transformation": "source-media-pixel-crop", "source_media_ref": item.media_ref,
-                                "source_bbox": element.bbox, "crop_pixel_bounds": bounds,
-                                "paint_fragment_index": indice - 1})
-        if isinstance(tile, RasterEl):
-            tile.source_component_ids = tuple(dict.fromkeys((element.source_id, *element.source_component_ids)))
-            tile.fallback_reason = element.fallback_reason or "source-media-segmentation"
-        media[media_ref] = MediaItem(media_ref, payload, "png", native_width=crop.width, native_height=crop.height,
-                                    color_mode=crop.mode, alpha=True, content_hash=sha256(payload).hexdigest(),
-                                    source_ids=tile.source_ids, dpi=item.dpi, media_kind="composite-crop")
-        entries.append({"source_id": tile.source_id, "media_ref": media_ref, "pixel_bounds": bounds,
-                        "width": crop.width, "height": crop.height, "mode": crop.mode,
-                        "payload_sha256": sha256(payload).hexdigest(), "rgba_sha256": sha256(crop.tobytes()).hexdigest(),
-                        "geometry": _crop_geometry_snapshot(tile)})
-        tuiles.append(tile)
-    proof = {"schema": "media-crop-partition-v1", "capture_method": "source-media-pixel-crop",
-             "source": source, "outputs": entries, "partition_verified": False,
-             "pixel_equivalence_verified": False, "reasons": []}
-    errors = verify_media_crop_partition(element, tuiles, media, proof, require_verified=False)
-    proof.update(partition_verified=not errors, pixel_equivalence_verified=not errors, reasons=errors)
-    if errors:
-        element.attributes["crop_unverified_reasons"] = errors
-        return []
-    evidence = Evidence("media-crop-partition", "pdfexact.fallback.rasterize", None, (("proof", proof),))
-    for tile in tuiles:
-        tile.evidence.append(evidence)
-    return tuiles
-
-
-def _crop_geometry_snapshot(element):
-    names = ("bbox", "quad", "transform", "clip_bbox", "clip_ids", "alpha", "opacity", "z_index",
-             "alpha_preserved", "paint_group_id", "parent_group_id", "compositing", "source_kind",
-             "placement_id", "source_xref", "source_placements", "source_xrefs", "paint_sequences")
-    return deepcopy({name: getattr(element, name, None) for name in names})
-
-
-def _crop_geometry_problem(element):
-    bbox = element.bbox
-    if bbox.largeur <= 0 or bbox.hauteur <= 0:
-        return "invalid-source-media-bbox"
-    quad = tuple(getattr(element, "quad", ()) or ())
-    expected = ((bbox.x0, bbox.y0), (bbox.x1, bbox.y0), (bbox.x1, bbox.y1), (bbox.x0, bbox.y1))
-    if quad and quad != expected:
-        return "ambiguous-transformed-or-clipped-media-coordinate-space"
-    matrix = tuple(getattr(element, "transform", ()) or ())
-    if matrix:
-        if len(matrix) != 6:
-            return "invalid-source-media-transform"
-        a, b, c, d, e, f = matrix
-        if b != 0 or c != 0 or a <= 0 or d <= 0:
-            return "ambiguous-transformed-media-coordinate-space"
-        projected = tuple(round(value * 12700) for value in (e, f, e + a, f + d))
-        if projected != (bbox.x0, bbox.y0, bbox.x1, bbox.y1):
-            return "ambiguous-clipped-media-coordinate-space"
-    return None
-
-
-def _media_crop_geometry(source, bounds, size):
-    x0, y0, x1, y1 = bounds
-    width, height = size
-    bbox = source.bbox
-    box = BBox(round(bbox.x0 + bbox.largeur * x0 / width), round(bbox.y0 + bbox.hauteur * y0 / height),
-               round(bbox.x0 + bbox.largeur * x1 / width), round(bbox.y0 + bbox.hauteur * y1 / height))
-    result = _crop_geometry_snapshot(source)
-    result["bbox"] = box
-    if hasattr(source, "quad"):
-        result["quad"] = ((box.x0, box.y0), (box.x1, box.y0), (box.x1, box.y1), (box.x0, box.y1))
-    matrix = tuple(getattr(source, "transform", ()) or ())
-    if matrix:
-        a, b, c, d, e, f = matrix
-        result["transform"] = (a * (x1 - x0) / width, b * (x1 - x0) / width,
-                               c * (y1 - y0) / height, d * (y1 - y0) / height,
-                               e + a * x0 / width + c * y0 / height, f + b * x0 / width + d * y0 / height)
-    clip = getattr(source, "clip_bbox", None)
-    if clip is not None:
-        result["clip_bbox"] = _bbox_intersection(box, clip) or BBox(box.x0, box.y0, box.x0, box.y0)
-    return result
-
-
-def verify_media_crop_partition(source, outputs, media, proof, *, require_verified=True) -> list[str]:
-    """Recompute exhaustive pixel partition, RGBA equality and canonical geometry."""
-    errors = []
-    if not isinstance(proof, dict) or proof.get("schema") != "media-crop-partition-v1" or proof.get("capture_method") != "source-media-pixel-crop":
-        return ["invalid-media-crop-schema"]
-    if require_verified and (proof.get("partition_verified") is not True or proof.get("pixel_equivalence_verified") is not True or proof.get("reasons") != []):
-        errors.append("media-crop-not-verified")
-    source_info = proof.get("source", {})
-    entries = proof.get("outputs", [])
-    if not isinstance(source_info, dict) or not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
-        return [*errors, "invalid-media-crop-schema"]
-    if any(not isinstance(entry.get("source_id"), str) for entry in entries):
-        return [*errors, "invalid-media-crop-output-identity"]
-    if source_info.get("source_id") != getattr(source, "source_id", None) or source_info.get("media_ref") != source.media_ref:
-        errors.append("media-crop-source-identity-mismatch")
-    if source_info.get("geometry") != _crop_geometry_snapshot(source) or _crop_geometry_problem(source):
-        return [*errors, "media-crop-source-geometry-mismatch"]
-    item = media.get(source.media_ref)
-    if item is None:
-        return [*errors, "missing-media-crop-source-payload"]
-    if sha256(item.donnees).hexdigest() != source_info.get("payload_sha256") or item.donnees != source_info.get("payload"):
-        errors.append("media-crop-source-payload-mismatch")
-    try:
-        with Image.open(BytesIO(item.donnees)) as decoded:
-            mode = decoded.mode
-            image = decoded.convert("RGBA")
-    except Exception:  # noqa: BLE001
-        return [*errors, "media-crop-source-decode-failed"]
-    if (image.width, image.height, mode) != (source_info.get("width"), source_info.get("height"), source_info.get("mode")):
-        errors.append("media-crop-source-dimensions-mode-mismatch")
-    if sha256(image.tobytes()).hexdigest() != source_info.get("rgba_sha256"):
-        errors.append("media-crop-source-rgba-mismatch")
-    by_id = {getattr(output, "source_id", None): output for output in outputs}
-    entry_ids = [entry["source_id"] for entry in entries]
-    if len(by_id) != len(outputs) or len(set(entry_ids)) != len(entries) or len(entries) != len(outputs) or set(by_id) != set(entry_ids):
-        errors.append("media-crop-output-set-mismatch")
-    canvas = Image.new("RGBA", image.size)
-    coverage = Image.new("L", image.size)
-    draw = ImageDraw.Draw(coverage)
-    for entry in entries:
-        output = by_id.get(entry.get("source_id"))
-        bounds = entry.get("pixel_bounds", ())
-        if not isinstance(bounds, (tuple, list)) or len(bounds) != 4 or any(type(value) is not int for value in bounds):
-            errors.append("invalid-media-crop-pixel-bounds")
-            continue
-        x0, y0, x1, y1 = bounds
-        if not (0 <= x0 < x1 <= image.width and 0 <= y0 < y1 <= image.height):
-            errors.append("media-crop-pixel-bounds-outside-source")
-            continue
-        if coverage.crop(bounds).getbbox() is not None:
-            errors.append("media-crop-pixel-overlap")
-        draw.rectangle((x0, y0, x1 - 1, y1 - 1), fill=1)
-        if output is None:
-            continue
-        expected = _media_crop_geometry(source, bounds, image.size)
-        if _crop_geometry_snapshot(output) != expected or entry.get("geometry") != expected:
-            errors.append("media-crop-output-geometry-mismatch")
-        if source.source_id not in element_source_ids(output) or output.attributes.get("crop_parent_id") != source.source_id:
-            errors.append("media-crop-output-lineage-mismatch")
-        if output.media_ref != entry.get("media_ref") or output.attributes.get("crop_pixel_bounds") != tuple(bounds):
-            errors.append("media-crop-output-identity-mismatch")
-        tile_item = media.get(output.media_ref)
-        if tile_item is None:
-            errors.append("missing-media-crop-output-payload")
-            continue
-        if sha256(tile_item.donnees).hexdigest() != entry.get("payload_sha256"):
-            errors.append("media-crop-output-payload-mismatch")
-        try:
-            with Image.open(BytesIO(tile_item.donnees)) as decoded:
-                tile_mode = decoded.mode
-                tile = decoded.convert("RGBA")
-        except Exception:  # noqa: BLE001
-            errors.append("media-crop-output-decode-failed")
-            continue
-        if tile.size != (x1 - x0, y1 - y0) or (tile.width, tile.height, tile_mode) != (entry.get("width"), entry.get("height"), entry.get("mode")):
-            errors.append("media-crop-output-dimensions-mode-mismatch")
-            continue
-        if sha256(tile.tobytes()).hexdigest() != entry.get("rgba_sha256"):
-            errors.append("media-crop-output-rgba-mismatch")
-        canvas.paste(tile, (x0, y0))
-    if coverage.getextrema() != (1, 1):
-        errors.append("media-crop-pixel-hole")
-    if canvas.tobytes() != image.tobytes():
-        errors.append("media-crop-rgba-reconstruction-mismatch")
-    return list(dict.fromkeys(errors))
-
-
 def nettoyer_images_fond_texte_positionne(elements_visuels: list, elements_texte: list, media: dict) -> int:
     """Efface dans les bitmaps de fond les zones où le texte Word est réinjecté."""
     zones_texte = _zones_elements_texte(elements_texte)
@@ -736,7 +456,7 @@ def resserrer_ancres_visuelles(elements: list, media: dict) -> int:
     return modifies
 
 
-def nettoyer_tuiles_page_depuis_source(
+def nettoyer_image_page_depuis_source(
     page,
     elements_visuels: list,
     elements_texte: list,
@@ -744,11 +464,10 @@ def nettoyer_tuiles_page_depuis_source(
     dpi: int = 300,
     geometrie: PageGeometry | None = None,
 ) -> int:
-    """Nettoie une page-image avant sa decoupe en tuiles.
+    """Efface le texte OCR de l'image pleine page d'une page numerisee.
 
-    Le nettoyage tuile par tuile echoue quand une grande boite OCR couvre toute une
-    tuile. On reconstruit donc temporairement la page complete, on inpaint les boites
-    OCR avec leur contexte voisin, puis on recoupe uniquement les tuiles de fond.
+    On rend la page complete, on inpaint les boites OCR avec leur contexte voisin,
+    puis on separe l'image nettoyee en ses composants visuels reels.
     """
     zones = _zones_elements_texte(elements_texte)
     if not zones:
@@ -772,7 +491,7 @@ def nettoyer_tuiles_page_depuis_source(
         return 0
     image = _inpaint_regions(image, rects)
 
-    tuiles = bboxes_segmentees(page_bbox)
+    tuiles = [page_bbox]
     nettoyes = 0
     ajouts = []
     for element in elements_visuels:
@@ -835,8 +554,6 @@ def _zones_elements_texte(elements: list) -> list[BBox]:
             elif _texte_inpainting_autorise(element.texte, element.bbox):
                 zones.append(element.bbox)
     return zones
-
-
 
 
 def _texte_inpainting_autorise(texte: str, bbox: BBox) -> bool:
@@ -1009,8 +726,6 @@ def _segmenter_tuile_vide(tuile: BBox) -> list[tuple[Image.Image, BBox]]:
             BBox(tuile.x0, tuile.y0, tuile.x0 + 1, tuile.y0 + 1),
         )
     ]
-
-
 
 
 def _inpaint_regions(image: Image.Image, rects: list[tuple[int, int, int, int]]) -> Image.Image:
