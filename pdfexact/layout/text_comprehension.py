@@ -759,6 +759,7 @@ def hard_line_break(previous: str, current: str) -> bool:
     return previous.rstrip(" \t").endswith(("\n", "\r")) or current.lstrip(" \t").startswith(("\n", "\r"))
 
 
+
 def cjk_join_without_space(previous: str, current: str) -> bool:
     if not previous or not current or previous[-1].isspace() or current[0].isspace():
         return False
