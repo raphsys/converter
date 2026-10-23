@@ -29,21 +29,24 @@ class Boite:
     page_index: int
     bbox: BBox
     kind: str
+    # Position of the segmented element in its page, and of the line in ``fine``.
+    element_index: int | None = None
+    ligne_index: int | None = None
 
 
 def boites(document: Document, granularite: str) -> list[Boite]:
     """The segmentation bboxes: a text block per paragraph, or per line in ``fine``."""
     resultat = []
     for page in document.pages:
-        for element in page.elements:
+        for element_index, element in enumerate(page.elements):
             kind = next((name for cls, name in _NATURES if isinstance(element, cls)), None)
             if kind == "text" and granularite == "fine" and getattr(element, "lignes", None):
-                cadres = [ligne.bbox for ligne in element.lignes]
+                cadres = [(ligne.bbox, ligne_index) for ligne_index, ligne in enumerate(element.lignes)]
             else:
-                cadres = [getattr(element, "bbox", None)]
-            for bbox in cadres:
+                cadres = [(getattr(element, "bbox", None), None)]
+            for bbox, ligne_index in cadres:
                 if kind is not None and bbox is not None and bbox.largeur > 0 and bbox.hauteur > 0:
-                    resultat.append(Boite(page.index, bbox, kind))
+                    resultat.append(Boite(page.index, bbox, kind, element_index, ligne_index))
     return resultat
 
 

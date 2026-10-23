@@ -474,6 +474,8 @@ class Page:
     element_registry: object | None = None
     source_inventory: dict[str, object] = field(default_factory=dict)
     source_transformations: list[dict[str, object]] = field(default_factory=list)
+    # Zones of the layout AI (raw label, role, confidence, bbox), kept for identification.
+    zones_layout: list[object] = field(default_factory=list)
 
 
 @dataclass

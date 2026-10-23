@@ -1696,6 +1696,7 @@ def _remplir_page(
         device=layout_device,
         required=False,
     )
+    page_ir.zones_layout = list(page_layout_ai.zones)
     if page_layout_ai.warnings:
         print(
             "      avertissement layout IA: "

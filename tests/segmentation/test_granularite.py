@@ -62,3 +62,18 @@ def test_granularity_defaults_to_blocs_and_rejects_unknown_values():
     assert OptionsSegmentation(granularite="fine").granularite == "fine"
     with pytest.raises(ValueError):
         OptionsSegmentation(granularite="moyenne")
+
+
+def test_each_box_points_to_its_element_and_in_fine_to_its_line(tmp_path):
+    document, _pdf = _document(tmp_path)
+    texte = 4  # frame, logo_a, logo_b, separate, then the text block
+    fines = [b for b in boites(document, "fine") if b.kind == "text"]
+    assert [(b.element_index, b.ligne_index) for b in fines] == [(texte, 0), (texte, 1)]
+    blocs = [b for b in boites(document, "blocs") if b.kind == "text"]
+    assert [(b.element_index, b.ligne_index) for b in blocs] == [(texte, None)]
+
+
+def test_pages_keep_their_layout_zones():
+    from pdfexact.ir import Page
+
+    assert Page(0, 1, 1).zones_layout == []
