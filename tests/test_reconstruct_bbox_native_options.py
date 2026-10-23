@@ -115,3 +115,23 @@ def test_user_help_exposes_the_options_without_loading_models():
         assert flag in result.stdout
 
 
+
+
+@pytest.mark.parametrize("expression,expected", [
+    (None, None), ("", None), ("all", None), ("ALL", None), (" all ", None),
+    ("1-5", [0, 1, 2, 3, 4]),
+    ("1-40", list(range(25))),
+    ("20-30", [19, 20, 21, 22, 23, 24]),
+    ("3,30", [2]),
+    ("26-30", []),
+    ("1-3,2", [0, 1, 2]),
+])
+def test_pages_accept_all_and_are_limited_to_the_document(expression, expected):
+    assert reconstruct._pages(expression, 25) == expected
+
+
+def test_pages_beyond_the_document_reach_segmentation_without_error(monkeypatch, tmp_path, pipeline):
+    monkeypatch.setattr(reconstruct, "_nombre_pages", lambda source: 3)
+    monkeypatch.setattr(sys, "argv", pipeline["argv"] + ["--pages", "2-10"])
+    assert reconstruct.main() == 0
+    assert pipeline["extract"]["pages"] == [1, 2]

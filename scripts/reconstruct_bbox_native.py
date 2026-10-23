@@ -6,27 +6,43 @@ import argparse
 from pathlib import Path
 from time import perf_counter
 
+import pymupdf
+
 from pdfexact.bboxes import annotate_pdf_bboxes, write_bbox_docx
 from pdfexact.segmentation import OptionsSegmentation, enregistrer_catalogue, segmenter
 
 
-def _pages(expression: str | None) -> list[int] | None:
-    if not expression:
+def _toutes(expression: str | None) -> bool:
+    return not expression or expression.strip().casefold() == "all"
+
+
+def _nombre_pages(source_pdf: Path) -> int:
+    with pymupdf.open(source_pdf) as pdf:
+        return pdf.page_count
+
+
+def _pages(expression: str | None, page_count: int) -> list[int] | None:
+    """Pages 1-based of the command line, as 0-based indices within the document.
+
+    "all" (or nothing) selects every page; pages beyond the document are dropped.
+    """
+    if _toutes(expression):
         return None
     selected: list[int] = []
     for token in expression.split(","):
         token = token.strip()
         if "-" in token:
             start, end = (int(part) for part in token.split("-", 1))
-            selected.extend(range(start - 1, end))
-        else:
+            selected.extend(range(start - 1, min(end, page_count)))
+        elif int(token) <= page_count:
             selected.append(int(token) - 1)
-    return selected
+    return list(dict.fromkeys(selected))
 
 
 def _options(args) -> OptionsSegmentation:
+    pages = None if _toutes(args.pages) else _pages(args.pages, _nombre_pages(args.source_pdf))
     return OptionsSegmentation(
-        pages=_pages(args.pages),
+        pages=pages,
         dpi=args.dpi,
         text_mode=args.text_mode,
         ocr_language=args.ocr_language,
@@ -79,7 +95,10 @@ def main() -> int:
     parser.add_argument("source_pdf", type=Path)
     parser.add_argument("--pdf-out", type=Path, required=True)
     parser.add_argument("--docx-out", type=Path, required=True)
-    parser.add_argument("--pages")
+    parser.add_argument(
+        "--pages", default="all",
+        help="pages a traiter : all, 3, 1-5, 1,4,7-9 ; les pages au-dela du document sont ignorees",
+    )
     parser.add_argument("--dpi", type=int, default=150)
     parser.add_argument("--text-mode", choices=("spans", "rapidocr"), default="spans")
     parser.add_argument(
