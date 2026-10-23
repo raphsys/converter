@@ -6,6 +6,7 @@ dans le DOCX ; une substitution dynamique ne prouve ni l'identité de la police 
 ni l'équivalence de ses métriques.
 """
 import json
+import logging
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -14,6 +15,10 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
+
+# Reading system fonts, fontTools warns about harmless metadata (old timestamps,
+# extra bytes in the post table) once per font file; only errors are shown.
+logging.getLogger("fontTools.ttLib").setLevel(logging.ERROR)
 
 EXTENSIONS_INDEXABLES = {".ttf", ".otf", ".ttc"}
 

@@ -82,9 +82,14 @@ def _rapporter(resultat, records, args) -> None:
         vus[key] = vus.get(key, 0) + 1
     print("vision_ia: " + (" ".join(f"{key}={value}" for key, value in sorted(vus.items())) or "aucune-zone"))
     print(f"ocr_images: textes_lus={resultat.textes_images}")
+    # One line per page and reason, not one per zone.
+    non_compris: dict[tuple[int, str], int] = {}
     for zone in resultat.vision:
         if zone["status"] != "compris":
-            print(f"vision_ia: page={zone['page'] + 1} non-compris reason={zone['reason']}")
+            cle = (zone["page"] + 1, zone["reason"])
+            non_compris[cle] = non_compris.get(cle, 0) + 1
+    for (page, raison), nombre in non_compris.items():
+        print(f"vision_ia: page={page} non-compris={nombre} reason={raison}")
     print("durees: " + " ".join(f"{nom}={valeur:.1f}s" for nom, valeur in resultat.durees.items())
           + f" total={sum(resultat.durees.values()):.1f}s")
 

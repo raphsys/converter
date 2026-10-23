@@ -135,3 +135,21 @@ def test_pages_beyond_the_document_reach_segmentation_without_error(monkeypatch,
     monkeypatch.setattr(sys, "argv", pipeline["argv"] + ["--pages", "2-10"])
     assert reconstruct.main() == 0
     assert pipeline["extract"]["pages"] == [1, 2]
+
+
+def test_visual_zones_not_understood_are_reported_once_per_page_and_reason(capsys):
+    zones = [{"page": 62, "status": "non-compris", "reason": "sans-modele-vision"}] * 8
+    resultat = SimpleNamespace(diagnostics=[], document=SimpleNamespace(pages=[]), vision=zones,
+                               textes_images=0, durees={})
+    args = SimpleNamespace(pdf_out=Path("a.pdf"), docx_out=Path("a.docx"))
+    reconstruct._rapporter(resultat, [], args)
+    lignes = [l for l in capsys.readouterr().out.splitlines() if l.startswith("vision_ia: page=")]
+    assert lignes == ["vision_ia: page=63 non-compris=8 reason=sans-modele-vision"]
+
+
+def test_font_library_metadata_warnings_are_silenced():
+    import logging
+
+    import pdfexact.fontlib  # noqa: F401
+
+    assert logging.getLogger("fontTools.ttLib").getEffectiveLevel() >= logging.ERROR
