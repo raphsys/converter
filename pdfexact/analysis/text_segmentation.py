@@ -5,7 +5,6 @@ constituée de TextBox/FlowParagraph uniques par groupe sémantique; aucune lign
 ne devient un paragraphe Word indépendant.
 """
 from __future__ import annotations
-from pdfexact.analysis.table_of_contents import marquer_entrees_de_sommaire
 
 from collections import Counter
 from copy import deepcopy
@@ -318,8 +317,6 @@ def _boundary(previous, current, step, obstacles, *, ai_confirmed=False, protect
         "".join(span.texte for span in current.lignes[0].spans),
     ):
         return "source-hard-break"
-    if previous.presentation.get("toc_entry") == "end":
-        return "toc-entry"
     previous_frame = _hard_frame_id(previous) or last_frame_id
     current_frame = _hard_frame_id(current)
     frame_change = previous_frame and current_frame and previous_frame != current_frame
@@ -498,7 +495,6 @@ def segmenter_page_textes(page) -> None:
         return
 
     units.sort(key=lambda value: (value.bbox.y0, value.bbox.x0))
-    marquer_entrees_de_sommaire(units)
     groupes = _groupes_ia(units, obstacles, protected)
     if groupes is None:
         groupes = []
