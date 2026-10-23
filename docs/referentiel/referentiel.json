@@ -1,2763 +1,881 @@
 {
- "schema": "pdfexact.referentiel/1",
- "description": "Référentiel des éléments identifiables, de leurs attributs et des propriétés des bboxes.",
- "convention_positions": "[x, y, largeur, hauteur] en points, origine en haut à gauche, x vers la droite, y vers le bas",
- "sources": {
-  "PDF": "ISO 32000-2 (PDF 2.0) : objets de contenu, XObjects, annotations, AcroForm, contenu optionnel",
-  "PDF-TAG": "ISO 32000-2 §14.8 : types de structure du PDF balisé (Tagged PDF)",
-  "OOXML-W": "ECMA-376 WordprocessingML (DOCX)",
-  "OOXML-D": "ECMA-376 DrawingML (formes, images, graphiques, SmartArt)",
-  "OOXML-P": "ECMA-376 PresentationML (PPTX)",
-  "OOXML-M": "ECMA-376 Office Math (OMML)",
-  "ODF": "OASIS OpenDocument 1.3",
-  "CSS": "CSS (modèle de boîte, CSS Text, Fonts, Backgrounds & Borders, Multi-column, Writing Modes)",
-  "HTML": "HTML Living Standard",
-  "VYSI": "vysi : taxonomie FT01, FT02 typographie, FT03 cadres, AD06-AD12, ADQ006, DS v2",
-  "PADDLEX": "PP-DocLayout_plus-L : étiquettes de zones (inference.yml)",
-  "PERFECT": "vysi/docs/archive/indication_docs_parser_pour_vysi/perfect_document_extractor.py (schéma perfect_extraction.v1)"
+ "schema": "pdfexact.referentiel/2",
+ "finalite": "Contrat de l'identification : pour chaque bbox issue de la segmentation, son type (liste fermée), les propriétés de bbox à remplir, et les attributs de ce type. Chaque notion est définie une seule fois.",
+ "conventions": {
+  "positions": "[x, y, largeur, hauteur] en points, origine en haut à gauche, x vers la droite, y vers le bas",
+  "champs": "Chaque champ est toujours présent ; il vaut null quand la valeur n'est pas établie (jamais devinée).",
+  "portee": "Les propriétés de bbox valent pour toute bbox ; un attribut vaut pour les familles de sa portée. Les lignes, runs et glyphes sont des bbox de granularité plus fine, pas des types. Le texte présent dans une image est porté par des bbox enfants d'origine ocr.",
+  "priorite": "Une visualisation (graphique, diagramme, carte) l'emporte sur image ou vectoriel ; image_generique quand seule la famille image est établie ; inconnu quand même la famille ne l'est pas ; page_numerisee si l'image porte le contenu de la page, arriere_plan sinon ; un objet de la couche d'annotation prend un type annotation, un objet imprimé un type image ; signature pour une marque de signature, ecriture_manuscrite pour tout autre texte manuscrit ; lien est la zone cliquable, url le texte écrit : les deux coexistent."
  },
  "familles": {
-  "page": "Page et ses régions physiques",
-  "region": "Régions de mise en page (colonnes, cadres, zones)",
-  "texte": "Blocs et éléments textuels",
-  "en_ligne": "Éléments textuels en ligne (dans un paragraphe)",
-  "granularite": "Granularités du texte (ligne, run, mot, glyphe)",
+  "page": "Page et sa périphérie (en-tête, pied, numéro, fond, filigrane)",
+  "zone": "Zones de mise en page (zone de contenu, colonne, cadre, encadré, figure)",
+  "texte": "Blocs de texte",
+  "en_ligne": "Éléments en ligne dans un texte (appel de note, champ calculé, ruby)",
+  "expression": "Expressions à protéger dans un texte",
   "liste": "Listes",
   "tableau": "Tableaux",
-  "image": "Images matricielles",
-  "vectoriel": "Graphismes vectoriels et formes",
-  "donnees_visuelles": "Graphiques de données, diagrammes, schémas",
   "formule": "Formules",
-  "expression_speciale": "Expressions spéciales (vysi special_expression_type)",
-  "annotation": "Annotations et révisions",
-  "navigation": "Navigation (liens, signets, plan, renvois)",
-  "formulaire": "Champs de formulaire",
-  "media": "Médias et objets incorporés",
+  "image": "Images matricielles",
+  "vectoriel": "Graphismes vectoriels",
+  "visualisation": "Graphiques de données, diagrammes, cartes (quel que soit leur encodage)",
   "decoration": "Décorations",
+  "annotation": "Annotations et révisions (couche distincte du contenu imprimé)",
+  "lien": "Liens et renvois",
+  "formulaire": "Champs et contrôles de formulaire",
+  "media": "Médias, objets incorporés et pièces jointes",
   "inconnu": "Non identifié"
  },
- "elements": [
-  {
-   "id": "document",
-   "famille": "page",
-   "libelle": "Document",
-   "sources": [
-    "PDF-TAG:Document",
-    "OOXML-W:document",
-    "HTML:html",
-    "PERFECT:document"
-   ],
-   "vysi": [
-    "document"
-   ]
-  },
+ "types": [
   {
    "id": "page",
    "famille": "page",
-   "libelle": "Page",
-   "sources": [
-    "PDF:Page",
-    "OOXML-P:sld",
-    "PERFECT:pages[]"
-   ],
-   "vysi": [
-    "page",
-    "fixed_page"
-   ]
-  },
-  {
-   "id": "section",
-   "famille": "page",
-   "libelle": "Section (mise en page propre : marges, colonnes, orientation)",
-   "sources": [
-    "OOXML-W:sectPr",
-    "ODF:text:section",
-    "PDF-TAG:Sect"
-   ],
-   "vysi": [
-    "section",
-    "flow_section"
-   ]
+   "libelle": "Page"
   },
   {
    "id": "en_tete",
    "famille": "page",
-   "libelle": "En-tête de page",
-   "sources": [
-    "OOXML-W:hdr",
-    "PDF:Artifact/Pagination",
-    "PADDLEX:header",
-    "PERFECT:text.headers"
-   ],
-   "vysi": [
-    "header"
-   ]
+   "libelle": "En-tête de page"
   },
   {
    "id": "pied_de_page",
    "famille": "page",
-   "libelle": "Pied de page",
-   "sources": [
-    "OOXML-W:ftr",
-    "PDF:Artifact/Pagination",
-    "PADDLEX:footer",
-    "PERFECT:text.footers"
-   ],
-   "vysi": [
-    "footer"
-   ]
+   "libelle": "Pied de page"
   },
   {
    "id": "numero_page",
    "famille": "page",
-   "libelle": "Numéro de page",
-   "sources": [
-    "OOXML-W:PAGE field",
-    "PDF:Artifact/Pagination",
-    "PADDLEX:number",
-    "PERFECT:text.page_numbers"
-   ],
-   "vysi": [
-    "page_number"
-   ]
+   "libelle": "Numéro de page affiché"
   },
   {
-   "id": "arriere_plan_page",
+   "id": "arriere_plan",
    "famille": "page",
-   "libelle": "Arrière-plan de page",
-   "sources": [
-    "OOXML-W:background",
-    "PDF:Artifact/Background",
-    "CSS:background",
-    "PERFECT:background"
-   ],
-   "vysi": []
+   "libelle": "Arrière-plan de page sans contenu (couleur, image, texture)"
   },
   {
    "id": "filigrane",
    "famille": "page",
-   "libelle": "Filigrane",
-   "sources": [
-    "OOXML-W:VML watermark",
-    "PDF:Watermark annotation",
-    "PERFECT:background.watermark"
-   ],
-   "vysi": []
+   "libelle": "Filigrane"
   },
   {
    "id": "bordure_page",
    "famille": "page",
-   "libelle": "Bordure de page",
-   "sources": [
-    "OOXML-W:pgBorders"
-   ],
-   "vysi": []
+   "libelle": "Bordure de page"
   },
   {
-   "id": "note_marginale",
-   "famille": "page",
-   "libelle": "Note ou texte en marge",
-   "sources": [
-    "PDF-TAG:Aside",
-    "PADDLEX:aside_text"
-   ],
-   "vysi": [
-    "marginalia"
-   ]
-  },
-  {
-   "id": "region_contenu",
-   "famille": "region",
-   "libelle": "Région de contenu",
-   "sources": [
-    "VYSI:frame_type content_region"
-   ],
-   "vysi": [
-    "content_region"
-   ]
+   "id": "zone_contenu",
+   "famille": "zone",
+   "libelle": "Zone de contenu principal"
   },
   {
    "id": "colonne",
-   "famille": "region",
-   "libelle": "Colonne",
-   "sources": [
-    "OOXML-W:cols",
-    "CSS:column-count",
-    "ODF:style:columns",
-    "PERFECT:columns"
-   ],
-   "vysi": [
-    "column"
-   ]
+   "famille": "zone",
+   "libelle": "Colonne"
   },
   {
    "id": "cadre_texte",
-   "famille": "region",
-   "libelle": "Cadre ou zone de texte positionné",
-   "sources": [
-    "OOXML-W:framePr",
-    "OOXML-D:wps:txbx",
-    "ODF:draw:text-box"
-   ],
-   "vysi": [
-    "text",
-    "framed_text"
-   ]
+   "famille": "zone",
+   "libelle": "Cadre ou zone de texte positionnée"
   },
   {
    "id": "encadre",
-   "famille": "region",
-   "libelle": "Encadré / callout",
-   "sources": [
-    "PDF-TAG:Aside",
-    "OOXML-D:callout shapes"
-   ],
-   "vysi": [
-    "callout"
-   ]
+   "famille": "zone",
+   "libelle": "Encadré, barre latérale"
   },
   {
-   "id": "barre_laterale",
-   "famille": "region",
-   "libelle": "Barre latérale",
-   "sources": [
-    "PDF-TAG:Aside",
-    "HTML:aside",
-    "PERFECT:columns.sidebar"
-   ],
-   "vysi": [
-    "sidebar"
-   ]
-  },
-  {
-   "id": "groupe",
-   "famille": "region",
-   "libelle": "Groupe d'éléments",
-   "sources": [
-    "OOXML-D:grpSp",
-    "PDF:Form XObject",
-    "PDF-TAG:Div"
-   ],
-   "vysi": [
-    "group"
-   ]
-  },
-  {
-   "id": "zone_decoupe",
-   "famille": "region",
-   "libelle": "Zone de découpe (clip)",
-   "sources": [
-    "PDF:clipping path",
-    "CSS:clip-path"
-   ],
-   "vysi": [
-    "clipping"
-   ]
-  },
-  {
-   "id": "region_implicite",
-   "famille": "region",
-   "libelle": "Région de mise en page implicite",
-   "sources": [
-    "VYSI:frame_type implicit_layout"
-   ],
-   "vysi": [
-    "implicit_layout"
-   ]
+   "id": "figure",
+   "famille": "zone",
+   "libelle": "Figure (illustration et sa légende)"
   },
   {
    "id": "titre_document",
    "famille": "texte",
-   "libelle": "Titre du document",
-   "sources": [
-    "PDF-TAG:Title",
-    "OOXML-W:Title style",
-    "PADDLEX:doc_title"
-   ],
-   "vysi": [
-    "title"
-   ]
+   "libelle": "Titre du document"
   },
   {
    "id": "sous_titre",
    "famille": "texte",
-   "libelle": "Sous-titre",
-   "sources": [
-    "OOXML-W:Subtitle style",
-    "HTML:hgroup"
-   ],
-   "vysi": [
-    "subtitle"
-   ]
-  },
-  {
-   "id": "chapitre",
-   "famille": "texte",
-   "libelle": "Chapitre",
-   "sources": [
-    "PDF-TAG:Part",
-    "VYSI:chapter"
-   ],
-   "vysi": [
-    "chapter"
-   ]
+   "libelle": "Sous-titre"
   },
   {
    "id": "intertitre",
    "famille": "texte",
-   "libelle": "Intertitre (niveaux 1 à n)",
-   "sources": [
-    "PDF-TAG:H/H1-H6",
-    "OOXML-W:outlineLvl",
-    "HTML:h1-h6",
-    "PADDLEX:paragraph_title",
-    "PERFECT:role heading"
-   ],
-   "vysi": [
-    "heading",
-    "section",
-    "subsection"
-   ]
+   "libelle": "Intertitre"
   },
   {
    "id": "paragraphe",
    "famille": "texte",
-   "libelle": "Paragraphe",
-   "sources": [
-    "PDF-TAG:P",
-    "OOXML-W:p",
-    "HTML:p",
-    "PADDLEX:text",
-    "PERFECT:role paragraph"
-   ],
-   "vysi": [
-    "paragraph"
-   ]
+   "libelle": "Paragraphe"
   },
   {
-   "id": "citation_bloc",
+   "id": "citation",
    "famille": "texte",
-   "libelle": "Citation en bloc",
-   "sources": [
-    "PDF-TAG:BlockQuote",
-    "HTML:blockquote"
-   ],
-   "vysi": [
-    "quote"
-   ]
+   "libelle": "Citation en bloc"
   },
   {
    "id": "legende",
    "famille": "texte",
-   "libelle": "Légende de figure ou de tableau",
-   "sources": [
-    "PDF-TAG:Caption",
-    "OOXML-W:Caption style",
-    "PADDLEX:figure_title",
-    "PERFECT:caption_for_image/table"
-   ],
-   "vysi": [
-    "caption",
-    "figure_label"
-   ]
+   "libelle": "Légende de figure, de tableau ou de graphique"
   },
   {
    "id": "resume",
    "famille": "texte",
-   "libelle": "Résumé (abstract)",
-   "sources": [
-    "PADDLEX:abstract"
-   ],
-   "vysi": []
+   "libelle": "Résumé"
   },
   {
    "id": "note_bas_page",
    "famille": "texte",
-   "libelle": "Note de bas de page",
-   "sources": [
-    "PDF-TAG:FENote",
-    "OOXML-W:footnote",
-    "PADDLEX:footnote",
-    "PERFECT:document_profile.has_notes"
-   ],
-   "vysi": [
-    "footnote",
-    "note"
-   ]
+   "libelle": "Note de bas de page"
   },
   {
    "id": "note_fin",
    "famille": "texte",
-   "libelle": "Note de fin",
-   "sources": [
-    "PDF-TAG:FENote",
-    "OOXML-W:endnote"
-   ],
-   "vysi": [
-    "endnote"
-   ]
+   "libelle": "Note de fin"
+  },
+  {
+   "id": "note_marginale",
+   "famille": "texte",
+   "libelle": "Note en marge"
   },
   {
    "id": "table_des_matieres",
    "famille": "texte",
-   "libelle": "Table des matières / sommaire",
-   "sources": [
-    "PDF-TAG:TOC",
-    "OOXML-W:TOC field",
-    "PADDLEX:content"
-   ],
-   "vysi": [
-    "toc_block"
-   ]
+   "libelle": "Table des matières, liste des figures ou des tableaux"
   },
   {
    "id": "entree_sommaire",
    "famille": "texte",
-   "libelle": "Entrée de sommaire",
-   "sources": [
-    "PDF-TAG:TOCI"
-   ],
-   "vysi": [
-    "toc_entry"
-   ]
+   "libelle": "Entrée de table des matières"
   },
   {
    "id": "index",
    "famille": "texte",
-   "libelle": "Index",
-   "sources": [
-    "PDF-TAG:Index",
-    "OOXML-W:INDEX field"
-   ],
-   "vysi": []
+   "libelle": "Index"
   },
   {
    "id": "entree_index",
    "famille": "texte",
-   "libelle": "Entrée d'index",
-   "sources": [
-    "OOXML-W:XE field"
-   ],
-   "vysi": []
+   "libelle": "Entrée d'index"
   },
   {
    "id": "glossaire",
    "famille": "texte",
-   "libelle": "Glossaire et ses entrées",
-   "sources": [
-    "HTML:dl"
-   ],
-   "vysi": [
-    "glossary_entry"
-   ]
+   "libelle": "Glossaire"
+  },
+  {
+   "id": "entree_glossaire",
+   "famille": "texte",
+   "libelle": "Entrée de glossaire"
   },
   {
    "id": "bibliographie",
    "famille": "texte",
-   "libelle": "Bibliographie",
-   "sources": [
-    "PADDLEX:reference",
-    "PERFECT:document_profile.has_references"
-   ],
-   "vysi": [
-    "bibliography_block"
-   ]
+   "libelle": "Bibliographie"
   },
   {
    "id": "entree_bibliographique",
    "famille": "texte",
-   "libelle": "Entrée bibliographique",
-   "sources": [
-    "PDF-TAG:BibEntry",
-    "PADDLEX:reference_content"
-   ],
-   "vysi": [
-    "bibliography_reference",
-    "reference"
-   ]
+   "libelle": "Entrée bibliographique"
   },
   {
    "id": "bloc_code",
    "famille": "texte",
-   "libelle": "Bloc de code",
-   "sources": [
-    "PDF-TAG:Code",
-    "HTML:pre",
-    "PADDLEX:algorithm",
-    "PERFECT:role code / special_region code"
-   ],
-   "vysi": [
-    "code_block",
-    "code"
-   ]
+   "libelle": "Bloc de code"
   },
   {
    "id": "lettrine",
    "famille": "texte",
-   "libelle": "Lettrine",
-   "sources": [
-    "OOXML-W:framePr dropCap",
-    "CSS:initial-letter"
-   ],
-   "vysi": [
-    "dropcap"
-   ]
+   "libelle": "Lettrine"
   },
   {
    "id": "etiquette",
    "famille": "texte",
-   "libelle": "Étiquette / libellé court",
-   "sources": [
-    "PDF-TAG:Lbl"
-   ],
-   "vysi": [
-    "label",
-    "graphic_label"
-   ]
+   "libelle": "Étiquette, libellé court"
   },
   {
-   "id": "metadonnees",
+   "id": "metadonnees_visibles",
    "famille": "texte",
-   "libelle": "Métadonnées visibles (auteur, date, référence)",
-   "sources": [
-    "PDF:Info/XMP",
-    "OOXML-W:core properties",
-    "PERFECT:metadata"
-   ],
-   "vysi": [
-    "metadata"
-   ]
-  },
-  {
-   "id": "texte_dans_image",
-   "famille": "texte",
-   "libelle": "Texte contenu dans une image",
-   "sources": [
-    "VYSI:AD05 source_kind ocr"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "texte_sceau",
-   "famille": "texte",
-   "libelle": "Texte de sceau / tampon",
-   "sources": [
-    "PADDLEX:seal"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "citation_en_ligne",
-   "famille": "en_ligne",
-   "libelle": "Citation en ligne",
-   "sources": [
-    "PDF-TAG:Quote",
-    "HTML:q"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "mise_en_evidence",
-   "famille": "en_ligne",
-   "libelle": "Mise en évidence (emphase, fort)",
-   "sources": [
-    "PDF-TAG:Em/Strong",
-    "HTML:em/strong"
-   ],
-   "vysi": []
+   "libelle": "Métadonnées affichées (auteur, date, référence)"
   },
   {
    "id": "appel_de_note",
    "famille": "en_ligne",
-   "libelle": "Appel de note",
-   "sources": [
-    "OOXML-W:footnoteReference",
-    "PDF-TAG:Reference"
-   ],
-   "vysi": []
+   "libelle": "Appel de note"
   },
   {
-   "id": "code_en_ligne",
+   "id": "champ_calcule",
    "famille": "en_ligne",
-   "libelle": "Code en ligne",
-   "sources": [
-    "PDF-TAG:Code",
-    "HTML:code"
-   ],
-   "vysi": [
-    "code_literal"
-   ]
+   "libelle": "Champ calculé (date, numéro de page, renvoi automatique)"
   },
   {
    "id": "ruby",
    "famille": "en_ligne",
-   "libelle": "Annotation ruby (CJK)",
-   "sources": [
-    "PDF-TAG:Ruby/RB/RT/RP",
-    "OOXML-W:ruby",
-    "HTML:ruby"
-   ],
-   "vysi": []
+   "libelle": "Annotation interlinéaire CJK (ruby, warichu)"
   },
   {
-   "id": "warichu",
-   "famille": "en_ligne",
-   "libelle": "Warichu (commentaire en ligne japonais)",
-   "sources": [
-    "PDF-TAG:Warichu"
-   ],
-   "vysi": []
+   "id": "code_en_ligne",
+   "famille": "expression",
+   "libelle": "Code en ligne"
   },
   {
-   "id": "indice_exposant",
-   "famille": "en_ligne",
-   "libelle": "Indice / exposant",
-   "sources": [
-    "PDF-TAG:Sub",
-    "OOXML-W:vertAlign"
-   ],
-   "vysi": [
-    "subscript",
-    "superscript"
-   ]
+   "id": "url",
+   "famille": "expression",
+   "libelle": "URL écrite dans le texte"
   },
   {
-   "id": "champ",
-   "famille": "en_ligne",
-   "libelle": "Champ calculé (date, page, renvoi)",
-   "sources": [
-    "OOXML-W:fldSimple/fldChar",
-    "ODF:text:page-number"
-   ],
-   "vysi": [
-    "field"
-   ]
+   "id": "email",
+   "famille": "expression",
+   "libelle": "Adresse e-mail"
   },
   {
-   "id": "tabulation",
-   "famille": "en_ligne",
-   "libelle": "Tabulation et points de conduite",
-   "sources": [
-    "OOXML-W:tab",
-    "ODF:text:tab"
-   ],
-   "vysi": []
+   "id": "identifiant",
+   "famille": "expression",
+   "libelle": "Identifiant (technique, DOI, ISBN, référence)"
   },
   {
-   "id": "saut",
-   "famille": "en_ligne",
-   "libelle": "Saut de ligne, de colonne ou de page",
-   "sources": [
-    "OOXML-W:br",
-    "HTML:br"
-   ],
-   "vysi": []
+   "id": "grandeur",
+   "famille": "expression",
+   "libelle": "Grandeur avec unité, pourcentage, valeur scientifique"
   },
   {
-   "id": "symbole",
-   "famille": "en_ligne",
-   "libelle": "Symbole d'une police de symboles",
-   "sources": [
-    "OOXML-W:sym"
-   ],
-   "vysi": [
-    "scientific_symbol"
-   ]
+   "id": "date",
+   "famille": "expression",
+   "libelle": "Date"
   },
   {
-   "id": "ligne_texte",
-   "famille": "granularite",
-   "libelle": "Ligne de texte",
-   "sources": [
-    "PDF:text line",
-    "VYSI:AD06 text_line",
-    "PERFECT:lines[]"
-   ],
-   "vysi": [
-    "text_line",
-    "fixed_text_line",
-    "line"
-   ]
-  },
-  {
-   "id": "run",
-   "famille": "granularite",
-   "libelle": "Segment de style homogène (run / span)",
-   "sources": [
-    "OOXML-W:r",
-    "PDF-TAG:Span",
-    "PERFECT:spans[]"
-   ],
-   "vysi": [
-    "run",
-    "span",
-    "text_span",
-    "fixed_text_span"
-   ]
-  },
-  {
-   "id": "mot",
-   "famille": "granularite",
-   "libelle": "Mot",
-   "sources": [
-    "PDF:word (extraction)",
-    "PERFECT:words[]"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "glyphe",
-   "famille": "granularite",
-   "libelle": "Glyphe / grappe de glyphes",
-   "sources": [
-    "PDF:glyph",
-    "VYSI:AD06 glyph_cluster",
-    "PERFECT:chars[]"
-   ],
-   "vysi": [
-    "glyph_cluster"
-   ]
-  },
-  {
-   "id": "phrase",
-   "famille": "granularite",
-   "libelle": "Phrase",
-   "sources": [
-    "VYSI:ADQ006 sentence"
-   ],
-   "vysi": [
-    "sentence"
-   ]
+   "id": "acronyme",
+   "famille": "expression",
+   "libelle": "Acronyme, abréviation"
   },
   {
    "id": "liste",
    "famille": "liste",
-   "libelle": "Liste",
-   "sources": [
-    "PDF-TAG:L",
-    "OOXML-W:numPr",
-    "HTML:ul/ol"
-   ],
-   "vysi": [
-    "list",
-    "list_block"
-   ]
+   "libelle": "Liste"
   },
   {
    "id": "element_liste",
    "famille": "liste",
-   "libelle": "Élément de liste",
-   "sources": [
-    "PDF-TAG:LI",
-    "HTML:li",
-    "PERFECT:role list_item"
-   ],
-   "vysi": [
-    "list_item",
-    "list_line"
-   ]
+   "libelle": "Élément de liste"
   },
   {
    "id": "marqueur_liste",
    "famille": "liste",
-   "libelle": "Puce ou numéro de liste",
-   "sources": [
-    "PDF-TAG:Lbl",
-    "OOXML-W:lvlText"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "corps_element_liste",
-   "famille": "liste",
-   "libelle": "Corps d'un élément de liste",
-   "sources": [
-    "PDF-TAG:LBody"
-   ],
-   "vysi": []
+   "libelle": "Puce ou numéro de liste"
   },
   {
    "id": "tableau",
    "famille": "tableau",
-   "libelle": "Tableau",
-   "sources": [
-    "PDF-TAG:Table",
-    "OOXML-W:tbl",
-    "HTML:table",
-    "PADDLEX:table",
-    "PERFECT:tables[]"
-   ],
-   "vysi": [
-    "table"
-   ]
+   "libelle": "Tableau"
   },
   {
    "id": "ligne_tableau",
    "famille": "tableau",
-   "libelle": "Ligne de tableau",
-   "sources": [
-    "PDF-TAG:TR",
-    "OOXML-W:tr"
-   ],
-   "vysi": [
-    "table_row",
-    "row"
-   ]
+   "libelle": "Ligne de tableau"
   },
   {
    "id": "cellule",
    "famille": "tableau",
-   "libelle": "Cellule",
-   "sources": [
-    "PDF-TAG:TD",
-    "OOXML-W:tc",
-    "PERFECT:tables[].cells"
-   ],
-   "vysi": [
-    "table_cell",
-    "cell",
-    "numeric_cell"
-   ]
-  },
-  {
-   "id": "cellule_entete",
-   "famille": "tableau",
-   "libelle": "Cellule d'en-tête",
-   "sources": [
-    "PDF-TAG:TH",
-    "HTML:th"
-   ],
-   "vysi": [
-    "header_cell"
-   ]
-  },
-  {
-   "id": "groupe_lignes",
-   "famille": "tableau",
-   "libelle": "Groupe de lignes (en-tête, corps, pied)",
-   "sources": [
-    "PDF-TAG:THead/TBody/TFoot",
-    "HTML:thead/tbody/tfoot"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "titre_tableau",
-   "famille": "tableau",
-   "libelle": "Titre de tableau",
-   "sources": [
-    "VYSI:RC table_title"
-   ],
-   "vysi": [
-    "caption"
-   ]
-  },
-  {
-   "id": "image",
-   "famille": "image",
-   "libelle": "Image matricielle",
-   "sources": [
-    "PDF:Image XObject / inline image",
-    "OOXML-D:pic",
-    "PADDLEX:image",
-    "PERFECT:images[]"
-   ],
-   "vysi": [
-    "image",
-    "image_region",
-    "image_frame"
-   ]
-  },
-  {
-   "id": "photo",
-   "famille": "image",
-   "libelle": "Photographie",
-   "sources": [
-    "VYSI:AD06 candidate_class photo"
-   ],
-   "vysi": [
-    "photo"
-   ]
-  },
-  {
-   "id": "logo",
-   "famille": "image",
-   "libelle": "Logo",
-   "sources": [
-    "VYSI:AD06 candidate_class logo",
-    "PERFECT:document_profile.has_logo"
-   ],
-   "vysi": [
-    "logo"
-   ]
-  },
-  {
-   "id": "icone",
-   "famille": "image",
-   "libelle": "Icône / pictogramme",
-   "sources": [
-    "HTML:img (icon)"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "page_numerisee",
-   "famille": "image",
-   "libelle": "Page numérisée (image pleine page)",
-   "sources": [
-    "VYSI:raster frame"
-   ],
-   "vysi": [
-    "raster_canvas"
-   ]
-  },
-  {
-   "id": "signature",
-   "famille": "image",
-   "libelle": "Signature manuscrite",
-   "sources": [
-    "VYSI:AD06 candidate_class signature",
-    "PERFECT:document_profile.has_signature"
-   ],
-   "vysi": [
-    "signature"
-   ]
-  },
-  {
-   "id": "sceau_tampon",
-   "famille": "image",
-   "libelle": "Sceau / tampon",
-   "sources": [
-    "PADDLEX:seal",
-    "PDF:Stamp annotation",
-    "PERFECT:document_profile.has_stamp"
-   ],
-   "vysi": [
-    "seal",
-    "stamp"
-   ]
-  },
-  {
-   "id": "qr_code",
-   "famille": "image",
-   "libelle": "QR code",
-   "sources": [
-    "VYSI:AD06 candidate_class qr_code"
-   ],
-   "vysi": [
-    "qr_code",
-    "qrcode"
-   ]
-  },
-  {
-   "id": "code_barres",
-   "famille": "image",
-   "libelle": "Code-barres",
-   "sources": [
-    "VYSI:AD06 candidate_class barcode"
-   ],
-   "vysi": [
-    "barcode"
-   ]
-  },
-  {
-   "id": "dessin_vectoriel",
-   "famille": "vectoriel",
-   "libelle": "Dessin / illustration vectorielle",
-   "sources": [
-    "PDF:path objects",
-    "OOXML-D:custGeom",
-    "PERFECT:drawings[] shape"
-   ],
-   "vysi": [
-    "drawing",
-    "geometry",
-    "draw_vector"
-   ]
-  },
-  {
-   "id": "forme",
-   "famille": "vectoriel",
-   "libelle": "Forme géométrique (rectangle, ellipse, flèche…)",
-   "sources": [
-    "OOXML-D:prstGeom",
-    "ODF:draw:custom-shape"
-   ],
-   "vysi": [
-    "shape_region",
-    "sp"
-   ]
-  },
-  {
-   "id": "trait_connecteur",
-   "famille": "vectoriel",
-   "libelle": "Trait / connecteur",
-   "sources": [
-    "OOXML-D:cxnSp",
-    "PDF:path line"
-   ],
-   "vysi": [
-    "cxnSp"
-   ]
-  },
-  {
-   "id": "degrade",
-   "famille": "vectoriel",
-   "libelle": "Dégradé (shading)",
-   "sources": [
-    "PDF:sh / Shading",
-    "OOXML-D:gradFill"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "motif",
-   "famille": "vectoriel",
-   "libelle": "Motif (pattern)",
-   "sources": [
-    "PDF:Pattern",
-    "OOXML-D:pattFill"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "graphique",
-   "famille": "donnees_visuelles",
-   "libelle": "Graphique de données (courbes, barres, secteurs…)",
-   "sources": [
-    "OOXML-D:c:chart",
-    "PADDLEX:chart",
-    "PERFECT:document_profile.has_charts"
-   ],
-   "vysi": [
-    "chart"
-   ]
-  },
-  {
-   "id": "diagramme",
-   "famille": "donnees_visuelles",
-   "libelle": "Diagramme / SmartArt / organigramme",
-   "sources": [
-    "OOXML-D:dgm",
-    "VYSI:AD06 diagram"
-   ],
-   "vysi": [
-    "diagram"
-   ]
-  },
-  {
-   "id": "figure",
-   "famille": "donnees_visuelles",
-   "libelle": "Figure (ensemble illustration + légende)",
-   "sources": [
-    "PDF-TAG:Figure",
-    "HTML:figure"
-   ],
-   "vysi": [
-    "figure"
-   ]
-  },
-  {
-   "id": "carte",
-   "famille": "donnees_visuelles",
-   "libelle": "Carte géographique",
-   "sources": [
-    "HTML:img (map)"
-   ],
-   "vysi": []
+   "libelle": "Cellule"
   },
   {
    "id": "formule_bloc",
    "famille": "formule",
-   "libelle": "Formule en bloc",
-   "sources": [
-    "PDF-TAG:Formula",
-    "OOXML-M:oMathPara",
-    "PADDLEX:formula",
-    "PERFECT:role formula / special_region formula"
-   ],
-   "vysi": [
-    "formula",
-    "formula_or_equation",
-    "equation"
-   ]
+   "libelle": "Formule en bloc (mathématique, chimique, physique, matrice)"
   },
   {
    "id": "formule_en_ligne",
    "famille": "formule",
-   "libelle": "Formule en ligne",
-   "sources": [
-    "OOXML-M:oMath",
-    "HTML:math"
-   ],
-   "vysi": [
-    "inline_formula",
-    "formula_fragment"
-   ]
+   "libelle": "Formule en ligne"
   },
   {
    "id": "numero_formule",
    "famille": "formule",
-   "libelle": "Numéro d'équation",
-   "sources": [
-    "PADDLEX:formula_number"
-   ],
-   "vysi": []
+   "libelle": "Numéro d'équation"
   },
   {
-   "id": "expression_mathematique",
-   "famille": "expression_speciale",
-   "libelle": "Expression mathématique",
-   "sources": [
-    "VYSI:mathematical_formula"
-   ],
-   "vysi": [
-    "mathematical_formula"
-   ]
+   "id": "photo",
+   "famille": "image",
+   "libelle": "Photographie"
   },
   {
-   "id": "formule_chimique",
-   "famille": "expression_speciale",
-   "libelle": "Formule chimique / équation de réaction",
-   "sources": [
-    "VYSI:chemical_formula, reaction_equation"
-   ],
-   "vysi": [
-    "chemical_formula",
-    "reaction_equation"
-   ]
+   "id": "illustration",
+   "famille": "image",
+   "libelle": "Illustration matricielle qui n'est ni graphique, ni diagramme, ni carte"
   },
   {
-   "id": "expression_physique",
-   "famille": "expression_speciale",
-   "libelle": "Expression physique / grandeur avec unité",
-   "sources": [
-    "VYSI:physical_expression, unit_expression"
-   ],
-   "vysi": [
-    "physical_expression",
-    "unit_expression",
-    "technical_quantity"
-   ]
+   "id": "logo",
+   "famille": "image",
+   "libelle": "Logo"
   },
   {
-   "id": "matrice",
-   "famille": "expression_speciale",
-   "libelle": "Matrice",
-   "sources": [
-    "VYSI:matrix",
-    "OOXML-M:m"
-   ],
-   "vysi": [
-    "matrix"
-   ]
+   "id": "icone",
+   "famille": "image",
+   "libelle": "Icône, pictogramme"
   },
   {
-   "id": "identifiant_technique",
-   "famille": "expression_speciale",
-   "libelle": "Identifiant technique",
-   "sources": [
-    "VYSI:technical_identifier"
-   ],
-   "vysi": [
-    "technical_identifier",
-    "identifier"
-   ]
+   "id": "page_numerisee",
+   "famille": "image",
+   "libelle": "Image pleine page portant le contenu de la page (scan)"
   },
   {
-   "id": "acronyme_abreviation",
-   "famille": "expression_speciale",
-   "libelle": "Acronyme / abréviation",
-   "sources": [
-    "VYSI:acronym, abbreviation",
-    "HTML:abbr"
-   ],
-   "vysi": [
-    "acronym",
-    "abbreviation"
-   ]
-  },
-  {
-   "id": "url_email",
-   "famille": "expression_speciale",
-   "libelle": "URL / adresse e-mail",
-   "sources": [
-    "VYSI:url, email"
-   ],
-   "vysi": [
-    "url",
-    "email"
-   ]
-  },
-  {
-   "id": "identifiant_bibliographique",
-   "famille": "expression_speciale",
-   "libelle": "Identifiant bibliographique (DOI, ISBN)",
-   "sources": [
-    "VYSI:bibliographic_identifier"
-   ],
-   "vysi": [
-    "bibliographic_identifier",
-    "doi"
-   ]
-  },
-  {
-   "id": "date_valeur",
-   "famille": "expression_speciale",
-   "libelle": "Date, pourcentage, valeur scientifique",
-   "sources": [
-    "VYSI:ADQ006 protected spans"
-   ],
-   "vysi": [
-    "date",
-    "percentage",
-    "scientific_value"
-   ]
-  },
-  {
-   "id": "commentaire",
-   "famille": "annotation",
-   "libelle": "Commentaire",
-   "sources": [
-    "PDF:Text annotation",
-    "OOXML-W:comment",
-    "PERFECT:annotations[]"
-   ],
-   "vysi": [
-    "comment"
-   ]
-  },
-  {
-   "id": "annotation_balisage",
-   "famille": "annotation",
-   "libelle": "Surlignage, soulignement, barré, ondulé",
-   "sources": [
-    "PDF:Highlight/Underline/StrikeOut/Squiggly"
-   ],
-   "vysi": [
-    "highlight",
-    "underline",
-    "strikeout"
-   ]
-  },
-  {
-   "id": "annotation_texte_libre",
-   "famille": "annotation",
-   "libelle": "Annotation texte libre",
-   "sources": [
-    "PDF:FreeText"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "annotation_dessin",
-   "famille": "annotation",
-   "libelle": "Annotation dessinée (encre, ligne, formes)",
-   "sources": [
-    "PDF:Ink/Line/Square/Circle/Polygon/PolyLine"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "annotation_tampon",
-   "famille": "annotation",
-   "libelle": "Tampon (annotation)",
-   "sources": [
-    "PDF:Stamp"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "piece_jointe",
-   "famille": "annotation",
-   "libelle": "Pièce jointe",
-   "sources": [
-    "PDF:FileAttachment"
-   ],
-   "vysi": [
-    "fileattachment"
-   ]
-  },
-  {
-   "id": "caviardage",
-   "famille": "annotation",
-   "libelle": "Caviardage (redaction)",
-   "sources": [
-    "PDF:Redact"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "revision",
-   "famille": "annotation",
-   "libelle": "Révision suivie (insertion, suppression, déplacement, format)",
-   "sources": [
-    "OOXML-W:ins/del/moveFrom/moveTo/rPrChange"
-   ],
-   "vysi": [
-    "insert",
-    "delete",
-    "move_from",
-    "move_to",
-    "format_change"
-   ]
-  },
-  {
-   "id": "controle_contenu",
-   "famille": "annotation",
-   "libelle": "Contrôle de contenu",
-   "sources": [
-    "OOXML-W:sdt"
-   ],
-   "vysi": [
-    "content_control"
-   ]
-  },
-  {
-   "id": "lien",
-   "famille": "navigation",
-   "libelle": "Lien hypertexte (externe ou interne)",
-   "sources": [
-    "PDF:Link annotation",
-    "OOXML-W:hyperlink",
-    "HTML:a"
-   ],
-   "vysi": [
-    "link"
-   ]
-  },
-  {
-   "id": "signet",
-   "famille": "navigation",
-   "libelle": "Signet / ancre",
-   "sources": [
-    "OOXML-W:bookmarkStart",
-    "PDF:named destination"
-   ],
-   "vysi": [
-    "bookmark"
-   ]
-  },
-  {
-   "id": "plan_document",
-   "famille": "navigation",
-   "libelle": "Plan du document (outline)",
-   "sources": [
-    "PDF:Outlines"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "renvoi",
-   "famille": "navigation",
-   "libelle": "Renvoi interne (voir page, voir figure)",
-   "sources": [
-    "OOXML-W:REF/PAGEREF field"
-   ],
-   "vysi": [
-    "references"
-   ]
-  },
-  {
-   "id": "champ_formulaire",
-   "famille": "formulaire",
-   "libelle": "Champ de formulaire",
-   "sources": [
-    "PDF:AcroForm Widget",
-    "PDF-TAG:Form",
-    "OOXML-W:ffData"
-   ],
-   "vysi": [
-    "form_field",
-    "widget"
-   ]
-  },
-  {
-   "id": "champ_texte",
-   "famille": "formulaire",
-   "libelle": "Champ texte",
-   "sources": [
-    "PDF:Tx"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "case_a_cocher",
-   "famille": "formulaire",
-   "libelle": "Case à cocher",
-   "sources": [
-    "PDF:Btn checkbox",
-    "OOXML-W:checkBox"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "bouton_radio",
-   "famille": "formulaire",
-   "libelle": "Bouton radio",
-   "sources": [
-    "PDF:Btn radio"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "liste_choix",
-   "famille": "formulaire",
-   "libelle": "Liste / liste déroulante",
-   "sources": [
-    "PDF:Ch",
-    "OOXML-W:ddList"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "bouton",
-   "famille": "formulaire",
-   "libelle": "Bouton poussoir",
-   "sources": [
-    "PDF:Btn pushbutton"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "champ_signature",
-   "famille": "formulaire",
-   "libelle": "Champ de signature",
-   "sources": [
-    "PDF:Sig"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "objet_incorpore",
-   "famille": "media",
-   "libelle": "Objet incorporé (OLE, document)",
-   "sources": [
-    "OOXML-W:object/oleObj"
-   ],
-   "vysi": [
-    "embedded_document",
-    "activex_control"
-   ]
-  },
-  {
-   "id": "audio_video",
-   "famille": "media",
-   "libelle": "Audio / vidéo",
-   "sources": [
-    "PDF:RichMedia/Sound/Movie",
-    "OOXML-P:video"
-   ],
-   "vysi": [
-    "media"
-   ]
-  },
-  {
-   "id": "modele_3d",
-   "famille": "media",
-   "libelle": "Modèle 3D",
-   "sources": [
-    "PDF:3D annotation"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "separateur",
-   "famille": "decoration",
-   "libelle": "Séparateur / filet",
-   "sources": [
-    "PDF:path line",
-    "OOXML-W:pBdr",
-    "HTML:hr",
-    "PERFECT:drawing role rule_line / vertical_rule"
-   ],
-   "vysi": [
-    "separator",
-    "table_line"
-   ]
-  },
-  {
-   "id": "fond_bloc",
-   "famille": "decoration",
-   "libelle": "Fond coloré / bandeau",
-   "sources": [
-    "OOXML-W:shd",
-    "CSS:background-color",
-    "PERFECT:drawing role background_rect"
-   ],
-   "vysi": [
-    "decoration"
-   ]
-  },
-  {
-   "id": "ornement",
-   "famille": "decoration",
-   "libelle": "Ornement décoratif",
-   "sources": [
-    "PDF:Artifact"
-   ],
-   "vysi": [
-    "decorative"
-   ]
-  },
-  {
-   "id": "espace_blanc",
-   "famille": "decoration",
-   "libelle": "Zone d'espace blanc significative",
-   "sources": [
-    "VYSI:AD06 whitespace_region"
-   ],
-   "vysi": [
-    "whitespace_region"
-   ]
-  },
-  {
-   "id": "inconnu",
-   "famille": "inconnu",
-   "libelle": "Élément non identifié",
-   "sources": [
-    "VYSI:unknown"
-   ],
-   "vysi": [
-    "unknown"
-   ]
-  },
-  {
-   "id": "region_corps",
-   "famille": "region",
-   "libelle": "Corps de page (contenu principal)",
-   "sources": [
-    "PERFECT:regions[] type body, role main_content"
-   ],
-   "vysi": [
-    "body"
-   ]
-  },
-  {
-   "id": "region_speciale",
-   "famille": "region",
-   "libelle": "Région spéciale préservée visuellement (code, formule)",
-   "sources": [
-    "PERFECT:formulas_and_specials[]"
-   ],
-   "vysi": []
+   "id": "signature",
+   "famille": "image",
+   "libelle": "Signature manuscrite"
   },
   {
    "id": "ecriture_manuscrite",
    "famille": "image",
-   "libelle": "Écriture manuscrite",
-   "sources": [
-    "PERFECT:document_profile.has_handwriting",
-    "VYSI:AD05 handwriting_recognition"
-   ],
-   "vysi": [
-    "handwriting_recognition"
-   ]
+   "libelle": "Écriture manuscrite"
   },
   {
-   "id": "segment_traduisible",
-   "famille": "granularite",
-   "libelle": "Segment de texte traduisible",
-   "sources": [
-    "PERFECT:text.translatable_segments"
-   ],
-   "vysi": []
+   "id": "sceau",
+   "famille": "image",
+   "libelle": "Sceau ou tampon imprimé"
   },
   {
-   "id": "segment_non_traduisible",
-   "famille": "granularite",
-   "libelle": "Segment de texte non traduisible (et sa raison)",
-   "sources": [
-    "PERFECT:text.non_translatable_segments"
-   ],
-   "vysi": []
+   "id": "qr_code",
+   "famille": "image",
+   "libelle": "QR code"
   },
   {
-   "id": "objet_rendu",
-   "famille": "region",
-   "libelle": "Objet de rendu (texte, dessin, image, région spéciale)",
-   "sources": [
-    "PERFECT:render_objects[]"
-   ],
-   "vysi": [
-    "draw_text",
-    "draw_image",
-    "draw_vector"
-   ]
+   "id": "code_barres",
+   "famille": "image",
+   "libelle": "Code-barres"
+  },
+  {
+   "id": "image_generique",
+   "famille": "image",
+   "libelle": "Image dont la nature n'est pas établie"
+  },
+  {
+   "id": "dessin_vectoriel",
+   "famille": "vectoriel",
+   "libelle": "Dessin vectoriel qui n'est ni graphique, ni diagramme, ni carte"
+  },
+  {
+   "id": "forme",
+   "famille": "vectoriel",
+   "libelle": "Forme géométrique (rectangle, ellipse, flèche…)"
+  },
+  {
+   "id": "connecteur",
+   "famille": "vectoriel",
+   "libelle": "Trait ou connecteur entre éléments"
+  },
+  {
+   "id": "graphique",
+   "famille": "visualisation",
+   "libelle": "Graphique de données"
+  },
+  {
+   "id": "diagramme",
+   "famille": "visualisation",
+   "libelle": "Diagramme, schéma, organigramme"
+  },
+  {
+   "id": "carte",
+   "famille": "visualisation",
+   "libelle": "Carte géographique"
+  },
+  {
+   "id": "separateur",
+   "famille": "decoration",
+   "libelle": "Filet, séparateur"
+  },
+  {
+   "id": "bandeau",
+   "famille": "decoration",
+   "libelle": "Fond coloré, bandeau"
+  },
+  {
+   "id": "ornement",
+   "famille": "decoration",
+   "libelle": "Ornement"
+  },
+  {
+   "id": "commentaire",
+   "famille": "annotation",
+   "libelle": "Commentaire (note attachée, souvent repliée)"
+  },
+  {
+   "id": "annotation_texte",
+   "famille": "annotation",
+   "libelle": "Annotation de texte affichée sur la page"
+  },
+  {
+   "id": "annotation_balisage",
+   "famille": "annotation",
+   "libelle": "Surlignage, soulignement, barré annotés"
+  },
+  {
+   "id": "annotation_graphique",
+   "famille": "annotation",
+   "libelle": "Annotation dessinée ou tampon annoté"
+  },
+  {
+   "id": "caviardage",
+   "famille": "annotation",
+   "libelle": "Caviardage"
+  },
+  {
+   "id": "revision",
+   "famille": "annotation",
+   "libelle": "Révision suivie (insertion, suppression, déplacement)"
+  },
+  {
+   "id": "lien",
+   "famille": "lien",
+   "libelle": "Zone cliquable d'un lien hypertexte"
+  },
+  {
+   "id": "renvoi",
+   "famille": "lien",
+   "libelle": "Renvoi interne (voir page, voir figure)"
+  },
+  {
+   "id": "champ_formulaire",
+   "famille": "formulaire",
+   "libelle": "Champ de formulaire"
+  },
+  {
+   "id": "controle_contenu",
+   "famille": "formulaire",
+   "libelle": "Contrôle de contenu"
+  },
+  {
+   "id": "objet_incorpore",
+   "famille": "media",
+   "libelle": "Objet incorporé (OLE, document)"
+  },
+  {
+   "id": "piece_jointe",
+   "famille": "media",
+   "libelle": "Pièce jointe"
+  },
+  {
+   "id": "media",
+   "famille": "media",
+   "libelle": "Audio, vidéo, 3D"
+  },
+  {
+   "id": "inconnu",
+   "famille": "inconnu",
+   "libelle": "Élément dont même la famille n'est pas établie"
   }
  ],
- "attributs": [
+ "proprietes_bbox": [
   {
    "id": "id",
    "groupe": "identite",
    "libelle": "Identifiant",
-   "valeurs": "chaîne",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:unit_id"
-   ],
-   "vysi": [
-    "unit_id"
-   ]
+   "valeurs": "chaîne"
   },
   {
    "id": "type",
    "groupe": "identite",
-   "libelle": "Type d'élément (référentiel)",
-   "valeurs": "id d'élément",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:kind, object_type"
-   ],
-   "vysi": [
-    "kind",
-    "object_type"
-   ]
+   "libelle": "Type identifié",
+   "valeurs": "id de types"
   },
   {
-   "id": "source_ids",
+   "id": "statut",
    "groupe": "identite",
-   "libelle": "Identifiants sources natifs",
-   "valeurs": "liste",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:source_native_ids"
-   ],
-   "vysi": [
-    "source_native_ids"
-   ]
-  },
-  {
-   "id": "origine",
-   "groupe": "identite",
-   "libelle": "Origine de l'observation",
-   "valeurs": "native | ocr | detecteur | calcule | synthetique",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:AD05 source_kind, origin",
-    "PERFECT:source native_pdf | ocr | pdf_image_block | pdf_vector"
-   ],
-   "vysi": [
-    "source_kind",
-    "origin"
-   ]
-  },
-  {
-   "id": "statut_epistemique",
-   "groupe": "identite",
-   "libelle": "Statut épistémique",
-   "valeurs": "observed | derived | inferred | hypothesis | ambiguous | abstained | rejected",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:epistemic_status"
-   ],
-   "vysi": [
-    "epistemic_status"
-   ]
+   "libelle": "Statut de l'identification",
+   "valeurs": "identifie | ambigu | non_identifie"
   },
   {
    "id": "confiance",
    "groupe": "identite",
    "libelle": "Confiance",
-   "valeurs": "0..1 + méthode",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:confidence",
-    "PERFECT:confidence"
-   ],
-   "vysi": [
-    "confidence"
-   ]
+   "valeurs": "0..1"
   },
   {
-   "id": "disponibilite",
+   "id": "alternatives",
    "groupe": "identite",
-   "libelle": "Disponibilité de chaque valeur",
-   "valeurs": "native | calculated | inferred | unavailable",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:FT02 availability"
-   ],
-   "vysi": [
-    "availability"
-   ]
+   "libelle": "Autres types possibles et leur score",
+   "valeurs": "liste [type, score]"
+  },
+  {
+   "id": "granularite",
+   "groupe": "identite",
+   "libelle": "Granularité de la boîte",
+   "valeurs": "page | zone | bloc | ligne | run | glyphe"
+  },
+  {
+   "id": "origine",
+   "groupe": "identite",
+   "libelle": "Origine du contenu",
+   "valeurs": "native | ocr | calcule"
+  },
+  {
+   "id": "references_source",
+   "groupe": "identite",
+   "libelle": "Références aux objets sources (objet natif, image, police)",
+   "valeurs": "liste"
   },
   {
    "id": "page_index",
-   "groupe": "position",
-   "libelle": "Index de page",
-   "valeurs": "entier, base 0",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:physical_page_index"
-   ],
-   "vysi": [
-    "page_index",
-    "physical_page_index"
-   ]
+   "groupe": "geometrie",
+   "libelle": "Page",
+   "valeurs": "entier, base 0"
   },
   {
    "id": "bbox",
-   "groupe": "position",
+   "groupe": "geometrie",
    "libelle": "Boîte englobante",
-   "valeurs": "[x, y, largeur, hauteur] pt, origine haut-gauche",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PDF:BBox",
-    "CSS:box",
-    "VYSI:bbox",
-    "PERFECT:bbox [x0,y0,x1,y1] pt, origin top_left"
-   ],
-   "vysi": [
-    "bbox"
-   ]
+   "valeurs": "[x, y, largeur, hauteur] pt"
   },
   {
-   "id": "quad",
-   "groupe": "position",
-   "libelle": "Quadrilatère (texte tourné)",
-   "valeurs": "4 points pt",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale",
-    "image",
-    "vectoriel"
-   ],
-   "sources": [
-    "PDF:QuadPoints",
-    "VYSI:FT02 quad"
-   ],
-   "vysi": [
-    "quad"
-   ]
-  },
-  {
-   "id": "polygone",
-   "groupe": "position",
-   "libelle": "Contour polygonal",
-   "valeurs": "liste de points pt",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "VYSI:AD geometry polygon"
-   ],
-   "vysi": [
-    "polygon"
-   ]
-  },
-  {
-   "id": "ligne_de_base",
-   "groupe": "position",
-   "libelle": "Ligne de base",
-   "valeurs": "y pt (+ origine x,y)",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:text matrix",
-    "VYSI:baseline, origin",
-    "PERFECT:origin, baseline"
-   ],
-   "vysi": [
-    "baseline",
-    "origin"
-   ]
+   "id": "forme_exacte",
+   "groupe": "geometrie",
+   "libelle": "Forme exacte si non rectangulaire (quadrilatère, polygone ; rend aussi échelle et cisaillement)",
+   "valeurs": "points pt"
   },
   {
    "id": "rotation",
-   "groupe": "position",
+   "groupe": "geometrie",
    "libelle": "Rotation",
-   "valeurs": "degrés",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PDF:Rotate / text matrix",
-    "OOXML-D:xfrm rot",
-    "CSS:transform",
-    "PERFECT:rotation"
-   ],
-   "vysi": [
-    "rotation",
-    "text_rotation"
-   ]
+   "valeurs": "degrés"
   },
   {
    "id": "retournement",
-   "groupe": "position",
-   "libelle": "Retournement horizontal / vertical",
-   "valeurs": "booléens",
-   "familles": [
-    "image",
-    "vectoriel",
-    "region"
-   ],
-   "sources": [
-    "OOXML-D:xfrm flipH/flipV",
-    "CSS:scale(-1)"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "matrice_transformation",
-   "groupe": "position",
-   "libelle": "Matrice de transformation",
-   "valeurs": "a b c d e f",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PDF:CTM / Tm",
-    "CSS:matrix()",
-    "PERFECT:transform"
-   ],
-   "vysi": [
-    "text_matrix",
-    "transform_to_parent"
-   ]
-  },
-  {
-   "id": "ordre_empilement",
-   "groupe": "position",
-   "libelle": "Ordre d'empilement (z)",
-   "valeurs": "entier",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PDF:ordre du flux de contenu",
-    "OOXML-D:relativeHeight",
-    "CSS:z-index",
-    "PERFECT:render_order_index, z_index"
-   ],
-   "vysi": [
-    "z_order",
-    "z_index",
-    "render_order"
-   ]
-  },
-  {
-   "id": "couche",
-   "groupe": "position",
-   "libelle": "Couche / contenu optionnel",
-   "valeurs": "nom de calque",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PDF:Optional Content (OCG)",
-    "VYSI:layer"
-   ],
-   "vysi": [
-    "layer"
-   ]
-  },
-  {
-   "id": "ordre_lecture",
-   "groupe": "position",
-   "libelle": "Ordre de lecture",
-   "valeurs": "index page / document",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PDF-TAG:ordre structurel",
-    "VYSI:AD09",
-    "PERFECT:reading_order_index"
-   ],
-   "vysi": [
-    "reading_order_index",
-    "page_order_index",
-    "document_order_index"
-   ]
-  },
-  {
-   "id": "colonne_index",
-   "groupe": "position",
-   "libelle": "Index de colonne",
-   "valeurs": "entier",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:AD09 column_index",
-    "PERFECT:layout.column_index"
-   ],
-   "vysi": [
-    "column_index",
-    "column_id"
-   ]
-  },
-  {
-   "id": "couloir",
-   "groupe": "position",
-   "libelle": "Couloir de lecture",
-   "valeurs": "header | body | footnote | footer | marginalia | container",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:AD09 lane"
-   ],
-   "vysi": [
-    "lane"
-   ]
-  },
-  {
-   "id": "ancrage",
-   "groupe": "position",
-   "libelle": "Ancrage",
-   "valeurs": "en_ligne | flottant",
-   "familles": [
-    "image",
-    "vectoriel",
-    "region",
-    "donnees_visuelles",
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-D:wp:inline / wp:anchor",
-    "CSS:float, position"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "position_relative",
-   "groupe": "position",
-   "libelle": "Position relative à (page, marge, colonne, paragraphe, caractère)",
-   "valeurs": "référence + décalage pt",
-   "familles": [
-    "image",
-    "vectoriel",
-    "region",
-    "donnees_visuelles",
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-D:positionH/positionV relativeFrom",
-    "CSS:position"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "habillage",
-   "groupe": "position",
-   "libelle": "Habillage du texte",
-   "valeurs": "carre | serre | traversant | haut_bas | derriere | devant | aucun",
-   "familles": [
-    "image",
-    "vectoriel",
-    "region",
-    "donnees_visuelles",
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-D:wrapSquare/wrapTight/wrapThrough/wrapTopAndBottom",
-    "CSS:shape-outside"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "distance_texte",
-   "groupe": "position",
-   "libelle": "Distance au texte (haut, bas, gauche, droite)",
-   "valeurs": "pt",
-   "familles": [
-    "image",
-    "vectoriel",
-    "region",
-    "donnees_visuelles",
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-D:distT/distB/distL/distR",
-    "CSS:margin"
-   ],
-   "vysi": []
+   "groupe": "geometrie",
+   "libelle": "Retournement horizontal, vertical",
+   "valeurs": "booléens"
   },
   {
    "id": "visibilite",
-   "groupe": "position",
-   "libelle": "Visibilité / rognage",
-   "valeurs": "fully_visible | partially_clipped | not_visible",
-   "familles": [
+   "groupe": "geometrie",
+   "libelle": "Visibilité",
+   "valeurs": "visible | rogne | invisible | masque"
+  },
+  {
+   "id": "ordre_lecture",
+   "groupe": "disposition",
+   "libelle": "Ordre de lecture",
+   "valeurs": "entier"
+  },
+  {
+   "id": "ordre_empilement",
+   "groupe": "disposition",
+   "libelle": "Ordre d'empilement",
+   "valeurs": "entier"
+  },
+  {
+   "id": "calque",
+   "groupe": "disposition",
+   "libelle": "Calque (contenu optionnel)",
+   "valeurs": "nom"
+  },
+  {
+   "id": "zone_page",
+   "groupe": "disposition",
+   "libelle": "Zone de page",
+   "valeurs": "en_tete | corps | notes | pied | marge"
+  },
+  {
+   "id": "colonne_index",
+   "groupe": "disposition",
+   "libelle": "Colonne d'appartenance",
+   "valeurs": "entier"
+  },
+  {
+   "id": "parent",
+   "groupe": "disposition",
+   "libelle": "Boîte parente (appartenance)",
+   "valeurs": "id"
+  },
+  {
+   "id": "enfants",
+   "groupe": "disposition",
+   "libelle": "Boîtes enfants",
+   "valeurs": "ids"
+  },
+  {
+   "id": "suite",
+   "groupe": "disposition",
+   "libelle": "Boîte qui continue le même contenu (débordement, page suivante)",
+   "valeurs": "id"
+  },
+  {
+   "id": "relations",
+   "groupe": "disposition",
+   "libelle": "Relations typées hors appartenance",
+   "valeurs": "legende_de | note_de | etiquette_de | renvoie_a | illustre"
+  },
+  {
+   "id": "ancrage",
+   "groupe": "disposition",
+   "libelle": "Ancrage",
+   "valeurs": "en_ligne | flottant"
+  },
+  {
+   "id": "position_relative",
+   "groupe": "disposition",
+   "libelle": "Position relative à",
+   "valeurs": "page | marge | colonne | paragraphe | caractere + décalage pt"
+  },
+  {
+   "id": "habillage",
+   "groupe": "disposition",
+   "libelle": "Habillage du texte",
+   "valeurs": "carre | serre | haut_bas | derriere | devant | aucun"
+  },
+  {
+   "id": "distance_texte",
+   "groupe": "disposition",
+   "libelle": "Distance au texte",
+   "valeurs": "pt (4 côtés)"
+  },
+  {
+   "id": "marges_internes",
+   "groupe": "agencement_interne",
+   "libelle": "Marges internes",
+   "valeurs": "pt (4 côtés)"
+  },
+  {
+   "id": "colonnes",
+   "groupe": "agencement_interne",
+   "libelle": "Colonnes de la page ou de la zone (nombre, largeurs, gouttières, filet)",
+   "valeurs": "entiers + pt + booléen"
+  },
+  {
+   "id": "segments_style",
+   "groupe": "style_interne",
+   "libelle": "Segments de style successifs ; chaque segment porte des attributs de caractère, langue comprise",
+   "valeurs": "liste [début, fin, attributs]"
+  },
+  {
+   "id": "nature_contenu",
+   "groupe": "contenu",
+   "libelle": "Nature du contenu",
+   "valeurs": "texte_natif | texte_image | image | vectoriel | mixte | vide"
+  },
+  {
+   "id": "texte",
+   "groupe": "contenu",
+   "libelle": "Texte",
+   "valeurs": "chaîne"
+  }
+ ],
+ "attributs": [
+  {
+   "id": "police",
+   "groupe": "caractere",
+   "libelle": "Police (famille, nom PostScript, fichier incorporé, classe serif / sans / mono / symbole)",
+   "valeurs": "chaînes + classe",
+   "portee": [
     "page",
-    "region",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
     "formule",
-    "expression_speciale",
+    "visualisation",
     "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:geometry visibility"
-   ],
-   "vysi": [
-    "visibility",
-    "clipped"
-   ]
-  },
-  {
-   "id": "chemin_decoupe",
-   "groupe": "position",
-   "libelle": "Chemin de découpe appliqué",
-   "valeurs": "référence",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PDF:W/W*",
-    "VYSI:clip_ref"
-   ],
-   "vysi": [
-    "clip_ref"
-   ]
-  },
-  {
-   "id": "police_famille",
-   "groupe": "caractere",
-   "libelle": "Famille de police",
-   "valeurs": "nom",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:rFonts",
-    "CSS:font-family",
-    "VYSI:font_family",
-    "PERFECT:style.font_family"
-   ],
-   "vysi": [
-    "font_family",
-    "font_name"
-   ]
-  },
-  {
-   "id": "police_postscript",
-   "groupe": "caractere",
-   "libelle": "Nom PostScript de la police",
-   "valeurs": "nom",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:BaseFont",
-    "VYSI:font_postscript_name",
-    "PERFECT:style.font_postscript_name"
-   ],
-   "vysi": [
-    "font_postscript_name"
-   ]
-  },
-  {
-   "id": "police_ressource",
-   "groupe": "caractere",
-   "libelle": "Ressource de police (fichier, incorporée)",
-   "valeurs": "référence",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:FontFile",
-    "VYSI:font_resource_id",
-    "PERFECT:style.embedded_font_path"
-   ],
-   "vysi": [
-    "font_resource_id"
-   ]
-  },
-  {
-   "id": "classe_police",
-   "groupe": "caractere",
-   "libelle": "Classe de police",
-   "valeurs": "serif | sans | mono | symbol | unknown",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:FontDescriptor Flags",
-    "VYSI:font_family_class",
-    "PERFECT:flags is_serif/is_monospace/is_symbolic"
-   ],
-   "vysi": [
-    "font_family_class",
-    "font_flags"
+    "lien",
+    "formulaire"
    ]
   },
   {
    "id": "taille",
    "groupe": "caractere",
-   "libelle": "Corps / taille",
+   "libelle": "Corps",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:sz (demi-points)",
-    "CSS:font-size",
-    "VYSI:font_size",
-    "PERFECT:style.size_pt"
-   ],
-   "vysi": [
-    "font_size",
-    "font_size_pt",
-    "size_half_points"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
    "id": "graisse",
    "groupe": "caractere",
    "libelle": "Graisse",
-   "valeurs": "100..900 / gras",
-   "familles": [
+   "valeurs": "100..900",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:b",
-    "CSS:font-weight",
-    "VYSI:font_weight",
-    "PERFECT:style.bold"
-   ],
-   "vysi": [
-    "font_weight",
-    "bold"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
-   "id": "style_police",
+   "id": "italique",
    "groupe": "caractere",
-   "libelle": "Style (normal, italique, oblique)",
-   "valeurs": "énumération",
-   "familles": [
+   "libelle": "Italique, oblique",
+   "valeurs": "booléen",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:i",
-    "CSS:font-style",
-    "VYSI:font_style",
-    "PERFECT:style.italic"
-   ],
-   "vysi": [
-    "font_style",
-    "italic"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
    "id": "chasse",
    "groupe": "caractere",
    "libelle": "Chasse (étroit, large)",
-   "valeurs": "énumération / %",
-   "familles": [
+   "valeurs": "%",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "CSS:font-stretch",
-    "VYSI:font_stretch"
-   ],
-   "vysi": [
-    "font_stretch",
-    "font_width"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
-   "id": "axes_variation",
-   "groupe": "caractere",
-   "libelle": "Axes de police variable",
-   "valeurs": "axe=valeur",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "CSS:font-variation-settings",
-    "VYSI:font_variation_axes"
-   ],
-   "vysi": [
-    "font_variation_axes"
-   ]
-  },
-  {
-   "id": "couleur_texte",
+   "id": "couleur",
    "groupe": "caractere",
    "libelle": "Couleur du texte",
-   "valeurs": "sRGB / CMJN / gris",
-   "familles": [
+   "valeurs": "couleur",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:color",
-    "PDF:fill color",
-    "VYSI:text_color",
-    "PERFECT:style.color_rgb, fill_color"
-   ],
-   "vysi": [
-    "text_color",
-    "color",
-    "color_srgb"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
-   "id": "couleur_contour_texte",
+   "id": "couleur_contour",
    "groupe": "caractere",
    "libelle": "Couleur de contour du texte",
    "valeurs": "couleur",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:stroke color",
-    "VYSI:stroke_color",
-    "PERFECT:style.stroke_color"
-   ],
-   "vysi": [
-    "stroke_color"
-   ]
-  },
-  {
-   "id": "opacite_texte",
-   "groupe": "caractere",
-   "libelle": "Opacité",
-   "valeurs": "0..1",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:ca/CA",
-    "VYSI:opacity",
-    "PERFECT:style.opacity"
-   ],
-   "vysi": [
-    "opacity"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
    "id": "soulignement",
    "groupe": "caractere",
-   "libelle": "Soulignement (type, couleur)",
-   "valeurs": "énumération",
-   "familles": [
+   "libelle": "Soulignement",
+   "valeurs": "aucun | simple | double | pointille… + couleur",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:u",
-    "CSS:text-decoration",
-    "VYSI:underline",
-    "PERFECT:style.underline"
-   ],
-   "vysi": [
-    "underline"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
    "id": "barre",
    "groupe": "caractere",
-   "libelle": "Barré simple / double",
-   "valeurs": "énumération",
-   "familles": [
+   "libelle": "Barré",
+   "valeurs": "aucun | simple | double",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:strike/dstrike",
-    "VYSI:strikethrough",
-    "PERFECT:style.strikeout"
-   ],
-   "vysi": [
-    "strikethrough"
-   ]
-  },
-  {
-   "id": "petites_capitales",
-   "groupe": "caractere",
-   "libelle": "Petites capitales",
-   "valeurs": "booléen",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:smallCaps",
-    "VYSI:small_caps",
-    "PERFECT:style.small_caps"
-   ],
-   "vysi": [
-    "small_caps"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
    "id": "capitales",
    "groupe": "caractere",
-   "libelle": "Tout en capitales",
-   "valeurs": "booléen",
-   "familles": [
+   "libelle": "Capitales, petites capitales",
+   "valeurs": "aucune | capitales | petites_capitales",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:caps",
-    "VYSI:all_caps"
-   ],
-   "vysi": [
-    "all_caps"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
-   "id": "exposant_indice",
+   "id": "position_verticale",
    "groupe": "caractere",
-   "libelle": "Exposant / indice",
-   "valeurs": "énumération",
-   "familles": [
+   "libelle": "Exposant, indice, décalage vertical",
+   "valeurs": "normal | exposant | indice + décalage pt",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:vertAlign",
-    "VYSI:superscript, subscript",
-    "PERFECT:style.superscript"
-   ],
-   "vysi": [
-    "superscript",
-    "subscript",
-    "vertical_align"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
@@ -2765,23 +883,19 @@
    "groupe": "caractere",
    "libelle": "Espacement des lettres",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:spacing",
-    "PDF:Tc",
-    "VYSI:letter_spacing",
-    "PERFECT:style.letter_spacing"
-   ],
-   "vysi": [
-    "letter_spacing"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
@@ -2789,46 +903,19 @@
    "groupe": "caractere",
    "libelle": "Espacement des mots",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:Tw",
-    "CSS:word-spacing",
-    "VYSI:word_spacing",
-    "PERFECT:style.word_spacing"
-   ],
-   "vysi": [
-    "word_spacing"
-   ]
-  },
-  {
-   "id": "decalage_vertical",
-   "groupe": "caractere",
-   "libelle": "Décalage vertical (rise)",
-   "valeurs": "pt",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:Ts",
-    "OOXML-W:position",
-    "VYSI:text_rise"
-   ],
-   "vysi": [
-    "text_rise"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
@@ -2836,181 +923,99 @@
    "groupe": "caractere",
    "libelle": "Échelle horizontale",
    "valeurs": "%",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:Tz",
-    "OOXML-W:w",
-    "PERFECT:style.horizontal_scale"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "crenage",
-   "groupe": "caractere",
-   "libelle": "Crénage",
-   "valeurs": "booléen / seuil pt",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:kern",
-    "CSS:font-kerning"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "ligatures",
-   "groupe": "caractere",
-   "libelle": "Ligatures et fonctions OpenType",
-   "valeurs": "liste",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "CSS:font-feature-settings",
-    "OOXML-W:w14:ligatures"
-   ],
-   "vysi": []
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
+   ]
   },
   {
    "id": "mode_rendu",
    "groupe": "caractere",
-   "libelle": "Mode de rendu (plein, contour, invisible…)",
-   "valeurs": "0..7",
-   "familles": [
+   "libelle": "Mode de rendu",
+   "valeurs": "plein | contour | plein_contour",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PDF:Tr",
-    "PERFECT:style.text_rendering_mode"
-   ],
-   "vysi": []
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
+   ]
   },
   {
-   "id": "surlignage_couleur",
+   "id": "surlignage",
    "groupe": "caractere",
-   "libelle": "Surlignage / trame de caractère",
+   "libelle": "Surlignage",
    "valeurs": "couleur",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:highlight/shd"
-   ],
-   "vysi": []
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
+   ]
   },
   {
    "id": "effets_texte",
    "groupe": "caractere",
-   "libelle": "Effets (ombre, relief, gravure, contour, lueur)",
+   "libelle": "Effets de texte (ombre, relief, gravure, marque d'emphase)",
    "valeurs": "liste",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:shadow/emboss/imprint/outline",
-    "OOXML-D:effectLst"
-   ],
-   "vysi": []
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
+   ]
   },
   {
-   "id": "cache",
+   "id": "casse",
    "groupe": "caractere",
-   "libelle": "Texte masqué",
-   "valeurs": "booléen",
-   "familles": [
+   "libelle": "Casse et casse à préserver",
+   "valeurs": "majuscules | minuscules | titre | phrase | mixte + booléen",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:vanish"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "marque_emphase",
-   "groupe": "caractere",
-   "libelle": "Marque d'emphase (CJK)",
-   "valeurs": "énumération",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:em",
-    "CSS:text-emphasis"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "mode_ecriture",
-   "groupe": "caractere",
-   "libelle": "Mode d'écriture",
-   "valeurs": "horizontal | vertical",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "CSS:writing-mode",
-    "VYSI:writing_mode",
-    "PERFECT:style.writing_mode, line.wmode"
-   ],
-   "vysi": [
-    "writing_mode"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
@@ -3018,24 +1023,19 @@
    "groupe": "caractere",
    "libelle": "Langue",
    "valeurs": "BCP 47",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:lang",
-    "PDF:Lang",
-    "VYSI:language",
-    "PERFECT:language"
-   ],
-   "vysi": [
-    "language",
-    "dominant_language_tag"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
@@ -3043,181 +1043,84 @@
    "groupe": "caractere",
    "libelle": "Système d'écriture",
    "valeurs": "ISO 15924",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "VYSI:script",
-    "PERFECT:script"
-   ],
-   "vysi": [
-    "script",
-    "scripts"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
-   "id": "direction",
+   "id": "sens_ecriture",
    "groupe": "caractere",
-   "libelle": "Direction",
-   "valeurs": "ltr | rtl | ttb | btt | mixed",
-   "familles": [
+   "libelle": "Sens d'écriture",
+   "valeurs": "ltr | rtl | ttb",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "en_ligne",
-    "granularite",
+    "expression",
     "liste",
     "tableau",
     "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:rtl/bidi",
-    "CSS:direction",
-    "VYSI:direction",
-    "PERFECT:direction, line.dir"
-   ],
-   "vysi": [
-    "direction"
-   ]
-  },
-  {
-   "id": "style_nomme",
-   "groupe": "caractere",
-   "libelle": "Style nommé appliqué",
-   "valeurs": "référence",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "OOXML-W:rStyle/pStyle",
-    "VYSI:style_refs"
-   ],
-   "vysi": [
-    "style_refs",
-    "style"
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire"
    ]
   },
   {
    "id": "alignement",
    "groupe": "paragraphe",
    "libelle": "Alignement horizontal",
-   "valeurs": "gauche | centre | droite | justifie | distribue",
-   "familles": [
+   "valeurs": "gauche | centre | droite | justifie",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "liste",
     "tableau",
-    "region"
-   ],
-   "sources": [
-    "OOXML-W:jc",
-    "CSS:text-align",
-    "VYSI:alignment",
-    "PERFECT:layout.alignment (left|center|right|floating)"
-   ],
-   "vysi": [
-    "alignment",
-    "align"
+    "annotation",
+    "formulaire"
    ]
   },
   {
    "id": "alignement_vertical",
    "groupe": "paragraphe",
    "libelle": "Alignement vertical",
-   "valeurs": "haut | centre | bas | justifie",
-   "familles": [
+   "valeurs": "haut | centre | bas",
+   "portee": [
+    "page",
+    "zone",
     "texte",
+    "liste",
     "tableau",
-    "region"
-   ],
-   "sources": [
-    "OOXML-W:vAlign/textAlignment",
-    "VYSI:vertical_alignment"
-   ],
-   "vysi": [
-    "vertical_alignment"
+    "annotation",
+    "formulaire"
    ]
   },
   {
-   "id": "retrait_gauche",
+   "id": "retraits",
    "groupe": "paragraphe",
-   "libelle": "Retrait gauche",
+   "libelle": "Retraits gauche, droit, première ligne (négatif = suspendu)",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:ind left",
-    "CSS:padding-left",
-    "VYSI:left_indent",
-    "PERFECT:layout.indent_left"
-   ],
-   "vysi": [
-    "left_indent"
-   ]
-  },
-  {
-   "id": "retrait_droit",
-   "groupe": "paragraphe",
-   "libelle": "Retrait droit",
-   "valeurs": "pt",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:ind right",
-    "VYSI:right_indent",
-    "PERFECT:layout.indent_right"
-   ],
-   "vysi": [
-    "right_indent"
-   ]
-  },
-  {
-   "id": "retrait_premiere_ligne",
-   "groupe": "paragraphe",
-   "libelle": "Retrait de première ligne",
-   "valeurs": "pt",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:ind firstLine",
-    "CSS:text-indent",
-    "VYSI:first_line_indent"
-   ],
-   "vysi": [
-    "first_line_indent"
-   ]
-  },
-  {
-   "id": "retrait_suspendu",
-   "groupe": "paragraphe",
-   "libelle": "Retrait suspendu",
-   "valeurs": "pt",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:ind hanging",
-    "VYSI:hanging_indent"
-   ],
-   "vysi": [
-    "hanging_indent"
+    "liste",
+    "tableau",
+    "annotation",
+    "formulaire"
    ]
   },
   {
@@ -3225,18 +1128,14 @@
    "groupe": "paragraphe",
    "libelle": "Espace avant",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "liste",
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:spacing before",
-    "VYSI:space_before",
-    "PERFECT:layout.space_before"
-   ],
-   "vysi": [
-    "space_before"
+    "tableau",
+    "annotation",
+    "formulaire"
    ]
   },
   {
@@ -3244,358 +1143,102 @@
    "groupe": "paragraphe",
    "libelle": "Espace après",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "liste",
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:spacing after",
-    "VYSI:space_after",
-    "PERFECT:layout.space_after"
-   ],
-   "vysi": [
-    "space_after"
+    "tableau",
+    "annotation",
+    "formulaire"
    ]
   },
   {
    "id": "interligne",
    "groupe": "paragraphe",
-   "libelle": "Interligne + mode",
-   "valeurs": "pt ou multiple ; auto | exact | au_moins | multiple",
-   "familles": [
+   "libelle": "Interligne",
+   "valeurs": "valeur + exact | au_moins | multiple",
+   "portee": [
+    "page",
+    "zone",
     "texte",
     "liste",
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:spacing line/lineRule",
-    "CSS:line-height",
-    "VYSI:line_height, line_height_mode",
-    "PERFECT:line_height"
-   ],
-   "vysi": [
-    "line_height",
-    "line_height_mode"
+    "tableau",
+    "annotation",
+    "formulaire"
    ]
   },
   {
    "id": "taquets",
    "groupe": "paragraphe",
-   "libelle": "Taquets de tabulation (position, type, points de conduite)",
-   "valeurs": "liste pt",
-   "familles": [
+   "libelle": "Taquets de tabulation",
+   "valeurs": "liste [position pt, type, points de conduite]",
+   "portee": [
+    "page",
+    "zone",
     "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:tabs",
-    "VYSI:tab_stops"
-   ],
-   "vysi": [
-    "tab_stops",
-    "tabs"
+    "liste",
+    "tableau",
+    "annotation",
+    "formulaire"
    ]
   },
   {
-   "id": "cesure",
+   "id": "niveau_hierarchique",
    "groupe": "paragraphe",
-   "libelle": "Césure",
-   "valeurs": "booléen",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:suppressAutoHyphens",
-    "CSS:hyphens",
-    "VYSI:hyphenation"
-   ],
-   "vysi": [
-    "hyphenation"
-   ]
-  },
-  {
-   "id": "lier_au_suivant",
-   "groupe": "paragraphe",
-   "libelle": "Paragraphe solidaire du suivant",
-   "valeurs": "booléen",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:keepNext",
-    "VYSI:keep_with_next",
-    "PERFECT:layout.keep_with_next"
-   ],
-   "vysi": [
-    "keep_with_next"
-   ]
-  },
-  {
-   "id": "lignes_solidaires",
-   "groupe": "paragraphe",
-   "libelle": "Lignes solidaires",
-   "valeurs": "booléen",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:keepLines",
-    "VYSI:keep_lines_together"
-   ],
-   "vysi": [
-    "keep_lines_together"
-   ]
-  },
-  {
-   "id": "veuves_orphelines",
-   "groupe": "paragraphe",
-   "libelle": "Contrôle des veuves et orphelines",
-   "valeurs": "booléen",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:widowControl",
-    "VYSI:widow_orphan_control"
-   ],
-   "vysi": [
-    "widow_orphan_control"
-   ]
-  },
-  {
-   "id": "saut_page_avant",
-   "groupe": "paragraphe",
-   "libelle": "Saut de page avant",
-   "valeurs": "booléen",
-   "familles": [
-    "texte"
-   ],
-   "sources": [
-    "OOXML-W:pageBreakBefore"
-   ],
-   "vysi": [
-    "page_break_before"
-   ]
-  },
-  {
-   "id": "espacement_contextuel",
-   "groupe": "paragraphe",
-   "libelle": "Espacement contextuel (supprimé entre styles identiques)",
-   "valeurs": "booléen",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:contextualSpacing"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "bordure_paragraphe",
-   "groupe": "paragraphe",
-   "libelle": "Bordures de paragraphe",
-   "valeurs": "côtés + style + épaisseur pt + couleur",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:pBdr"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "trame_paragraphe",
-   "groupe": "paragraphe",
-   "libelle": "Trame / fond de paragraphe",
-   "valeurs": "couleur / motif",
-   "familles": [
-    "texte",
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:shd"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "grille_lignes",
-   "groupe": "paragraphe",
-   "libelle": "Alignement sur la grille",
-   "valeurs": "booléen",
-   "familles": [
-    "texte"
-   ],
-   "sources": [
-    "OOXML-W:snapToGrid",
-    "OOXML-W:docGrid"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "parametres_lettrine",
-   "groupe": "paragraphe",
-   "libelle": "Lettrine (lignes occupées, distance)",
-   "valeurs": "entier + pt",
-   "familles": [
-    "texte"
-   ],
-   "sources": [
-    "OOXML-W:framePr dropCap/lines/hSpace"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "niveau_plan",
-   "groupe": "paragraphe",
-   "libelle": "Niveau de plan",
+   "libelle": "Niveau hiérarchique (intertitre, élément de liste, entrée de sommaire)",
    "valeurs": "entier",
-   "familles": [
-    "texte"
-   ],
-   "sources": [
-    "OOXML-W:outlineLvl",
-    "PDF-TAG:H1-H6",
-    "PERFECT:semantic.heading_level"
-   ],
-   "vysi": [
-    "level"
+   "portee": [
+    "texte",
+    "liste"
    ]
   },
   {
-   "id": "type_liste",
-   "groupe": "liste",
-   "libelle": "Type de liste",
-   "valeurs": "puces | numerotee",
-   "familles": [
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:numFmt",
-    "HTML:ul/ol",
-    "PERFECT:semantic.list_type"
-   ],
-   "vysi": []
+   "id": "lignes_lettrine",
+   "groupe": "paragraphe",
+   "libelle": "Lignes occupées (type lettrine seulement)",
+   "valeurs": "entier",
+   "portee": [
+    "texte"
+   ]
   },
   {
-   "id": "format_numerotation",
+   "id": "format_marqueur",
    "groupe": "liste",
-   "libelle": "Format de numérotation",
-   "valeurs": "decimal | lettre | romain | puce…",
-   "familles": [
+   "libelle": "Format du marqueur",
+   "valeurs": "puce | decimal | lettre | romain | image",
+   "portee": [
     "liste"
-   ],
-   "sources": [
-    "OOXML-W:numFmt",
-    "CSS:list-style-type"
-   ],
-   "vysi": []
+   ]
   },
   {
    "id": "texte_marqueur",
    "groupe": "liste",
-   "libelle": "Texte / gabarit du marqueur",
+   "libelle": "Texte du marqueur",
    "valeurs": "chaîne",
-   "familles": [
+   "portee": [
     "liste"
-   ],
-   "sources": [
-    "OOXML-W:lvlText",
-    "PERFECT:semantic.list_marker"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "police_marqueur",
-   "groupe": "liste",
-   "libelle": "Police et style du marqueur",
-   "valeurs": "référence",
-   "familles": [
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:lvl rPr"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "valeur_depart",
-   "groupe": "liste",
-   "libelle": "Valeur de départ",
-   "valeurs": "entier",
-   "familles": [
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:start",
-    "HTML:ol start"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "niveau_liste",
-   "groupe": "liste",
-   "libelle": "Niveau d'imbrication",
-   "valeurs": "entier",
-   "familles": [
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:ilvl",
-    "VYSI:list_level"
-   ],
-   "vysi": [
-    "list_level"
    ]
   },
   {
-   "id": "suffixe_marqueur",
-   "groupe": "liste",
-   "libelle": "Séparation marqueur / texte",
-   "valeurs": "tabulation | espace | rien",
-   "familles": [
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:suff"
-   ],
-   "vysi": []
+   "id": "valeur_numero",
+   "groupe": "numerotation",
+   "libelle": "Valeur d'un numéro (marqueur, légende, équation, page)",
+   "valeurs": "entier ou chaîne",
+   "portee": [
+    "liste",
+    "texte",
+    "formule",
+    "page"
+   ]
   },
   {
-   "id": "image_puce",
-   "groupe": "liste",
-   "libelle": "Puce image",
-   "valeurs": "référence",
-   "familles": [
-    "liste"
-   ],
-   "sources": [
-    "OOXML-W:lvlPicBulletId",
-    "CSS:list-style-image"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "nb_lignes_colonnes",
+   "id": "dimensions_tableau",
    "groupe": "tableau",
    "libelle": "Nombre de lignes et de colonnes",
    "valeurs": "entiers",
-   "familles": [
+   "portee": [
     "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tblGrid",
-    "HTML:table",
-    "PERFECT:tables rows, columns, header_rows"
-   ],
-   "vysi": [
-    "grid_columns"
    ]
   },
   {
@@ -3603,174 +1246,44 @@
    "groupe": "tableau",
    "libelle": "Largeurs de colonnes",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
     "tableau"
-   ],
-   "sources": [
-    "OOXML-W:gridCol"
-   ],
-   "vysi": [
-    "cell_width"
    ]
   },
   {
-   "id": "hauteur_ligne",
+   "id": "hauteurs_lignes",
    "groupe": "tableau",
-   "libelle": "Hauteur de ligne + règle",
-   "valeurs": "pt ; exact | au_moins | auto",
-   "familles": [
+   "libelle": "Hauteurs de lignes",
+   "valeurs": "pt + exact | au_moins",
+   "portee": [
     "tableau"
-   ],
-   "sources": [
-    "OOXML-W:trHeight"
-   ],
-   "vysi": [
-    "row_height"
    ]
   },
   {
-   "id": "fusion_horizontale",
+   "id": "position_cellule",
    "groupe": "tableau",
-   "libelle": "Fusion horizontale",
-   "valeurs": "nombre de colonnes",
-   "familles": [
+   "libelle": "Ligne et colonne de la cellule",
+   "valeurs": "entiers",
+   "portee": [
     "tableau"
-   ],
-   "sources": [
-    "OOXML-W:gridSpan",
-    "PDF-TAG:ColSpan",
-    "HTML:colspan"
-   ],
-   "vysi": [
-    "cell_grid_span"
    ]
   },
   {
-   "id": "fusion_verticale",
+   "id": "fusion",
    "groupe": "tableau",
-   "libelle": "Fusion verticale",
-   "valeurs": "nombre de lignes",
-   "familles": [
+   "libelle": "Fusion de cellules (colonnes, lignes)",
+   "valeurs": "entiers",
+   "portee": [
     "tableau"
-   ],
-   "sources": [
-    "OOXML-W:vMerge",
-    "PDF-TAG:RowSpan",
-    "HTML:rowspan"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "portee_entete",
-   "groupe": "tableau",
-   "libelle": "Portée d'en-tête",
-   "valeurs": "ligne | colonne | les deux",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "PDF-TAG:Scope",
-    "HTML:scope"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "marges_cellule",
-   "groupe": "tableau",
-   "libelle": "Marges internes de cellule",
-   "valeurs": "pt (4 côtés)",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tcMar",
-    "CSS:padding"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "orientation_texte_cellule",
-   "groupe": "tableau",
-   "libelle": "Orientation du texte de cellule",
-   "valeurs": "énumération",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:textDirection"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "ligne_entete_repetee",
-   "groupe": "tableau",
-   "libelle": "Ligne d'en-tête répétée",
-   "valeurs": "booléen",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tblHeader"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "ligne_insecable",
-   "groupe": "tableau",
-   "libelle": "Ligne non sécable",
-   "valeurs": "booléen",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:cantSplit"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "alignement_tableau",
-   "groupe": "tableau",
-   "libelle": "Alignement du tableau",
-   "valeurs": "énumération",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tblJc"
-   ],
-   "vysi": [
-    "table_alignment"
    ]
   },
   {
-   "id": "largeur_tableau",
+   "id": "entete",
    "groupe": "tableau",
-   "libelle": "Largeur du tableau",
-   "valeurs": "pt / %",
-   "familles": [
+   "libelle": "Cellule ou ligne d'en-tête (portée, répétée)",
+   "valeurs": "aucun | ligne | colonne + booléen",
+   "portee": [
     "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tblW"
-   ],
-   "vysi": [
-    "table_width"
-   ]
-  },
-  {
-   "id": "disposition_tableau",
-   "groupe": "tableau",
-   "libelle": "Disposition fixe / automatique",
-   "valeurs": "énumération",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tblLayout",
-    "CSS:table-layout"
-   ],
-   "vysi": [
-    "table_layout"
    ]
   },
   {
@@ -3778,374 +1291,118 @@
    "groupe": "tableau",
    "libelle": "Espacement entre cellules",
    "valeurs": "pt",
-   "familles": [
+   "portee": [
     "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tblCellSpacing",
-    "CSS:border-spacing"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "style_tableau",
-   "groupe": "tableau",
-   "libelle": "Style de tableau et bandes",
-   "valeurs": "référence + options",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "OOXML-W:tblStyle/tblLook"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "index_cellule",
-   "groupe": "tableau",
-   "libelle": "Index ligne / colonne de la cellule",
-   "valeurs": "entiers",
-   "familles": [
-    "tableau"
-   ],
-   "sources": [
-    "VYSI:row_index, cell_index"
-   ],
-   "vysi": [
-    "row_index",
-    "cell_index",
-    "cell_ref"
    ]
   },
   {
-   "id": "couleur_fond",
+   "id": "remplissage",
    "groupe": "aspect",
-   "libelle": "Couleur de fond",
-   "valeurs": "couleur",
-   "familles": [
+   "libelle": "Remplissage (couleur, dégradé, motif, image)",
+   "valeurs": "couleur / dégradé / référence",
+   "portee": [
     "page",
-    "region",
+    "zone",
     "texte",
     "liste",
     "tableau",
+    "formule",
     "image",
     "vectoriel",
-    "donnees_visuelles",
-    "formule",
+    "visualisation",
+    "decoration",
     "annotation",
+    "lien",
     "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "CSS:background-color",
-    "OOXML-D:solidFill",
-    "PDF:fill",
-    "PERFECT:fill_color"
-   ],
-   "vysi": []
+    "media"
+   ]
   },
   {
-   "id": "motif_fond",
+   "id": "contour",
    "groupe": "aspect",
-   "libelle": "Motif / trame de fond",
-   "valeurs": "référence",
-   "familles": [
+   "libelle": "Contour ou bordure par côté (couleur, épaisseur, tirets, extrémités, jointures)",
+   "valeurs": "couleur + pt + motif",
+   "portee": [
     "page",
-    "region",
+    "zone",
     "texte",
     "liste",
     "tableau",
+    "formule",
     "image",
     "vectoriel",
-    "donnees_visuelles",
-    "formule",
+    "visualisation",
+    "decoration",
     "annotation",
+    "lien",
     "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "OOXML-D:pattFill",
-    "PDF:Pattern"
-   ],
-   "vysi": []
+    "media"
+   ]
   },
   {
-   "id": "degrade_fond",
+   "id": "coins",
    "groupe": "aspect",
-   "libelle": "Dégradé de fond",
-   "valeurs": "arrêts de couleur + angle",
-   "familles": [
+   "libelle": "Rayon des coins",
+   "valeurs": "pt",
+   "portee": [
     "page",
-    "region",
+    "zone",
     "texte",
     "liste",
     "tableau",
+    "formule",
     "image",
     "vectoriel",
-    "donnees_visuelles",
-    "formule",
+    "visualisation",
+    "decoration",
     "annotation",
+    "lien",
     "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "OOXML-D:gradFill",
-    "PDF:Shading",
-    "CSS:linear-gradient"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "image_fond",
-   "groupe": "aspect",
-   "libelle": "Image de fond",
-   "valeurs": "référence",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "OOXML-D:blipFill",
-    "CSS:background-image"
-   ],
-   "vysi": []
+    "media"
+   ]
   },
   {
    "id": "opacite",
    "groupe": "aspect",
-   "libelle": "Opacité de l'élément",
+   "libelle": "Opacité",
    "valeurs": "0..1",
-   "familles": [
+   "portee": [
     "page",
-    "region",
+    "zone",
     "texte",
     "liste",
     "tableau",
+    "formule",
     "image",
     "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "PDF:ca/CA, SMask",
-    "CSS:opacity",
-    "OOXML-D:alpha",
-    "PERFECT:opacity"
-   ],
-   "vysi": [
-    "opacity"
-   ]
-  },
-  {
-   "id": "bordure",
-   "groupe": "aspect",
-   "libelle": "Bordure par côté (style, épaisseur, couleur, espacement)",
-   "valeurs": "pt + couleur",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "CSS:border",
-    "OOXML-W:tcBorders/pBdr",
-    "OOXML-D:ln",
-    "PERFECT:tables style border_color/width"
-   ],
-   "vysi": [
-    "visual_border_ref"
-   ]
-  },
-  {
-   "id": "rayon_coins",
-   "groupe": "aspect",
-   "libelle": "Rayon des coins",
-   "valeurs": "pt",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "CSS:border-radius",
-    "OOXML-D:roundRect"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "ombre",
-   "groupe": "aspect",
-   "libelle": "Ombre portée",
-   "valeurs": "décalage pt + flou + couleur",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "CSS:box-shadow",
-    "OOXML-D:outerShdw"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "effets_3d",
-   "groupe": "aspect",
-   "libelle": "Effets 3D, reflet, lueur",
-   "valeurs": "liste",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "OOXML-D:scene3d/sp3d/reflection/glow"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "trait",
-   "groupe": "aspect",
-   "libelle": "Trait (couleur, épaisseur, tirets, extrémités, jointures)",
-   "valeurs": "couleur + pt + motif",
-   "familles": [
-    "vectoriel",
+    "visualisation",
     "decoration",
-    "annotation"
-   ],
-   "sources": [
-    "PDF:w/d/J/j",
-    "OOXML-D:ln prstDash/cap/join",
-    "CSS:stroke",
-    "PERFECT:stroke_color, stroke_width, line_cap, line_join, dashes"
-   ],
-   "vysi": []
+    "annotation",
+    "lien",
+    "formulaire",
+    "media"
+   ]
   },
   {
-   "id": "regle_remplissage",
+   "id": "effets",
    "groupe": "aspect",
-   "libelle": "Règle de remplissage",
-   "valeurs": "nonzero | evenodd",
-   "familles": [
-    "vectoriel"
-   ],
-   "sources": [
-    "PDF:f/f*",
-    "CSS:fill-rule",
-    "PERFECT:even_odd"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "mode_fusion",
-   "groupe": "aspect",
-   "libelle": "Mode de fusion",
-   "valeurs": "Normal | Multiply | Screen…",
-   "familles": [
+   "libelle": "Ombre, lueur, reflet, 3D",
+   "valeurs": "liste",
+   "portee": [
     "page",
-    "region",
+    "zone",
     "texte",
     "liste",
     "tableau",
+    "formule",
     "image",
     "vectoriel",
-    "donnees_visuelles",
-    "formule",
+    "visualisation",
+    "decoration",
     "annotation",
+    "lien",
     "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "PDF:BM",
-    "CSS:mix-blend-mode"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "espace_couleur",
-   "groupe": "aspect",
-   "libelle": "Espace colorimétrique",
-   "valeurs": "DeviceRGB | DeviceCMYK | DeviceGray | ICC | Indexed | Separation",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "PDF:ColorSpace",
-    "PERFECT:colorspace"
-   ],
-   "vysi": [
-    "icc_profile_ref"
+    "media"
    ]
   },
   {
@@ -4153,2761 +1410,1016 @@
    "groupe": "image",
    "libelle": "Dimensions en pixels",
    "valeurs": "px",
-   "familles": [
+   "portee": [
     "image"
-   ],
-   "sources": [
-    "PDF:Width/Height",
-    "VYSI:width_px, height_px",
-    "PERFECT:width_px, height_px"
-   ],
-   "vysi": [
-    "width_px",
-    "height_px"
    ]
   },
   {
-   "id": "resolution",
+   "id": "transparence_image",
    "groupe": "image",
-   "libelle": "Résolution effective",
-   "valeurs": "dpi",
-   "familles": [
+   "libelle": "Transparence de l'image (canal alpha, masque)",
+   "valeurs": "aucune | alpha | masque",
+   "portee": [
     "image"
-   ],
-   "sources": [
-    "VYSI:dpi",
-    "PERFECT:xres, yres"
-   ],
-   "vysi": [
-    "dpi"
    ]
-  },
-  {
-   "id": "profondeur_bits",
-   "groupe": "image",
-   "libelle": "Profondeur de couleur",
-   "valeurs": "bits par composante",
-   "familles": [
-    "image"
-   ],
-   "sources": [
-    "PDF:BitsPerComponent"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "compression",
-   "groupe": "image",
-   "libelle": "Format / compression",
-   "valeurs": "JPEG | JPX | Flate | JBIG2 | CCITT | PNG…",
-   "familles": [
-    "image"
-   ],
-   "sources": [
-    "PDF:Filter",
-    "PERFECT:ext"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "masque",
-   "groupe": "image",
-   "libelle": "Masque (doux, pochoir, couleur)",
-   "valeurs": "référence",
-   "familles": [
-    "image"
-   ],
-   "sources": [
-    "PDF:SMask/Mask/ImageMask",
-    "PERFECT:mask"
-   ],
-   "vysi": []
   },
   {
    "id": "recadrage",
    "groupe": "image",
-   "libelle": "Recadrage (haut, bas, gauche, droite)",
-   "valeurs": "%",
-   "familles": [
+   "libelle": "Recadrage",
+   "valeurs": "% (4 côtés)",
+   "portee": [
     "image"
-   ],
-   "sources": [
-    "OOXML-D:srcRect",
-    "CSS:object-position"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "ajustements_image",
-   "groupe": "image",
-   "libelle": "Luminosité, contraste, recoloration",
-   "valeurs": "valeurs",
-   "familles": [
-    "image"
-   ],
-   "sources": [
-    "OOXML-D:lum/duotone"
-   ],
-   "vysi": []
+   ]
   },
   {
    "id": "texte_alternatif",
    "groupe": "image",
    "libelle": "Texte alternatif",
    "valeurs": "chaîne",
-   "familles": [
+   "portee": [
     "image",
     "vectoriel",
-    "donnees_visuelles",
-    "formule"
-   ],
-   "sources": [
-    "PDF-TAG:Alt",
-    "OOXML-D:docPr descr",
-    "HTML:alt"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "orientation_exif",
-   "groupe": "image",
-   "libelle": "Orientation EXIF",
-   "valeurs": "entier",
-   "familles": [
-    "image"
-   ],
-   "sources": [
-    "VYSI:orientation"
-   ],
-   "vysi": [
-    "orientation"
+    "visualisation",
+    "formule",
+    "media"
    ]
   },
   {
-   "id": "interpolation",
-   "groupe": "image",
-   "libelle": "Interpolation",
-   "valeurs": "booléen",
-   "familles": [
-    "image"
-   ],
-   "sources": [
-    "PDF:Interpolate"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "contient_texte",
-   "groupe": "image",
-   "libelle": "Contient du texte lisible",
-   "valeurs": "booléen",
-   "familles": [
-    "image",
-    "donnees_visuelles"
-   ],
-   "sources": [
-    "VYSI:AD05 ocr"
-   ],
-   "vysi": [
-    "contains_text"
-   ]
-  },
-  {
-   "id": "geometrie_predefinie",
+   "id": "geometrie",
    "groupe": "forme",
-   "libelle": "Géométrie prédéfinie",
-   "valeurs": "nom (rect, ellipse, flèche…)",
-   "familles": [
-    "vectoriel"
-   ],
-   "sources": [
-    "OOXML-D:prstGeom"
-   ],
-   "vysi": [
-    "sp"
-   ]
-  },
-  {
-   "id": "chemin",
-   "groupe": "forme",
-   "libelle": "Chemin (opérateurs de tracé)",
-   "valeurs": "liste",
-   "familles": [
+   "libelle": "Géométrie (forme prédéfinie ou chemin, règle de remplissage)",
+   "valeurs": "nom | chemin",
+   "portee": [
     "vectoriel",
-    "decoration"
-   ],
-   "sources": [
-    "PDF:m/l/c/re/h",
-    "OOXML-D:custGeom",
-    "PERFECT:drawing items cmd/coords"
-   ],
-   "vysi": []
+    "decoration",
+    "page"
+   ]
   },
   {
    "id": "pointes_fleche",
    "groupe": "forme",
    "libelle": "Pointes de flèche (début, fin)",
    "valeurs": "énumération",
-   "familles": [
-    "vectoriel"
-   ],
-   "sources": [
-    "OOXML-D:headEnd/tailEnd",
-    "PDF:LE"
-   ],
-   "vysi": []
+   "portee": [
+    "vectoriel",
+    "visualisation"
+   ]
   },
   {
    "id": "connexions",
    "groupe": "forme",
-   "libelle": "Formes reliées (connecteur)",
-   "valeurs": "références",
-   "familles": [
-    "vectoriel"
-   ],
-   "sources": [
-    "OOXML-D:stCxn/endCxn"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "texte_interne",
-   "groupe": "forme",
-   "libelle": "Texte interne de la forme",
-   "valeurs": "référence",
-   "familles": [
-    "vectoriel"
-   ],
-   "sources": [
-    "OOXML-D:txBody"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "type_graphique",
-   "groupe": "donnees_visuelles",
-   "libelle": "Type de graphique",
-   "valeurs": "barres | courbes | secteurs | nuage…",
-   "familles": [
-    "donnees_visuelles"
-   ],
-   "sources": [
-    "OOXML-D:c:barChart/lineChart/pieChart…"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "series_donnees",
-   "groupe": "donnees_visuelles",
-   "libelle": "Séries et valeurs",
-   "valeurs": "tableau de données",
-   "familles": [
-    "donnees_visuelles"
-   ],
-   "sources": [
-    "OOXML-D:c:ser"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "axes",
-   "groupe": "donnees_visuelles",
-   "libelle": "Axes, titres, graduations",
-   "valeurs": "liste",
-   "familles": [
-    "donnees_visuelles"
-   ],
-   "sources": [
-    "OOXML-D:c:catAx/valAx"
-   ],
-   "vysi": [
-    "axis_label_for"
+   "libelle": "Éléments reliés par le connecteur",
+   "valeurs": "ids",
+   "portee": [
+    "vectoriel",
+    "visualisation"
    ]
   },
   {
-   "id": "legende_graphique",
-   "groupe": "donnees_visuelles",
-   "libelle": "Légende du graphique",
-   "valeurs": "référence",
-   "familles": [
-    "donnees_visuelles"
-   ],
-   "sources": [
-    "OOXML-D:c:legend"
-   ],
-   "vysi": [
-    "legend_for"
+   "id": "structure_graphique",
+   "groupe": "visualisation",
+   "libelle": "Type de graphique, séries, axes, légende",
+   "valeurs": "type + données",
+   "portee": [
+    "visualisation"
    ]
   },
   {
-   "id": "cible_lien",
-   "groupe": "navigation",
-   "libelle": "Cible (URI, page, destination)",
+   "id": "source_formule",
+   "groupe": "contenu_specifique",
+   "libelle": "Source de la formule",
+   "valeurs": "latex | mathml + chaîne",
+   "portee": [
+    "formule"
+   ]
+  },
+  {
+   "id": "langage_code",
+   "groupe": "contenu_specifique",
+   "libelle": "Langage du code",
+   "valeurs": "nom",
+   "portee": [
+    "texte",
+    "expression"
+   ]
+  },
+  {
+   "id": "texte_ruby",
+   "groupe": "contenu_specifique",
+   "libelle": "Texte de l'annotation ruby",
    "valeurs": "chaîne",
-   "familles": [
-    "navigation",
-    "annotation"
-   ],
-   "sources": [
-    "PDF:A/Dest",
-    "OOXML-W:r:id/anchor"
-   ],
-   "vysi": []
+   "portee": [
+    "en_ligne"
+   ]
   },
   {
-   "id": "type_annotation",
-   "groupe": "annotation",
-   "libelle": "Sous-type d'annotation",
-   "valeurs": "énumération PDF",
-   "familles": [
-    "annotation",
-    "navigation",
-    "formulaire"
-   ],
-   "sources": [
-    "PDF:Subtype",
-    "PERFECT:annotation type"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "contenu_annotation",
-   "groupe": "annotation",
-   "libelle": "Contenu, auteur, date",
-   "valeurs": "chaînes",
-   "familles": [
-    "annotation"
-   ],
-   "sources": [
-    "PDF:Contents/T/M",
-    "OOXML-W:author/date",
-    "PERFECT:content, title, subject"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "drapeaux_annotation",
-   "groupe": "annotation",
-   "libelle": "Drapeaux (masqué, imprimable, verrouillé)",
-   "valeurs": "bits",
-   "familles": [
+   "id": "sous_type",
+   "groupe": "contenu_specifique",
+   "libelle": "Sous-type (annotation, révision, champ de formulaire, champ calculé)",
+   "valeurs": "énumération selon le type",
+   "portee": [
     "annotation",
     "formulaire",
-    "navigation"
-   ],
-   "sources": [
-    "PDF:F",
-    "PERFECT:flags"
-   ],
-   "vysi": []
+    "en_ligne"
+   ]
+  },
+  {
+   "id": "cible",
+   "groupe": "contenu_specifique",
+   "libelle": "Cible (URI, page, élément, note)",
+   "valeurs": "chaîne / id",
+   "portee": [
+    "lien",
+    "annotation",
+    "en_ligne"
+   ]
+  },
+  {
+   "id": "auteur_date",
+   "groupe": "contenu_specifique",
+   "libelle": "Auteur et date d'une annotation ou d'une révision",
+   "valeurs": "chaîne + date",
+   "portee": [
+    "annotation"
+   ]
   },
   {
    "id": "nom_champ",
-   "groupe": "formulaire",
+   "groupe": "contenu_specifique",
    "libelle": "Nom du champ",
    "valeurs": "chaîne",
-   "familles": [
+   "portee": [
     "formulaire"
-   ],
-   "sources": [
-    "PDF:T"
-   ],
-   "vysi": []
+   ]
   },
   {
    "id": "valeur_champ",
-   "groupe": "formulaire",
-   "libelle": "Valeur et valeur par défaut",
-   "valeurs": "selon type",
-   "familles": [
+   "groupe": "contenu_specifique",
+   "libelle": "Valeur, valeur par défaut, options du champ",
+   "valeurs": "selon sous-type",
+   "portee": [
     "formulaire"
-   ],
-   "sources": [
-    "PDF:V/DV"
-   ],
-   "vysi": []
+   ]
   },
   {
-   "id": "options_champ",
-   "groupe": "formulaire",
-   "libelle": "Options (choix, longueur max, requis, lecture seule)",
-   "valeurs": "liste",
-   "familles": [
-    "formulaire"
-   ],
-   "sources": [
-    "PDF:Opt/MaxLen/Ff"
-   ],
-   "vysi": []
+   "id": "traduisible",
+   "groupe": "traduction",
+   "libelle": "Traduisible, et raison sinon",
+   "valeurs": "oui | non | partiel + raison",
+   "portee": [
+    "page",
+    "zone",
+    "texte",
+    "en_ligne",
+    "expression",
+    "liste",
+    "tableau",
+    "formule",
+    "visualisation",
+    "annotation",
+    "lien",
+    "formulaire",
+    "image",
+    "vectoriel",
+    "media"
+   ]
+  }
+ ],
+ "document": [
+  {
+   "id": "langue_declaree",
+   "libelle": "Langue déclarée",
+   "valeurs": "BCP 47"
+  },
+  {
+   "id": "metadonnees",
+   "libelle": "Titre, auteur, sujet, mots-clés, dates, producteur",
+   "valeurs": "chaînes / dates"
+  },
+  {
+   "id": "plan",
+   "libelle": "Plan et signets",
+   "valeurs": "arbre [titre, niveau, cible]"
+  }
+ ],
+ "page": [
+  {
+   "id": "libelle_page",
+   "libelle": "Libellé de page (numérotation logique : i, ii, 1…)",
+   "valeurs": "chaîne"
   },
   {
    "id": "taille_page",
-   "groupe": "page",
-   "libelle": "Taille de page",
-   "valeurs": "largeur, hauteur pt",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PDF:MediaBox",
-    "OOXML-W:pgSz",
-    "PERFECT:geometry.width/height"
-   ],
-   "vysi": [
-    "width_pt",
-    "height_pt"
-   ]
-  },
-  {
-   "id": "orientation_page",
-   "groupe": "page",
-   "libelle": "Orientation",
-   "valeurs": "portrait | paysage",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "OOXML-W:pgSz orient",
-    "PERFECT:geometry.orientation (portrait|landscape|square)"
-   ],
-   "vysi": []
+   "libelle": "Taille visible",
+   "valeurs": "largeur, hauteur pt"
   },
   {
    "id": "rotation_page",
-   "groupe": "page",
-   "libelle": "Rotation de page",
-   "valeurs": "0 | 90 | 180 | 270",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PDF:Rotate",
-    "PERFECT:geometry.rotation"
-   ],
-   "vysi": [
-    "rotation"
-   ]
-  },
-  {
-   "id": "boites_page",
-   "groupe": "page",
-   "libelle": "Boîtes de page",
-   "valeurs": "MediaBox, CropBox, BleedBox, TrimBox, ArtBox",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PDF:page boundaries",
-    "PERFECT:mediabox, cropbox, bleedbox, trimbox, artbox"
-   ],
-   "vysi": [
-    "box_refs"
-   ]
-  },
-  {
-   "id": "marges_page",
-   "groupe": "page",
-   "libelle": "Marges (haut, bas, gauche, droite, reliure)",
-   "valeurs": "pt",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "OOXML-W:pgMar",
-    "CSS:@page margin",
-    "PERFECT:margins left/right/top/bottom/inner/outer/binding"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "distance_en_tete_pied",
-   "groupe": "page",
-   "libelle": "Distance en-tête / pied de page",
-   "valeurs": "pt",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "OOXML-W:pgMar header/footer",
-    "PERFECT:margins header/footer"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "colonnes_section",
-   "groupe": "page",
-   "libelle": "Colonnes de section (nombre, espacement, séparateur)",
-   "valeurs": "entier + pt + booléen",
-   "familles": [
-    "page",
-    "region"
-   ],
-   "sources": [
-    "OOXML-W:cols",
-    "CSS:column-gap/column-rule",
-    "PERFECT:columns count"
-   ],
-   "vysi": [
-    "detected_column_count"
-   ]
-  },
-  {
-   "id": "numerotation_pages",
-   "groupe": "page",
-   "libelle": "Numérotation des pages (format, départ)",
-   "valeurs": "énumération + entier",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "OOXML-W:pgNumType",
-    "PDF:PageLabels",
-    "PERFECT:page_number_logical, page_label"
-   ],
-   "vysi": [
-    "physical_number"
-   ]
-  },
-  {
-   "id": "en_tetes_differents",
-   "groupe": "page",
-   "libelle": "En-tête première page / pair-impair différents",
-   "valeurs": "booléens",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "OOXML-W:titlePg, evenAndOddHeaders",
-    "PERFECT:margins even_odd_variation, first_page_variation"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "alignement_vertical_page",
-   "groupe": "page",
-   "libelle": "Alignement vertical de la page",
-   "valeurs": "énumération",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "OOXML-W:vAlign"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "grille_document",
-   "groupe": "page",
-   "libelle": "Grille du document (CJK)",
-   "valeurs": "type + pas pt",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "OOXML-W:docGrid"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "role_semantique",
-   "groupe": "semantique",
-   "libelle": "Rôle sémantique",
-   "valeurs": "vocabulaire semantic_role FT01",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:semantic_role"
-   ],
-   "vysi": [
-    "semantic_role",
-    "role"
-   ]
-  },
-  {
-   "id": "type_noeud_structure",
-   "groupe": "semantique",
-   "libelle": "Type de nœud de structure",
-   "valeurs": "vocabulaire structure_node_kind FT01",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:structure_node_kind"
-   ],
-   "vysi": [
-    "node_kind"
-   ]
-  },
-  {
-   "id": "type_cadre",
-   "groupe": "semantique",
-   "libelle": "Type de cadre",
-   "valeurs": "vocabulaire frame_type FT01",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "annotation",
-    "formulaire",
-    "media",
-    "decoration"
-   ],
-   "sources": [
-    "VYSI:frame_type"
-   ],
-   "vysi": [
-    "frame_type"
-   ]
-  },
-  {
-   "id": "nature_contenu",
-   "groupe": "semantique",
-   "libelle": "Nature du contenu",
-   "valeurs": "vocabulaire content_nature FT01",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:content_nature, AD11 content_classes"
-   ],
-   "vysi": [
-    "content_classes"
-   ]
-  },
-  {
-   "id": "domaine",
-   "groupe": "semantique",
-   "libelle": "Domaine",
-   "valeurs": "vocabulaire domain FT01",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:domain"
-   ],
-   "vysi": [
-    "domain_labels"
-   ]
-  },
-  {
-   "id": "eligibilite_traduction",
-   "groupe": "semantique",
-   "libelle": "Éligibilité à la traduction",
-   "valeurs": "eligible | partial | ineligible | review | none",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:translation_eligibility",
-    "PERFECT:translatable, non_translatable_reason"
-   ],
-   "vysi": [
-    "translation_eligibility",
-    "translatability"
-   ]
-  },
-  {
-   "id": "politique_protection",
-   "groupe": "semantique",
-   "libelle": "Politique de protection",
-   "valeurs": "translate | preserve_exact | preserve_structure | …",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:protection_policy, handling_policy"
-   ],
-   "vysi": [
-    "handling_policy",
-    "unit_policy",
-    "protected"
-   ]
-  },
-  {
-   "id": "segments_langue",
-   "groupe": "semantique",
-   "libelle": "Segments de langue",
-   "valeurs": "liste [début, fin, langue, écriture, direction]",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "VYSI:AD11 language_segments",
-    "PERFECT:text.languages"
-   ],
-   "vysi": [
-    "language_segments"
-   ]
-  },
-  {
-   "id": "parent",
-   "groupe": "relations",
-   "libelle": "Élément parent",
-   "valeurs": "référence",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:parent_id, parent_unit_id"
-   ],
-   "vysi": [
-    "parent_id",
-    "parent_unit_id",
-    "parent_frame_id"
-   ]
-  },
-  {
-   "id": "enfants",
-   "groupe": "relations",
-   "libelle": "Éléments enfants",
-   "valeurs": "références",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:child_unit_ids"
-   ],
-   "vysi": [
-    "child_unit_ids",
-    "child_frame_ids"
-   ]
-  },
-  {
-   "id": "suivant_precedent",
-   "groupe": "relations",
-   "libelle": "Suivant / précédent (lecture)",
-   "valeurs": "références",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:AD09 next, cross_page_next"
-   ],
-   "vysi": [
-    "next",
-    "cross_page_next"
-   ]
-  },
-  {
-   "id": "continuation",
-   "groupe": "relations",
-   "libelle": "Continuation (débordement, suite sur autre page)",
-   "valeurs": "référence",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:continues, continuation_of"
-   ],
-   "vysi": [
-    "continues",
-    "continuation_of"
-   ]
-  },
-  {
-   "id": "relations_semantiques",
-   "groupe": "relations",
-   "libelle": "Relations sémantiques",
-   "valeurs": "caption_of | note_for | label_for | references | legend_for | header_of | …",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "VYSI:AD10 semantic_relation",
-    "PERFECT:relationships caption_for_image, caption_for_table, text_context_for_special_region"
-   ],
-   "vysi": [
-    "caption_of",
-    "note_for",
-    "label_for",
-    "illustrates",
-    "callout_for",
-    "unit_for"
-   ]
-  },
-  {
-   "id": "source_chemin",
-   "groupe": "document_source",
-   "libelle": "Chemin et nom du fichier source",
-   "valeurs": "chaînes",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:source"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "source_extension_mime",
-   "groupe": "document_source",
-   "libelle": "Extension, type MIME, format détecté",
-   "valeurs": "chaînes",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:source"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "source_taille",
-   "groupe": "document_source",
-   "libelle": "Taille du fichier",
-   "valeurs": "octets",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:source"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "source_empreinte",
-   "groupe": "document_source",
-   "libelle": "Empreinte du fichier",
-   "valeurs": "SHA-256",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:source"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "source_dates_fichier",
-   "groupe": "document_source",
-   "libelle": "Dates de création / modification du fichier",
-   "valeurs": "ISO 8601",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:source"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_nombre_pages",
-   "groupe": "document_pdf",
-   "libelle": "Nombre de pages",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_version",
-   "groupe": "document_pdf",
-   "libelle": "Version PDF",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_chiffrement",
-   "groupe": "document_pdf",
-   "libelle": "Chiffré / mot de passe requis",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_permissions",
-   "groupe": "document_pdf",
-   "libelle": "Permissions",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_flux_xref",
-   "groupe": "document_pdf",
-   "libelle": "Flux de références croisées",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_calques",
-   "groupe": "document_pdf",
-   "libelle": "Présence de calques",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_formulaire",
-   "groupe": "document_pdf",
-   "libelle": "Présence d'un formulaire",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_annotations",
-   "groupe": "document_pdf",
-   "libelle": "Présence d'annotations",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_pieces_jointes",
-   "groupe": "document_pdf",
-   "libelle": "Présence de pièces jointes",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_structure_balisee",
-   "groupe": "document_pdf",
-   "libelle": "Structure balisée (Tagged PDF)",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_accessibilite",
-   "groupe": "document_pdf",
-   "libelle": "Accessibilité",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_ocr_preexistant",
-   "groupe": "document_pdf",
-   "libelle": "OCR déjà présent",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_texte_invisible",
-   "groupe": "document_pdf",
-   "libelle": "Texte invisible",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_texte_vectorise",
-   "groupe": "document_pdf",
-   "libelle": "Texte vectorisé (converti en tracés)",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_pages_numerisees",
-   "groupe": "document_pdf",
-   "libelle": "Pages numérisées",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_polices_incorporees",
-   "groupe": "document_pdf",
-   "libelle": "Polices incorporées",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_polices_substituees",
-   "groupe": "document_pdf",
-   "libelle": "Polices substituées",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_images_haute_resolution",
-   "groupe": "document_pdf",
-   "libelle": "Images haute résolution",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_transparence",
-   "groupe": "document_pdf",
-   "libelle": "Transparence",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "pdf_vecteurs_complexes",
-   "groupe": "document_pdf",
-   "libelle": "Vecteurs complexes",
-   "valeurs": "booléen / valeur",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:pdf"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_titre",
-   "groupe": "document_metadonnees",
-   "libelle": "Titre",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_auteur",
-   "groupe": "document_metadonnees",
-   "libelle": "Auteur",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_sujet",
-   "groupe": "document_metadonnees",
-   "libelle": "Sujet",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_mots_cles",
-   "groupe": "document_metadonnees",
-   "libelle": "Mots-clés",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_langue_declaree",
-   "groupe": "document_metadonnees",
-   "libelle": "Langue déclarée",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_langues_detectees",
-   "groupe": "document_metadonnees",
-   "libelle": "Langues détectées",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_dates",
-   "groupe": "document_metadonnees",
-   "libelle": "Dates de création / modification",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_producteur_createur",
-   "groupe": "document_metadonnees",
-   "libelle": "Producteur, créateur, application source et version",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_identifiant",
-   "groupe": "document_metadonnees",
-   "libelle": "Identifiant unique",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_droits",
-   "groupe": "document_metadonnees",
-   "libelle": "Copyright",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_classification_statut",
-   "groupe": "document_metadonnees",
-   "libelle": "Classification, statut",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_modele",
-   "groupe": "document_metadonnees",
-   "libelle": "Modèle (template)",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_revisions",
-   "groupe": "document_metadonnees",
-   "libelle": "Nombre de révisions, historique",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "meta_commentaires_internes",
-   "groupe": "document_metadonnees",
-   "libelle": "Commentaires internes",
-   "valeurs": "chaîne / date / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:metadata",
-    "PDF:Info/XMP"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "ressources_polices",
-   "groupe": "document_ressources",
-   "libelle": "Polices (xref, type, nom, clé normalisée, nom de ressource, encodage, incorporée, chemin, sous-ensemble, substitution)",
-   "valeurs": "liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:resources.fonts, _extract_page_fonts",
-    "PDF:Font"
-   ],
-   "vysi": [
-    "font"
-   ]
-  },
-  {
-   "id": "ressources_autres",
-   "groupe": "document_ressources",
-   "libelle": "Images, espaces couleur, XObjects, motifs",
-   "valeurs": "listes",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:resources",
-    "PDF:Resources"
-   ],
-   "vysi": [
-    "image",
-    "theme"
-   ]
-  },
-  {
-   "id": "styles_globaux",
-   "groupe": "document_ressources",
-   "libelle": "Styles globaux du document",
-   "valeurs": "liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:global_styles",
-    "OOXML-W:styles"
-   ],
-   "vysi": [
-    "style_definition"
-   ]
-  },
-  {
-   "id": "profil_type_probable",
-   "groupe": "document_profil",
-   "libelle": "Type probable du document",
-   "valeurs": "valeur / booléens / score",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:document_profile"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "profil_dominantes",
-   "groupe": "document_profil",
-   "libelle": "Orientation, style et nombre de colonnes dominants",
-   "valeurs": "valeur / booléens / score",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:document_profile"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "profil_presences",
-   "groupe": "document_profil",
-   "libelle": "Présence de tableaux, figures, graphiques, formules, code, notes, références, pagination, en-têtes, pieds, filigrane, logo, tampon, signature, écriture manuscrite",
-   "valeurs": "valeur / booléens / score",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:document_profile"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "profil_complexite",
-   "groupe": "document_profil",
-   "libelle": "Complexité visuelle et linguistique",
-   "valeurs": "valeur / booléens / score",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:document_profile"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "profil_qualite",
-   "groupe": "document_profil",
-   "libelle": "Qualité du document et de l'OCR",
-   "valeurs": "valeur / booléens / score",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:document_profile"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "profil_reconstructibilite",
-   "groupe": "document_profil",
-   "libelle": "Score de reconstructibilité",
-   "valeurs": "valeur / booléens / score",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:document_profile"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "numero_physique_logique",
-   "groupe": "page",
-   "libelle": "Numéro physique, numéro logique, libellé de page",
-   "valeurs": "entier / chaîne",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "format_probable",
-   "groupe": "page",
-   "libelle": "Format probable",
-   "valeurs": "A4 | A5 | Letter | Legal | custom",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "zones_page",
-   "groupe": "page",
-   "libelle": "Zones imprimable, visible, de contenu",
-   "valeurs": "bbox pt",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "rapport_aspect",
-   "groupe": "page",
-   "libelle": "Rapport largeur / hauteur",
-   "valeurs": "nombre",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "dpi_page",
-   "groupe": "page",
-   "libelle": "DPI cible et natif",
-   "valeurs": "dpi",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "marges_estimees",
-   "groupe": "page",
-   "libelle": "Marges visibles et probables",
-   "valeurs": "pt",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "alignement_contenu_page",
-   "groupe": "page",
-   "libelle": "Alignement du contenu dans la page",
-   "valeurs": "énumération",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "grille_page",
-   "groupe": "page",
-   "libelle": "Grilles verticale, horizontale, de ligne de base ; pas de ligne dominant ; paragraphes alignés sur la grille",
-   "valeurs": "pt / booléen",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "arriere_plan_detail",
-   "groupe": "page",
-   "libelle": "Arrière-plan : couleur, image, texture, papier numérisé, bruit, ombre, dégradé, filigrane, motif, bordure, fond vectoriel, fond raster, transparence, calques",
-   "valeurs": "valeurs",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "image_page_rendue",
-   "groupe": "page",
-   "libelle": "Image rendue de la page (pour l'IA)",
-   "valeurs": "référence + dpi",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "colonnes_detail",
-   "groupe": "page",
-   "libelle": "Colonnes : largeurs, gouttières, bornes, sens de lecture, symétrie, barre latérale, sauts, blocs à cheval",
-   "valeurs": "pt / liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "source_texte_page",
-   "groupe": "page",
-   "libelle": "Source du texte retenue",
-   "valeurs": "native_pdf | ocr | aucune",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page.geometry/background/columns/grid/text"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "profil_casse",
-   "groupe": "caractere",
-   "libelle": "Profil de casse (type, casse à préserver, acronymes, lettres, mots, ratio de majuscules)",
-   "valeurs": "all_caps | lower | title_case | sentence_case | mixed | numeric | symbolic",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PERFECT:case_profile"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "cle_police_normalisee",
-   "groupe": "caractere",
-   "libelle": "Clé de police normalisée",
-   "valeurs": "chaîne",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PERFECT:font_key_normalized"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "drapeaux_police",
-   "groupe": "caractere",
-   "libelle": "Drapeaux bruts de police (serif, chasse fixe, gras, italique, symbolique, exposant)",
-   "valeurs": "entier + booléens",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PERFECT:flags",
-    "PDF:FontDescriptor Flags"
-   ],
-   "vysi": [
-    "font_flags"
-   ]
-  },
-  {
-   "id": "categorie_unicode",
-   "groupe": "caractere",
-   "libelle": "Catégorie Unicode, espace, symbole mathématique",
-   "valeurs": "catégorie + booléens",
-   "familles": [
-    "granularite"
-   ],
-   "sources": [
-    "PERFECT:chars unicode_category, is_whitespace, is_math_symbol"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "comptages_texte",
-   "groupe": "caractere",
-   "libelle": "Nombre de caractères, mots, lignes, blocs",
-   "valeurs": "entiers",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PERFECT:char_count, word_count, line_count, block_count"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "resume_style",
-   "groupe": "caractere",
-   "libelle": "Résumé des styles du bloc",
-   "valeurs": "style dominant + liste",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PERFECT:style_summary"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "appartenance",
-   "groupe": "relations",
-   "libelle": "Appartenance (légende de, tableau, formule)",
-   "valeurs": "références",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PERFECT:semantic caption_for, table_membership, formula_membership"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "index_paragraphe",
-   "groupe": "position",
-   "libelle": "Index de paragraphe",
-   "valeurs": "entier",
-   "familles": [
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "formule",
-    "expression_speciale"
-   ],
-   "sources": [
-    "PERFECT:layout.paragraph_index"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "contraintes_reconstruction",
-   "groupe": "reconstruction",
-   "libelle": "Conserver bbox / taille / casse / couleur / styles ; autoriser recomposition, expansion horizontale / verticale, chevauchement ; rendu obligatoire",
-   "valeurs": "booléens",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PERFECT:reconstruction_constraints"
-   ],
-   "vysi": [
-    "page_locked",
-    "font_size_locked",
-    "line_spacing_locked"
-   ]
-  },
-  {
-   "id": "contraintes_page",
-   "groupe": "reconstruction",
-   "libelle": "Taille de page identique, tout le texte rendu, obstacles fixes, repositionnement en cascade, formules et images figées",
-   "valeurs": "booléens + liste",
-   "familles": [
-    "page"
-   ],
-   "sources": [
-    "PERFECT:page reconstruction_constraints"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "preserver_visuel",
-   "groupe": "reconstruction",
-   "libelle": "Doit préserver le visuel",
-   "valeurs": "booléen",
-   "familles": [
-    "image",
-    "vectoriel",
-    "region",
-    "formule"
-   ],
-   "sources": [
-    "PERFECT:must_preserve_visual"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "qualite_extraction",
-   "groupe": "qualite",
-   "libelle": "Score de présence des champs, avertissements, score de reconstructibilité, OCR utilisé, texte natif disponible, blocs sans style",
-   "valeurs": "scores + liste",
-   "familles": [
-    "page",
-    "region",
-    "texte",
-    "en_ligne",
-    "granularite",
-    "liste",
-    "tableau",
-    "image",
-    "vectoriel",
-    "donnees_visuelles",
-    "formule",
-    "expression_speciale",
-    "annotation",
-    "navigation",
-    "formulaire",
-    "media",
-    "decoration",
-    "inconnu"
-   ],
-   "sources": [
-    "PERFECT:quality_report"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "alpha_image",
-   "groupe": "image",
-   "libelle": "Canal alpha",
-   "valeurs": "booléen",
-   "familles": [
-    "image"
-   ],
-   "sources": [
-    "PERFECT:images alpha"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "xref",
-   "groupe": "identite",
-   "libelle": "Référence d'objet PDF (xref)",
-   "valeurs": "entier",
-   "familles": [
-    "image",
-    "vectoriel",
-    "page"
-   ],
-   "sources": [
-    "PERFECT:xref",
-    "PDF:indirect object"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "role_dessin",
-   "groupe": "forme",
-   "libelle": "Rôle d'un dessin",
-   "valeurs": "background_rect | rule_line | vertical_rule | shape",
-   "familles": [
-    "vectoriel",
-    "decoration"
-   ],
-   "sources": [
-    "PERFECT:_classify_drawing"
-   ],
-   "vysi": []
-  },
-  {
-   "id": "type_dessin",
-   "groupe": "forme",
-   "libelle": "Type de tracé (remplissage, contour, les deux), chemin fermé",
-   "valeurs": "f | s | fs ; booléen",
-   "familles": [
-    "vectoriel",
-    "decoration"
-   ],
-   "sources": [
-    "PERFECT:drawing type, close_path"
-   ],
-   "vysi": []
+   "libelle": "Rotation",
+   "valeurs": "0 | 90 | 180 | 270"
   }
  ],
- "proprietes_bbox": [
+ "exclusions": [
   {
-   "id": "type_boite",
-   "groupe": "identite",
-   "libelle": "Type de la boîte",
-   "valeurs": "élément | ligne | mot | glyphe | zone | colonne | groupe | page",
-   "sources": [
-    "VYSI:AD07 hierarchy levels"
-   ],
-   "vysi": [
-    "level",
-    "unit_kind"
-   ]
+   "nom": "semantic_role",
+   "raison": "doublon",
+   "remplace_par": "type"
   },
   {
-   "id": "type_element",
-   "groupe": "identite",
-   "libelle": "Type de l'élément contenu (référentiel)",
-   "valeurs": "id d'élément",
-   "sources": [
-    "VYSI:semantic_role"
-   ],
-   "vysi": [
-    "semantic_role"
-   ]
+   "nom": "structure_node_kind",
+   "raison": "doublon",
+   "remplace_par": "type"
   },
   {
-   "id": "etiquette_detecteur",
-   "groupe": "identite",
-   "libelle": "Étiquette brute du détecteur et son score",
-   "valeurs": "étiquette + 0..1",
-   "sources": [
-    "PADDLEX:label",
-    "VYSI:candidate_class"
-   ],
-   "vysi": [
-    "candidate_class"
-   ]
+   "nom": "frame_type",
+   "raison": "doublon",
+   "remplace_par": "type"
   },
   {
-   "id": "origine_boite",
-   "groupe": "identite",
-   "libelle": "Origine de la boîte",
-   "valeurs": "native | detecteur | calculee",
-   "sources": [
-    "VYSI:geometry source/method"
-   ],
-   "vysi": [
-    "source",
-    "method"
-   ]
+   "nom": "role_semantique",
+   "raison": "doublon",
+   "remplace_par": "type"
   },
   {
-   "id": "coordonnees",
-   "groupe": "geometrie",
-   "libelle": "x, y, largeur, hauteur",
-   "valeurs": "pt",
-   "sources": [
-    "VYSI:bbox",
-    "PERFECT:bbox"
-   ],
-   "vysi": [
-    "bbox"
-   ]
+   "nom": "object_type",
+   "raison": "doublon",
+   "remplace_par": "type"
   },
   {
-   "id": "systeme_coordonnees",
-   "groupe": "geometrie",
-   "libelle": "Système de coordonnées (origine, axes, unité)",
-   "valeurs": "top_left | bottom_left ; pt | px | emu",
-   "sources": [
-    "VYSI:coordinate_space"
-   ],
-   "vysi": [
-    "coordinate_space_ref",
-    "origin",
-    "unit"
-   ]
+   "nom": "font_family",
+   "raison": "doublon",
+   "remplace_par": "police"
   },
   {
-   "id": "rotation_boite",
-   "groupe": "geometrie",
-   "libelle": "Rotation de la boîte",
-   "valeurs": "degrés",
-   "sources": [
-    "OOXML-D:xfrm rot"
-   ],
-   "vysi": [
-    "rotation"
-   ]
+   "nom": "font_postscript_name",
+   "raison": "doublon",
+   "remplace_par": "police"
   },
   {
-   "id": "forme_boite",
-   "groupe": "geometrie",
-   "libelle": "Forme exacte (quad, polygone)",
-   "valeurs": "points",
-   "sources": [
-    "VYSI:quad, polygon"
-   ],
-   "vysi": [
-    "quad",
-    "polygon"
-   ]
+   "nom": "embedded_font_path",
+   "raison": "doublon",
+   "remplace_par": "police"
   },
   {
-   "id": "approximation",
-   "groupe": "geometrie",
-   "libelle": "Géométrie approximative",
-   "valeurs": "booléen",
-   "sources": [
-    "VYSI:approximate"
-   ],
-   "vysi": [
-    "approximate"
-   ]
+   "nom": "classe_police",
+   "raison": "doublon",
+   "remplace_par": "police"
   },
   {
-   "id": "nb_lignes",
-   "groupe": "agencement_interne",
-   "libelle": "Nombre de lignes",
-   "valeurs": "entier",
-   "sources": [
-    "VYSI:line_bboxes",
-    "PERFECT:line_count"
-   ],
-   "vysi": [
-    "line_bboxes"
-   ]
+   "nom": "font_flags",
+   "raison": "doublon",
+   "remplace_par": "police"
   },
   {
-   "id": "nb_colonnes_internes",
-   "groupe": "agencement_interne",
-   "libelle": "Colonnes internes",
-   "valeurs": "entier + gouttières pt",
-   "sources": [
-    "CSS:column-count"
-   ],
-   "vysi": []
+   "nom": "cle_police_normalisee",
+   "raison": "recalculable",
+   "remplace_par": null
   },
   {
-   "id": "sens_flux",
-   "groupe": "agencement_interne",
-   "libelle": "Sens du flux (écriture, empilement des lignes)",
-   "valeurs": "ltr | rtl | ttb",
-   "sources": [
-    "CSS:writing-mode, direction"
-   ],
-   "vysi": [
-    "direction",
-    "writing_mode"
-   ]
+   "nom": "size_pt",
+   "raison": "doublon",
+   "remplace_par": "taille"
   },
   {
-   "id": "alignement_lignes",
-   "groupe": "agencement_interne",
-   "libelle": "Alignement observé des lignes",
-   "valeurs": "gauche | centre | droite | justifie",
-   "sources": [
-    "CSS:text-align"
-   ],
-   "vysi": [
-    "align",
-    "source_align"
-   ]
+   "nom": "bold",
+   "raison": "doublon",
+   "remplace_par": "graisse"
   },
   {
-   "id": "alignement_vertical_contenu",
-   "groupe": "agencement_interne",
-   "libelle": "Alignement vertical du contenu",
-   "valeurs": "haut | centre | bas",
-   "sources": [
-    "CSS:align-content",
-    "OOXML-D:bodyPr anchor"
-   ],
-   "vysi": [
-    "vertical_align"
-   ]
+   "nom": "italic",
+   "raison": "doublon",
+   "remplace_par": "italique"
   },
   {
-   "id": "interligne_mesure",
-   "groupe": "agencement_interne",
-   "libelle": "Interligne mesuré",
-   "valeurs": "pt + ratio",
-   "sources": [
-    "VYSI:line_height_ratio"
-   ],
-   "vysi": [
-    "line_height_ratio"
-   ]
+   "nom": "color_rgb",
+   "raison": "doublon",
+   "remplace_par": "couleur"
   },
   {
-   "id": "espacement_blocs_internes",
-   "groupe": "agencement_interne",
-   "libelle": "Espacement entre blocs internes",
-   "valeurs": "pt",
-   "sources": [
-    "CSS:margin"
-   ],
-   "vysi": []
+   "nom": "fill_color",
+   "raison": "doublon",
+   "remplace_par": "couleur"
   },
   {
-   "id": "marges_internes",
-   "groupe": "agencement_interne",
-   "libelle": "Marges internes (padding)",
-   "valeurs": "pt (4 côtés)",
-   "sources": [
-    "CSS:padding",
-    "OOXML-D:bodyPr lIns/tIns/rIns/bIns",
-    "VYSI:padding"
-   ],
-   "vysi": [
-    "padding"
-   ]
+   "nom": "stroke_color",
+   "raison": "doublon",
+   "remplace_par": "couleur_contour"
   },
   {
-   "id": "retraits_observes",
-   "groupe": "agencement_interne",
-   "libelle": "Retraits observés (gauche, première ligne)",
-   "valeurs": "pt",
-   "sources": [
-    "OOXML-W:ind"
-   ],
-   "vysi": []
+   "nom": "opacite_texte",
+   "raison": "doublon",
+   "remplace_par": "opacite"
   },
   {
-   "id": "taquets_observes",
-   "groupe": "agencement_interne",
-   "libelle": "Alignements internes en colonnes (tabulations)",
-   "valeurs": "positions pt",
-   "sources": [
-    "OOXML-W:tabs"
-   ],
-   "vysi": []
+   "nom": "superscript",
+   "raison": "doublon",
+   "remplace_par": "position_verticale"
   },
   {
-   "id": "grille_interne",
-   "groupe": "agencement_interne",
-   "libelle": "Grille interne (cellules)",
-   "valeurs": "lignes × colonnes",
-   "sources": [
-    "OOXML-W:tblGrid"
-   ],
-   "vysi": []
+   "nom": "subscript",
+   "raison": "doublon",
+   "remplace_par": "position_verticale"
   },
   {
-   "id": "marqueurs_internes",
-   "groupe": "agencement_interne",
-   "libelle": "Puces / numéros internes",
-   "valeurs": "liste",
-   "sources": [
-    "OOXML-W:numPr"
-   ],
-   "vysi": []
+   "nom": "text_rise",
+   "raison": "doublon",
+   "remplace_par": "position_verticale"
   },
   {
-   "id": "densite_encre",
-   "groupe": "agencement_interne",
-   "libelle": "Densité / taux de remplissage",
-   "valeurs": "0..1",
-   "sources": [
-    "VYSI:AD06 visual primitives"
-   ],
-   "vysi": []
+   "nom": "indice_exposant",
+   "raison": "doublon",
+   "remplace_par": "position_verticale"
   },
   {
-   "id": "debordement",
-   "groupe": "agencement_interne",
-   "libelle": "Débordement du contenu",
-   "valeurs": "aucun | coupe | deborde",
-   "sources": [
-    "CSS:overflow",
-    "VYSI:overflow_policy"
-   ],
-   "vysi": [
-    "overflow_policy"
-   ]
+   "nom": "small_caps",
+   "raison": "doublon",
+   "remplace_par": "capitales"
   },
   {
-   "id": "segments_style",
-   "groupe": "style_interne",
-   "libelle": "Segments de style successifs (runs)",
-   "valeurs": "liste [début, fin, style]",
-   "sources": [
-    "OOXML-W:r",
-    "VYSI:style_runs"
-   ],
-   "vysi": [
-    "style_runs",
-    "style_run_refs"
-   ]
+   "nom": "all_caps",
+   "raison": "doublon",
+   "remplace_par": "capitales"
   },
   {
-   "id": "style_dominant",
-   "groupe": "style_interne",
-   "libelle": "Style dominant",
-   "valeurs": "police, taille, couleur, graisse",
-   "sources": [
-    "VYSI:dominant_font_name/size",
-    "PERFECT:style_summary"
-   ],
-   "vysi": [
-    "dominant_font_name",
-    "dominant_font_size"
-   ]
+   "nom": "profil_casse",
+   "raison": "doublon",
+   "remplace_par": "casse"
   },
   {
-   "id": "signature_style",
-   "groupe": "style_interne",
-   "libelle": "Signature de style",
-   "valeurs": "empreinte",
-   "sources": [
-    "VYSI:style_signature"
-   ],
-   "vysi": [
-    "style_signature"
-   ]
+   "nom": "marque_emphase",
+   "raison": "doublon",
+   "remplace_par": "effets_texte"
   },
   {
-   "id": "homogeneite_style",
-   "groupe": "style_interne",
-   "libelle": "Homogénéité (nombre de styles distincts)",
-   "valeurs": "entier",
-   "sources": [
-    "VYSI:style_runs"
-   ],
-   "vysi": []
+   "nom": "direction",
+   "raison": "doublon",
+   "remplace_par": "sens_ecriture"
   },
   {
-   "id": "couleurs_presentes",
-   "groupe": "style_interne",
-   "libelle": "Couleurs présentes",
-   "valeurs": "liste",
-   "sources": [
-    "PDF:fill/stroke colors"
-   ],
-   "vysi": []
+   "nom": "mode_ecriture",
+   "raison": "doublon",
+   "remplace_par": "sens_ecriture"
   },
   {
-   "id": "ordre_lecture_boite",
-   "groupe": "disposition",
-   "libelle": "Ordre de lecture",
-   "valeurs": "index",
-   "sources": [
-    "VYSI:AD09",
-    "PERFECT:reading_order"
-   ],
-   "vysi": [
-    "reading_order_index"
-   ]
+   "nom": "sens_flux",
+   "raison": "doublon",
+   "remplace_par": "sens_ecriture"
   },
   {
-   "id": "ordre_empilement_boite",
-   "groupe": "disposition",
-   "libelle": "Ordre d'empilement",
-   "valeurs": "entier",
-   "sources": [
-    "CSS:z-index",
-    "VYSI:z_order",
-    "PERFECT:render_order z_index"
-   ],
-   "vysi": [
-    "z_order"
-   ]
+   "nom": "orientation_texte_cellule",
+   "raison": "doublon",
+   "remplace_par": "sens_ecriture"
   },
   {
-   "id": "conteneur",
-   "groupe": "disposition",
-   "libelle": "Conteneur parent et enfants",
-   "valeurs": "références",
-   "sources": [
-    "VYSI:FT03 parent_frame_id"
-   ],
-   "vysi": [
-    "parent_frame_id",
-    "child_frame_ids"
-   ]
+   "nom": "masque",
+   "raison": "doublon",
+   "remplace_par": "visibilite"
   },
   {
-   "id": "voisins",
-   "groupe": "disposition",
-   "libelle": "Voisins (gauche, droite, dessus, dessous) et distances",
-   "valeurs": "références + pt",
-   "sources": [
-    "VYSI:AD09 edges"
-   ],
-   "vysi": []
+   "nom": "texte_invisible",
+   "raison": "doublon",
+   "remplace_par": "visibilite"
   },
   {
-   "id": "alignements_voisins",
-   "groupe": "disposition",
-   "libelle": "Bords alignés avec d'autres boîtes",
-   "valeurs": "références",
-   "sources": [
-    "VYSI:AD06 alignment_axis"
-   ],
-   "vysi": [
-    "alignment_axis"
-   ]
+   "nom": "retrait_suspendu",
+   "raison": "doublon",
+   "remplace_par": "retraits"
   },
   {
-   "id": "chevauchements",
-   "groupe": "disposition",
-   "libelle": "Chevauchements",
-   "valeurs": "références + aire",
-   "sources": [
-    "VYSI:collision_status"
-   ],
-   "vysi": [
-    "collision_status"
-   ]
+   "nom": "retrait_premiere_ligne",
+   "raison": "doublon",
+   "remplace_par": "retraits"
   },
   {
-   "id": "couloir_boite",
-   "groupe": "disposition",
-   "libelle": "Couloir / zone de page",
-   "valeurs": "header | body | footnote | footer | marginalia",
-   "sources": [
-    "VYSI:lane"
-   ],
-   "vysi": [
-    "lane",
-    "participation"
-   ]
+   "nom": "heading_level",
+   "raison": "doublon",
+   "remplace_par": "niveau_hierarchique"
   },
   {
-   "id": "ancrage_boite",
-   "groupe": "disposition",
-   "libelle": "Ancrage et habillage",
-   "valeurs": "en_ligne | flottant ; habillage",
-   "sources": [
-    "OOXML-D:wp:anchor"
-   ],
-   "vysi": []
+   "nom": "list_level",
+   "raison": "doublon",
+   "remplace_par": "niveau_hierarchique"
   },
   {
-   "id": "contraintes",
-   "groupe": "disposition",
-   "libelle": "Contraintes (contenance, débordement, redimensionnement, déplacement)",
-   "valeurs": "politiques FT03",
-   "sources": [
-    "VYSI:FT03 constraints"
-   ],
-   "vysi": [
-    "containment_policy",
-    "overflow_policy",
-    "resize_policy",
-    "movement_policy"
-   ]
+   "nom": "type_liste",
+   "raison": "doublon",
+   "remplace_par": "format_marqueur"
   },
   {
-   "id": "budget_mise_en_page",
-   "groupe": "disposition",
-   "libelle": "Budget de mise en page (caractères max, boîte de rendu)",
-   "valeurs": "entiers + boîte",
-   "sources": [
-    "VYSI:layout_budget"
-   ],
-   "vysi": [
-    "layout_budget"
-   ]
+   "nom": "valeur_depart",
+   "raison": "doublon",
+   "remplace_par": "valeur_numero"
   },
   {
-   "id": "fond_boite",
-   "groupe": "presentation",
-   "libelle": "Fond (couleur, motif, dégradé, image)",
-   "valeurs": "couleur / référence",
-   "sources": [
-    "CSS:background"
-   ],
-   "vysi": []
+   "nom": "valeur_marqueur",
+   "raison": "doublon",
+   "remplace_par": "valeur_numero"
   },
   {
-   "id": "bordure_boite",
-   "groupe": "presentation",
-   "libelle": "Bordure",
-   "valeurs": "côtés + style + pt + couleur",
-   "sources": [
-    "CSS:border"
-   ],
-   "vysi": [
-    "visual_border_ref"
-   ]
+   "nom": "bordure",
+   "raison": "doublon",
+   "remplace_par": "contour"
   },
   {
-   "id": "ombre_boite",
-   "groupe": "presentation",
-   "libelle": "Ombre",
-   "valeurs": "valeurs",
-   "sources": [
-    "CSS:box-shadow"
-   ],
-   "vysi": []
+   "nom": "trait",
+   "raison": "doublon",
+   "remplace_par": "contour"
   },
   {
-   "id": "coins_boite",
-   "groupe": "presentation",
-   "libelle": "Coins arrondis",
-   "valeurs": "pt",
-   "sources": [
-    "CSS:border-radius"
-   ],
-   "vysi": []
+   "nom": "bordure_paragraphe",
+   "raison": "doublon",
+   "remplace_par": "contour"
   },
   {
-   "id": "opacite_boite",
-   "groupe": "presentation",
-   "libelle": "Opacité",
-   "valeurs": "0..1",
-   "sources": [
-    "CSS:opacity"
-   ],
-   "vysi": [
-    "opacity"
-   ]
+   "nom": "couleur_fond",
+   "raison": "doublon",
+   "remplace_par": "remplissage"
   },
   {
-   "id": "visibilite_boite",
-   "groupe": "presentation",
-   "libelle": "Visibilité, rognage, calque",
-   "valeurs": "énumération",
-   "sources": [
-    "VYSI:visibility, clip_ref, layer"
-   ],
-   "vysi": [
-    "visibility",
-    "clip_ref",
-    "layer"
-   ]
+   "nom": "degrade",
+   "raison": "doublon",
+   "remplace_par": "remplissage"
   },
   {
-   "id": "nature_contenu_boite",
-   "groupe": "contenu",
-   "libelle": "Nature du contenu",
-   "valeurs": "texte_natif | texte_image | image | vectoriel | mixte | vide",
-   "sources": [
-    "VYSI:content_nature"
-   ],
-   "vysi": []
+   "nom": "motif",
+   "raison": "doublon",
+   "remplace_par": "remplissage"
   },
   {
-   "id": "texte_boite",
-   "groupe": "contenu",
-   "libelle": "Texte et nombre de caractères",
-   "valeurs": "chaîne + entier",
-   "sources": [
-    "VYSI:text"
-   ],
-   "vysi": [
-    "text"
-   ]
+   "nom": "trame_paragraphe",
+   "raison": "doublon",
+   "remplace_par": "remplissage"
   },
   {
-   "id": "langue_boite",
-   "groupe": "contenu",
-   "libelle": "Langue(s)",
-   "valeurs": "BCP 47",
-   "sources": [
-    "VYSI:language"
-   ],
-   "vysi": [
-    "dominant_language_tag"
-   ]
+   "nom": "ombre",
+   "raison": "doublon",
+   "remplace_par": "effets"
   },
   {
-   "id": "traduisible_boite",
-   "groupe": "contenu",
-   "libelle": "Traduisible",
-   "valeurs": "éligibilité FT01",
-   "sources": [
-    "VYSI:translation_eligibility"
-   ],
-   "vysi": [
-    "translation_eligibility"
-   ]
+   "nom": "mask",
+   "raison": "doublon",
+   "remplace_par": "transparence_image"
   },
   {
-   "id": "bbox_pixels",
-   "groupe": "geometrie",
-   "libelle": "Boîte en pixels de l'image rendue",
-   "valeurs": "px",
-   "sources": [
-    "PERFECT:bbox_px"
-   ],
-   "vysi": []
+   "nom": "alpha",
+   "raison": "doublon",
+   "remplace_par": "transparence_image"
   },
   {
-   "id": "sous_regions_a_preserver",
-   "groupe": "agencement_interne",
-   "libelle": "Sous-régions à conserver telles quelles (visuel)",
-   "valeurs": "liste [bbox, politique, source, indice texte]",
-   "sources": [
-    "PERFECT:internal_discrimination.preserve_visual"
-   ],
-   "vysi": []
+   "nom": "chemin",
+   "raison": "doublon",
+   "remplace_par": "geometrie"
   },
   {
-   "id": "sous_regions_traduisibles",
-   "groupe": "agencement_interne",
-   "libelle": "Sous-régions de texte traduisible",
-   "valeurs": "liste bbox",
-   "sources": [
-    "PERFECT:internal_discrimination.translate_text"
-   ],
-   "vysi": []
+   "nom": "regle_remplissage",
+   "raison": "doublon",
+   "remplace_par": "geometrie"
   },
   {
-   "id": "jetons_proteges",
-   "groupe": "agencement_interne",
-   "libelle": "Jetons protégés",
-   "valeurs": "liste",
-   "sources": [
-    "PERFECT:internal_discrimination.protect_token"
-   ],
-   "vysi": []
+   "nom": "quad",
+   "raison": "doublon",
+   "remplace_par": "forme_exacte"
   },
   {
-   "id": "fond_a_ignorer",
-   "groupe": "agencement_interne",
-   "libelle": "Fond à ignorer",
-   "valeurs": "liste bbox",
-   "sources": [
-    "PERFECT:internal_discrimination.ignore_background"
-   ],
-   "vysi": []
+   "nom": "polygone",
+   "raison": "doublon",
+   "remplace_par": "forme_exacte"
   },
   {
-   "id": "politique_rendu",
-   "groupe": "disposition",
-   "libelle": "Politique de rendu",
-   "valeurs": "preserve_source_region | reflow | …",
-   "sources": [
-    "PERFECT:render_policy"
-   ],
-   "vysi": [
-    "reconstruction_policy"
-   ]
+   "nom": "matrice_transformation",
+   "raison": "doublon",
+   "remplace_par": "forme_exacte"
   },
   {
-   "id": "politique_traduction",
-   "groupe": "contenu",
-   "libelle": "Politique de traduction",
-   "valeurs": "preserve_visual_region | translate | …",
-   "sources": [
-    "PERFECT:translation_policy"
-   ],
-   "vysi": [
-    "translation_policy"
-   ]
+   "nom": "xref",
+   "raison": "doublon",
+   "remplace_par": "references_source"
   },
   {
-   "id": "exclure_flux_traduction",
-   "groupe": "contenu",
-   "libelle": "Exclue du flux de traduction",
-   "valeurs": "booléen",
-   "sources": [
-    "PERFECT:must_exclude_from_translation_flow"
-   ],
-   "vysi": []
+   "nom": "source_ids",
+   "raison": "doublon",
+   "remplace_par": "references_source"
   },
   {
-   "id": "rendu_obligatoire",
-   "groupe": "presentation",
-   "libelle": "Doit être rendue",
-   "valeurs": "booléen",
-   "sources": [
-    "PERFECT:must_render"
-   ],
-   "vysi": []
+   "nom": "reading_order_index",
+   "raison": "doublon",
+   "remplace_par": "ordre_lecture"
   },
   {
-   "id": "source_detection",
-   "groupe": "identite",
-   "libelle": "Détecteur à l'origine de la boîte",
-   "valeurs": "chaîne",
-   "sources": [
-    "PERFECT:detection_source"
-   ],
-   "vysi": []
+   "nom": "z_index",
+   "raison": "doublon",
+   "remplace_par": "ordre_empilement"
+  },
+  {
+   "nom": "render_order_index",
+   "raison": "doublon",
+   "remplace_par": "ordre_empilement"
+  },
+  {
+   "nom": "couloir",
+   "raison": "doublon",
+   "remplace_par": "zone_page"
+  },
+  {
+   "nom": "continuation",
+   "raison": "doublon",
+   "remplace_par": "suite"
+  },
+  {
+   "nom": "caption_for",
+   "raison": "doublon",
+   "remplace_par": "relations"
+  },
+  {
+   "nom": "appartenance",
+   "raison": "doublon",
+   "remplace_par": "parent"
+  },
+  {
+   "nom": "padding",
+   "raison": "doublon",
+   "remplace_par": "marges_internes"
+  },
+  {
+   "nom": "marges_cellule",
+   "raison": "doublon",
+   "remplace_par": "marges_internes"
+  },
+  {
+   "nom": "colonnes_internes",
+   "raison": "doublon",
+   "remplace_par": "colonnes"
+  },
+  {
+   "nom": "colonnes_page",
+   "raison": "doublon",
+   "remplace_par": "colonnes"
+  },
+  {
+   "nom": "alignement_lignes",
+   "raison": "doublon",
+   "remplace_par": "alignement"
+  },
+  {
+   "nom": "interligne_mesure",
+   "raison": "doublon",
+   "remplace_par": "interligne"
+  },
+  {
+   "nom": "translatable",
+   "raison": "doublon",
+   "remplace_par": "traduisible"
+  },
+  {
+   "nom": "translation_eligibility",
+   "raison": "doublon",
+   "remplace_par": "traduisible"
+  },
+  {
+   "nom": "segments_langue",
+   "raison": "doublon",
+   "remplace_par": "segments_style"
+  },
+  {
+   "nom": "signet",
+   "raison": "doublon",
+   "remplace_par": "plan"
+  },
+  {
+   "nom": "ligne_texte",
+   "raison": "doublon",
+   "remplace_par": "granularite"
+  },
+  {
+   "nom": "run",
+   "raison": "doublon",
+   "remplace_par": "granularite"
+  },
+  {
+   "nom": "glyphe",
+   "raison": "doublon",
+   "remplace_par": "granularite"
+  },
+  {
+   "nom": "niveau",
+   "raison": "doublon",
+   "remplace_par": "granularite"
+  },
+  {
+   "nom": "etiquette_detecteur",
+   "raison": "doublon",
+   "remplace_par": "alternatives"
+  },
+  {
+   "nom": "sous_type_annotation",
+   "raison": "doublon",
+   "remplace_par": "sous_type"
+  },
+  {
+   "nom": "sous_type_champ",
+   "raison": "doublon",
+   "remplace_par": "sous_type"
+  },
+  {
+   "nom": "contenu_annotation",
+   "raison": "doublon",
+   "remplace_par": "auteur_date"
+  },
+  {
+   "nom": "region_corps",
+   "raison": "doublon",
+   "remplace_par": "zone_contenu"
+  },
+  {
+   "nom": "region_contenu",
+   "raison": "doublon",
+   "remplace_par": "zone_contenu"
+  },
+  {
+   "nom": "barre_laterale",
+   "raison": "doublon",
+   "remplace_par": "encadre"
+  },
+  {
+   "nom": "titre_tableau",
+   "raison": "doublon",
+   "remplace_par": "legende"
+  },
+  {
+   "nom": "cellule_entete",
+   "raison": "doublon",
+   "remplace_par": "entete"
+  },
+  {
+   "nom": "champ_texte",
+   "raison": "doublon",
+   "remplace_par": "champ_formulaire"
+  },
+  {
+   "nom": "case_a_cocher",
+   "raison": "doublon",
+   "remplace_par": "champ_formulaire"
+  },
+  {
+   "nom": "matrice",
+   "raison": "doublon",
+   "remplace_par": "formule_bloc"
+  },
+  {
+   "nom": "formule_chimique",
+   "raison": "doublon",
+   "remplace_par": "formule_bloc"
+  },
+  {
+   "nom": "annotation_tampon",
+   "raison": "doublon",
+   "remplace_par": "annotation_graphique"
+  },
+  {
+   "nom": "warichu",
+   "raison": "doublon",
+   "remplace_par": "ruby"
+  },
+  {
+   "nom": "mise_en_evidence",
+   "raison": "style_pas_type",
+   "remplace_par": null
+  },
+  {
+   "nom": "citation_en_ligne",
+   "raison": "style_pas_type",
+   "remplace_par": null
+  },
+  {
+   "nom": "tabulation",
+   "raison": "style_pas_type",
+   "remplace_par": null
+  },
+  {
+   "nom": "saut",
+   "raison": "style_pas_type",
+   "remplace_par": null
+  },
+  {
+   "nom": "symbole",
+   "raison": "style_pas_type",
+   "remplace_par": null
+  },
+  {
+   "nom": "mot",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "phrase",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "segment_traduisible",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "segment_non_traduisible",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "texte_dans_image",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "contient_texte",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "chapitre",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "section",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "orientation_page",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "format_probable",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "zones_page",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "marges",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "nature_page",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "grille_lignes",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "rapport_aspect",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "resolution",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "voisins",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "chevauchements",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "style_dominant",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "comptages_texte",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "categorie_unicode",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "homogeneite_style",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "couleurs_presentes",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "nb_lignes",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "cesure",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "profil_document",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "qualite_extraction",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "nombre_pages",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "langues_detectees",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "polices_document",
+   "raison": "recalculable",
+   "remplace_par": null
+  },
+  {
+   "nom": "orientation_exif",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "style_nomme",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "crenage",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "ligatures",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "profondeur_bits",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "interpolation",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "grille_document",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "disposition_tableau",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "style_tableau",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "format_image",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "espace_couleur",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "mode_fusion",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "boites_page",
+   "raison": "detail_de_format",
+   "remplace_par": null
+  },
+  {
+   "nom": "groupe",
+   "raison": "doublon",
+   "remplace_par": "enfants"
+  },
+  {
+   "nom": "contraintes_reconstruction",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "politique_rendu",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "politique_protection",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "rendu_obligatoire",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "preserver_visuel",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "objet_rendu",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "debordement",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "enchainement",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "region_preservee",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "sous_regions_conservees",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "sous_regions_traduisibles",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "fond_a_ignorer",
+   "raison": "decision_de_reconstruction",
+   "remplace_par": null
+  },
+  {
+   "nom": "source_fichier",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "propriete_technique_pdf",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "image_page_rendue",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "dpi_page",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "espace_blanc",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "zone_decoupe",
+   "raison": "hors_identification",
+   "remplace_par": null
+  },
+  {
+   "nom": "domaine",
+   "raison": "hors_identification",
+   "remplace_par": null
   }
- ],
- "politique_champs": "present_null_when_unknown : chaque champ est toujours présent ; il vaut null quand la valeur n'est pas établie (jamais devinée)."
+ ]
 }

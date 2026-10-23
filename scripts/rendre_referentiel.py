@@ -6,47 +6,63 @@ import json
 from pathlib import Path
 
 DOSSIER = Path(__file__).resolve().parent.parent / "docs" / "referentiel"
+RAISONS = {
+    "doublon": "doublon, fusionné dans",
+    "recalculable": "recalculable à partir des autres champs",
+    "detail_de_format": "détail propre à un format de fichier",
+    "decision_de_reconstruction": "décision de la reconstruction, pas de l'identification",
+    "style_pas_type": "style ou caractère, pas un type de bbox",
+    "hors_identification": "hors du périmètre de l'identification",
+}
 
 
-def _liste(valeurs) -> str:
-    return ", ".join(valeurs) or "—"
+def _table(entetes, lignes):
+    return ["| " + " | ".join(entetes) + " |", "|" + "---|" * len(entetes)] + ["| " + " | ".join(l) + " |" for l in lignes]
 
 
 def rendre(data: dict) -> str:
     familles = data["familles"]
-    lignes = [
-        "# Référentiel des éléments, attributs et propriétés des bboxes", "",
+    conv = data["conventions"]
+    out = [
+        "# Référentiel d'identification", "",
         "Rendu depuis `referentiel.json` (source unique) par `scripts/rendre_referentiel.py`. Ne pas éditer à la main.", "",
-        f"- Convention des positions : {data['convention_positions']}.",
-        f"- Politique des champs : {data['politique_champs']}", "",
-        f"**{len(data['elements'])} éléments, {len(data['attributs'])} attributs, "
-        f"{len(data['proprietes_bbox'])} propriétés de bbox.** Colonne vysi : noms existants dans vysi ; « — » = absent de vysi.",
-        "", "## Sources", "",
+        f"**Finalité.** {data['finalite']}", "",
+        f"- Positions : {conv['positions']}.",
+        f"- Champs : {conv['champs']}",
+        f"- Portée : {conv['portee']}",
+        f"- Priorité : {conv['priorite']}", "",
+        f"**{len(data['types'])} types, {len(data['proprietes_bbox'])} propriétés de bbox, "
+        f"{len(data['attributs'])} attributs, {len(data['document'])} attributs de document, "
+        f"{len(data['page'])} attributs de page.**", "",
+        "## 1. Types", "",
     ]
-    lignes += [f"- **{cle}** : {texte}" for cle, texte in data["sources"].items()]
-    lignes += ["", "## 1. Éléments", ""]
     for famille, libelle in familles.items():
-        lignes += [f"### {libelle} (`{famille}`)", "", "| id | élément | sources | vysi |", "|---|---|---|---|"]
-        lignes += [f"| `{e['id']}` | {e['libelle']} | {_liste(e['sources'])} | {_liste(e['vysi'])} |"
-                   for e in data["elements"] if e["famille"] == famille]
-        lignes.append("")
-    lignes += ["## 2. Attributs des éléments", ""]
-    for groupe in dict.fromkeys(a["groupe"] for a in data["attributs"]):
-        lignes += [f"### {groupe}", "", "| id | attribut | valeurs / unité | s'applique à | sources | vysi |",
-                   "|---|---|---|---|---|---|"]
-        for a in data["attributs"]:
-            if a["groupe"] == groupe:
-                portee = "toutes" if set(a["familles"]) == set(familles) else ", ".join(a["familles"])
-                lignes.append(f"| `{a['id']}` | {a['libelle']} | {a['valeurs']} | {portee} | "
-                              f"{_liste(a['sources'])} | {_liste(a['vysi'])} |")
-        lignes.append("")
-    lignes += ["## 3. Propriétés des bboxes", ""]
+        out += [f"### {libelle} (`{famille}`)", ""]
+        out += _table(("id", "type"), [(f"`{t['id']}`", t["libelle"]) for t in data["types"] if t["famille"] == famille])
+        out.append("")
+    out += ["## 2. Propriétés de toute bbox", ""]
     for groupe in dict.fromkeys(p["groupe"] for p in data["proprietes_bbox"]):
-        lignes += [f"### {groupe}", "", "| id | propriété | valeurs / unité | sources | vysi |", "|---|---|---|---|---|"]
-        lignes += [f"| `{p['id']}` | {p['libelle']} | {p['valeurs']} | {_liste(p['sources'])} | {_liste(p['vysi'])} |"
-                   for p in data["proprietes_bbox"] if p["groupe"] == groupe]
-        lignes.append("")
-    return "\n".join(lignes)
+        out += [f"### {groupe}", ""]
+        out += _table(("id", "propriété", "valeurs"),
+                      [(f"`{p['id']}`", p["libelle"], p["valeurs"]) for p in data["proprietes_bbox"] if p["groupe"] == groupe])
+        out.append("")
+    out += ["## 3. Attributs par type", ""]
+    for groupe in dict.fromkeys(a["groupe"] for a in data["attributs"]):
+        out += [f"### {groupe}", ""]
+        out += _table(("id", "attribut", "valeurs", "familles"),
+                      [(f"`{a['id']}`", a["libelle"], a["valeurs"], ", ".join(a["portee"]))
+                       for a in data["attributs"] if a["groupe"] == groupe])
+        out.append("")
+    for section, titre in (("document", "4. Attributs du document"), ("page", "5. Attributs de la page")):
+        out += [f"## {titre}", ""]
+        out += _table(("id", "attribut", "valeurs"), [(f"`{e['id']}`", e["libelle"], e["valeurs"]) for e in data[section]])
+        out.append("")
+    out += ["## Annexe : notions écartées lors de la fusion", ""]
+    out += _table(("notion", "raison"), [
+        (f"`{e['nom']}`", f"{RAISONS[e['raison']]} `{e['remplace_par']}`" if e["remplace_par"] else RAISONS[e["raison"]])
+        for e in data["exclusions"]])
+    out.append("")
+    return "\n".join(out)
 
 
 def main() -> int:
