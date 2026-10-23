@@ -1,12 +1,13 @@
-"""Bbox outputs: one rectangle per top-level element, in an annotated PDF and an empty DOCX."""
+"""Bbox outputs: the segmentation bboxes drawn in an annotated PDF and an empty DOCX."""
 import zipfile
 from xml.etree import ElementTree
 
 import pymupdf
 
-from pdfexact.bboxes import annotate_pdf_bboxes, collect_bbox_records, write_bbox_docx
+from pdfexact.bboxes import annotate_pdf_bboxes, write_bbox_docx
 from pdfexact.geometry import BBox, pt_vers_emu as u, pt_vers_twips
 from pdfexact.ir import Document, FontRef, Line, Page, ShapeEl, Span, TextBox
+from pdfexact.segmentation.granularite import boites
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 WPS = "{http://schemas.microsoft.com/office/word/2010/wordprocessingShape}"
@@ -22,13 +23,13 @@ def document():
 
 
 def test_one_record_per_visible_top_level_element():
-    records = collect_bbox_records(document())
+    records = boites(document(), "blocs")
     assert [(record.page_index, record.kind) for record in records] == [(0, "text"), (0, "shape")]
 
 
 def test_docx_holds_one_frame_per_record_and_one_section_per_page(tmp_path):
     destination = tmp_path / "boxes.docx"
-    records = write_bbox_docx(document(), destination)
+    records = write_bbox_docx(document(), destination, boites(document(), "blocs"))
     with zipfile.ZipFile(destination) as package:
         assert {"[Content_Types].xml", "_rels/.rels", "word/document.xml"} <= set(package.namelist())
         root = ElementTree.fromstring(package.read("word/document.xml"))
@@ -44,7 +45,7 @@ def test_pdf_copy_is_annotated_without_changing_page_count(tmp_path):
         pdf.new_page(width=612, height=792)
         pdf.new_page(width=612, height=792)
         pdf.save(source)
-    records = annotate_pdf_bboxes(source, destination, document())
+    records = annotate_pdf_bboxes(source, destination, boites(document(), "blocs"))
     with pymupdf.open(destination) as pdf:
         assert pdf.page_count == 2
         assert len(pdf[0].get_drawings()) == len(records) == 2

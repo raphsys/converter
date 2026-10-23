@@ -5,6 +5,7 @@ Entrée : un PDF et des ``OptionsSegmentation``. Sortie : un
 laquelle s'appuie l'identification. Son comportement est verrouillé par
 ``tests/segmentation/test_non_regression.py``.
 """
+from pdfexact.segmentation.granularite import GRANULARITES, Boite
 from pdfexact.segmentation.pipeline import (
     OptionsSegmentation,
     ResultatSegmentation,
@@ -12,4 +13,4 @@ from pdfexact.segmentation.pipeline import (
     segmenter,
 )
 
-__all__ = ["OptionsSegmentation", "ResultatSegmentation", "enregistrer_catalogue", "segmenter"]
+__all__ = ["GRANULARITES", "Boite", "OptionsSegmentation", "ResultatSegmentation", "enregistrer_catalogue", "segmenter"]

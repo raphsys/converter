@@ -53,6 +53,7 @@ def _options(args) -> OptionsSegmentation:
         layout_device=args.layout_device,
         text_understanding_url=args.text_understanding_url,
         text_understanding_timeout=args.text_understanding_timeout,
+        granularite=args.granularite,
     )
 
 
@@ -120,13 +121,17 @@ def main() -> int:
     )
     parser.add_argument("--text-understanding-url", default=None)
     parser.add_argument("--text-understanding-timeout", type=float, default=3.0)
+    parser.add_argument(
+        "--granularite", choices=("fine", "blocs"), default="blocs",
+        help="fine : lignes et details des images ; blocs : paragraphes et images entieres",
+    )
     args = parser.parse_args()
 
     resultat = segmenter(args.source_pdf, _options(args))
     debut = perf_counter()
     enregistrer_catalogue(resultat, args.source_pdf, args.docx_out.with_suffix(".extraction.json"))
-    records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, resultat.document)
-    write_bbox_docx(resultat.document, args.docx_out)
+    records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, resultat.boites())
+    write_bbox_docx(resultat.document, args.docx_out, records)
     resultat.durees["sorties"] = perf_counter() - debut
     _rapporter(resultat, records, args)
     return 0

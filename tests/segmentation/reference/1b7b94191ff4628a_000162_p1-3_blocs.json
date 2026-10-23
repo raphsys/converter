@@ -1,0 +1,471 @@
+{
+ "pages_sha256": "bd7db250812c93736709e642d967b2786a437f7db064c1984afaee0e79ce73b7",
+ "totals": {
+  "pages": 3,
+  "text_elements": 43,
+  "lines": 157,
+  "runs": 167,
+  "visual_elements": 8
+ },
+ "elements": [
+  [
+   0,
+   "TextBox",
+   1598400,
+   864000,
+   3751200,
+   1123200,
+   "ESTUARY SUBJECT REVIEW"
+  ],
+  [
+   0,
+   "TextBox",
+   1598400,
+   1119600,
+   3416400,
+   1443600,
+   "Fill-in-the-Blank"
+  ],
+  [
+   0,
+   "TextBox",
+   1713600,
+   1634400,
+   6087600,
+   2170800,
+   "1. An __________ is a partially enclosed body of water and its \nadjacent habitats where saltwater from the ocean mixes \nwith freshwater from rivers or streams. "
+  ],
+  [
+   0,
+   "TextBox",
+   1713600,
+   2394000,
+   6177600,
+   2739600,
+   "2. Waters whose salt content is between that of freshwater and \nthat of seawater are called __________."
+  ],
+  [
+   0,
+   "TextBox",
+   1713600,
+   2966400,
+   6181200,
+   3121200,
+   "3. Of the 32 largest cities in the world, 22 are located on              "
+  ],
+  [
+   0,
+   "TextBox",
+   1940400,
+   3157200,
+   2750400,
+   3312000,
+   "__________."
+  ],
+  [
+   0,
+   "TextBox",
+   1195200,
+   3412800,
+   6577200,
+   4179600,
+   "WORD BANK"
+  ],
+  [
+   0,
+   "TextBox",
+   1598400,
+   3909600,
+   2444400,
+   9054000,
+   "stenohaline\neuryhaline\nenergy\npneumatophores\npropagules\nanaerobic\nzoea\nmegalope\nanthropogenic\nstorms\nwinter ice\nanoxic\nglaciers\nhigh tides\nbar built\nbarrier\ndelta\ntectonic\nsmaller\nunique\ngeology\nestuary\nbrackish\nestuaries\nsalinity\nvariable\ntides\ntwo \nfreshwater "
+  ],
+  [
+   0,
+   "TextBox",
+   3333600,
+   3909600,
+   4302000,
+   9054000,
+   "nurseries\npollutants\nhabitat\nfish\necosystem services\nice age\ndecreases \nlagoons\nsediment \nearthquakes\nfjords\ntidal creeks\npannes\nmudflats\nnutrients\nwatershed\nSWMP\npolluted\nbuffers\ncoastal elevation \ncoastal plain \nhalophytes\nsmooth cordgrass\nmangrove\nprop roots\nsalinity\ndense\ntidal range\nisohalines"
+  ],
+  [
+   0,
+   "TextBox",
+   5065200,
+   3909600,
+   6051600,
+   8164800,
+   "highest \nmixing\nsalt wedge\nslightly stratified\nvertically-mixed \nstorms\npeat\nred mangrove\nflooded\nsalinity\nwrack\nconversion\npollution\nbiomagnification\nsediments\neutrophication\nnutrient\npathogens\ncombined sewage \t\n   overflows \ninvasives\nNERRS\nincreases\ndissolved oxygen"
+  ],
+  [
+   0,
+   "TextBox",
+   5065200,
+   8179200,
+   5839200,
+   8341200,
+   "photosynthesis"
+  ],
+  [
+   0,
+   "TextBox",
+   5065200,
+   8355600,
+   5824800,
+   9054000,
+   "organic matter\nturbidity\npH\nchlorophyll "
+  ],
+  [
+   0,
+   "TextBox",
+   799200,
+   9403200,
+   6951600,
+   9601200,
+   "oceanservice.noaa.gov/education                                                                                       1"
+  ],
+  [
+   0,
+   "RasterEl",
+   687921,
+   292100,
+   7086600,
+   522821,
+   null
+  ],
+  [
+   0,
+   "RasterEl",
+   717880,
+   707225,
+   1489393,
+   1478750,
+   null
+  ],
+  [
+   0,
+   "ImageEl",
+   685800,
+   3491344,
+   7086600,
+   9105900,
+   null
+  ],
+  [
+   0,
+   "RasterEl",
+   685800,
+   9139834,
+   7079983,
+   9649193,
+   null
+  ],
+  [
+   1,
+   "TextBox",
+   799200,
+   349200,
+   6944400,
+   504000,
+   "Subject Review                                                                                                    Estuaries"
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   918000,
+   6084000,
+   1263600,
+   "4. In the ocean the concentration of salts, or __________,  aver­\nages about 35 parts per thousand. "
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   1490400,
+   6217200,
+   1836000,
+   "5. The salinity of estuarine water is __________ from one day to \nthe next."
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   2062800,
+   5544000,
+   2217600,
+   "6. __________ are a major influence on many estuaries."
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   2440800,
+   6145200,
+   2790000,
+   "7. Most areas of the earth experience __________ high and low \ntides each day. "
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   3013200,
+   6148800,
+   3358800,
+   "8. Tides at broad mudflats might appear to be __________ than \ntides at the end of a long, narrow inlet."
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   3585600,
+   3866400,
+   3740400,
+   "9. Every estuary is __________."
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   3967200,
+   6091200,
+   4312800,
+   "10. Estuaries are typically classified based on how saltwater \nand freshwater mix in the estuary and on their __________."
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   4539600,
+   5882400,
+   4885200,
+   "11. Estuaries formed by rivers or streams entering massive \nlakes are called __________ estuaries. "
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   5108400,
+   5349600,
+   5266800,
+   "12. Estuaries are often called __________ of the sea. "
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   5490000,
+   5839200,
+   5835600,
+   "13. Estuaries filter out __________ from rivers and streams \nbefore they flow into the oceans."
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   6062400,
+   6058800,
+   6408000,
+   "14. Estuaries provide critical __________ for many birds, fish, \namphibians, insects, and other wildlife."
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   6634800,
+   6195600,
+   6980400,
+   "15. Estuaries provide habitat for more than 75 percent of the         \n__________ harvested in the United States. "
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   7203600,
+   5954400,
+   7552800,
+   "16. __________ are fundamental life support processes upon \nwhich all organisms depend. [two words]"
+  ],
+  [
+   1,
+   "TextBox",
+   1713600,
+   7776000,
+   6123600,
+   8312400,
+   "17. __________ is a spongy matrix of live roots, decomposing \norganic material, and soil that helps filter pollutants out of \nthe water."
+  ],
+  [
+   1,
+   "TextBox",
+   806400,
+   9421200,
+   6940800,
+   9586800,
+   "2                                                                                                        oceanservice.noaa.gov/education"
+  ],
+  [
+   1,
+   "RasterEl",
+   687819,
+   285750,
+   7086600,
+   516471,
+   null
+  ],
+  [
+   1,
+   "RasterEl",
+   685800,
+   9133484,
+   7079983,
+   9642856,
+   null
+  ],
+  [
+   2,
+   "TextBox",
+   799200,
+   338400,
+   6944400,
+   496800,
+   "Estuaries                                                                                                    Subject Review"
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   918000,
+   6145200,
+   1454400,
+   "18. One reason that estuaries are so productive is that the \nwater filtering through them brings in __________ from the \nsurrounding watershed. "
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   1681200,
+   6199200,
+   2217600,
+   "19. The entire land area that drains into a particular body of \nwater, like a lake, river or estuary is called a drainage basin \nor __________. "
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   2440800,
+   6120000,
+   2790000,
+   "20. Estuaries are some of the most fertile ecosystems on earth, \nyet they may also be one of the most __________."
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   3013200,
+   5965200,
+   3549600,
+   "21. Estuaries and their surrounding wetlands act as _______ \nthat stabilize shorelines and protect coastal areas from \nfloods, storm surges, and excessive erosion."
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   3776400,
+   6217200,
+   4122000,
+   "22. The __________ determines the rate of freshwater that flows \ninto an estuary from rivers and streams. [two words]"
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   4348800,
+   5864400,
+   4694400,
+   "23. __________ estuaries are formed when rising sea levels \nflood existing river valleys. [two words]"
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   4917600,
+   6195600,
+   5457600,
+   "24. __________ estuaries are characterized by barrier beaches or \nislands that form parallel to the coastline and separate the \nestuary from the ocean. [two words]"
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   5680800,
+   6123600,
+   6026400,
+   "25. __________ beaches and islands are formed by the accumu­\nlation of sand or sediments deposited by ocean waves. "
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   6444000,
+   5788800,
+   6789600,
+   "26. A __________ is characterized by large flat fan-shaped \ndeposits of sediment at the mouth of a river."
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   7012800,
+   6051600,
+   7362000,
+   "27. __________ estuaries are formed when the earth’s tectonic \nplates run into or fold-up underneath each other."
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   7585200,
+   6156000,
+   8121600,
+   "28. __________ are steep-walled river valleys created by \nadvancing glaciers that later became flooded with seawater \nas the glaciers retreated."
+  ],
+  [
+   2,
+   "TextBox",
+   1713600,
+   8348400,
+   6181200,
+   8694000,
+   "29. Most coastal plain estuaries in North America were formed \nat the end of the last__________. [two words]"
+  ],
+  [
+   2,
+   "TextBox",
+   799200,
+   9399600,
+   6951600,
+   9594000,
+   "oceanservice.noaa.gov/education                                                                                       3"
+  ],
+  [
+   2,
+   "RasterEl",
+   687921,
+   285750,
+   7086600,
+   516471,
+   null
+  ],
+  [
+   2,
+   "RasterEl",
+   685800,
+   9133484,
+   7079983,
+   9642856,
+   null
+  ]
+ ]
+}

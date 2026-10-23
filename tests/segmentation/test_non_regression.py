@@ -16,11 +16,13 @@ from pdfexact.segmentation import OptionsSegmentation, enregistrer_catalogue, se
 
 CORPUS = Path(os.environ.get("PDFEXACT_CORPUS_REFERENCE", "/home/raphael/Mes_Projets/vysi/vysi_real_corpus/pdf_native"))
 MODELES = Path(os.environ.get("PDFEXACT_MODELES_REFERENCE", "/home/raphael/Mes_Projets/vysi/ai_models"))
-# (PDF, pages 0-based, reference): a text report, and a page frame over full-page visuals.
-CAS = [
-    ("0fd83d2aa11747d4_000152.pdf", [0, 1, 2, 3, 4], "0fd83d2aa11747d4_000152_p1-5.json"),
-    ("1b7b94191ff4628a_000162.pdf", [0, 1, 2], "1b7b94191ff4628a_000162_p1-3.json"),
+# (PDF, pages 0-based, reference prefix): a text report, and a page frame over full-page visuals.
+DOCUMENTS = [
+    ("0fd83d2aa11747d4_000152.pdf", [0, 1, 2, 3, 4], "0fd83d2aa11747d4_000152_p1-5"),
+    ("1b7b94191ff4628a_000162.pdf", [0, 1, 2], "1b7b94191ff4628a_000162_p1-3"),
 ]
+CAS = [(nom, pages, f"{prefixe}_{granularite}.json", granularite)
+       for nom, pages, prefixe in DOCUMENTS for granularite in ("fine", "blocs")]
 
 
 def _sans_noms_media(valeur):
@@ -45,14 +47,15 @@ def _empreinte(catalogue):
     return {"pages_sha256": hashlib.sha256(brut).hexdigest(), "totals": catalogue["totals"], "elements": pages}
 
 
-@pytest.mark.parametrize("nom,pages,reference", CAS)
-def test_segmentation_of_the_reference_pdfs_is_unchanged(tmp_path, nom, pages, reference):
+@pytest.mark.parametrize("nom,pages,reference,granularite", CAS)
+def test_segmentation_of_the_reference_pdfs_is_unchanged(tmp_path, nom, pages, reference, granularite):
     pdf = CORPUS / nom
     if not (pdf.exists() and (MODELES / "ppstructurev3").exists()):
         pytest.skip("PDF or layout models of the reference absent")
     options = OptionsSegmentation(
         pages=pages, dpi=100, text_mode="spans", layout_provider="paddlex",
         layout_model="ppstructurev3/PP-DocLayout_plus-L", layout_model_root=str(MODELES), layout_device="cpu",
+        granularite=granularite,
     )
     catalogue_path = tmp_path / "catalogue.json"
     enregistrer_catalogue(segmenter(pdf, options), pdf, catalogue_path)

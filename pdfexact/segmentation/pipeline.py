@@ -24,6 +24,7 @@ from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehensio
 from pdfexact.layout.vision import annoter_zones_visuelles
 from pdfexact.model_paths import resolve_ai_models_root
 from pdfexact.report import Rapport
+from pdfexact.segmentation.granularite import GRANULARITES, Boite, boites, regrouper_visuels_en_blocs
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,12 @@ class OptionsSegmentation:
     layout_device: str | None = None
     text_understanding_url: str | None = None
     text_understanding_timeout: float = 3.0
+    # fine: lines and every visual part; blocs: paragraphs and whole images.
+    granularite: str = "blocs"
+
+    def __post_init__(self):
+        if self.granularite not in GRANULARITES:
+            raise ValueError(f"granularite inconnue : {self.granularite!r} (attendu : {', '.join(GRANULARITES)})")
 
 
 @dataclass(frozen=True)
@@ -48,6 +55,11 @@ class ResultatSegmentation:
     vision: list = field(default_factory=list)
     textes_images: int = 0
     durees: dict = field(default_factory=dict)
+    granularite: str = "blocs"
+
+    def boites(self) -> list[Boite]:
+        """The segmentation bboxes at the chosen granularity."""
+        return boites(self.document, self.granularite)
 
 
 def segmenter(source_pdf: Path, options: OptionsSegmentation) -> ResultatSegmentation:
@@ -73,8 +85,11 @@ def segmenter(source_pdf: Path, options: OptionsSegmentation) -> ResultatSegment
             model_root=resolve_ai_models_root(options.ai_models_root),
         )
         etape("ocr-images")
+        if options.granularite == "blocs":
+            regrouper_visuels_en_blocs(document, source_pdf, dpi=options.dpi)
+            etape("granularite")
         diagnostics = diagnostics_comprehension_texte()
-    return ResultatSegmentation(document, diagnostics, vision, textes_images, durees)
+    return ResultatSegmentation(document, diagnostics, vision, textes_images, durees, options.granularite)
 
 
 def _extraire_scene(source_pdf: Path, options: OptionsSegmentation) -> Document:
@@ -169,12 +184,10 @@ def enregistrer_catalogue(resultat: ResultatSegmentation, source_pdf: Path, dest
             index: int(getattr(pdf[index], "rotation", 0) or 0)
             for index in range(pdf.page_count)
         }
-    _ecrire_catalogue(
-        construire_catalogue(
-            resultat.document,
-            source_pdf=source_pdf,
-            extraction_mode="scene-single-pass",
-            page_rotations=rotations,
-        ),
-        destination,
+    catalogue = construire_catalogue(
+        resultat.document,
+        source_pdf=source_pdf,
+        extraction_mode="scene-single-pass",
+        page_rotations=rotations,
     )
+    _ecrire_catalogue({**catalogue, "granularite": resultat.granularite}, destination)
