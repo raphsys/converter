@@ -13,7 +13,9 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import numpy as np
 import pymupdf
+from PIL import Image
 
 from pdfexact.extract.blocks import (
     OcrLine,
@@ -239,6 +241,7 @@ def _sortie_sources_natives(page_pdf, sources, selected_line_ids, observations,
     """Retain acquired native components; OCR correspondence is a separate proof."""
     from pdfexact.analysis.ocr_correspondence import (
         build_ocr_native_correspondence,
+        memoire_empreintes,
         selection_event_details,
     )
 
@@ -260,6 +263,15 @@ def _sortie_sources_natives(page_pdf, sources, selected_line_ids, observations,
                "geometry": geometrie.snapshot()}
     if observation_page is not None:
         observation_page.ocr_correspondence_page_binding = deepcopy(binding)
+    with memoire_empreintes():
+        _prouver_correspondances(observations, observation_page, binding, owners, outputs,
+                                 build_ocr_native_correspondence, selection_event_details)
+    return _finaliser_source_ocr(page_pdf, outputs, observations, observation_page)
+
+
+def _prouver_correspondances(observations, observation_page, binding, owners, outputs,
+                             build_ocr_native_correspondence, selection_event_details):
+    """One correspondence proof per OCR row; the page shares its inventory digests."""
     for observation in observations:
         proof = None
         reasons = []
@@ -293,7 +305,6 @@ def _sortie_sources_natives(page_pdf, sources, selected_line_ids, observations,
             else:
                 for output in outputs:
                     output.evidence.append(evidence)
-    return _finaliser_source_ocr(page_pdf, outputs, observations, observation_page)
 
 
 def extraire_tesseract_lignes_absentes(
@@ -2357,7 +2368,8 @@ def _textbox(
 
 
 
-def lire_texte_des_images(document, source_pdf, polices, *, dpi=200, language="auto", model_root=None) -> int:
+def lire_texte_des_images(document, source_pdf, polices, *, dpi=200, language="auto", model_root=None,
+                          pages: set[int] | None = None) -> int:
     """Read the text printed inside visual zones (RapidOCR), native rows excluded.
 
     Zones come from vision: text seen inside the image, or a zone vision could
@@ -2366,7 +2378,7 @@ def lire_texte_des_images(document, source_pdf, polices, *, dpi=200, language="a
     import pymupdf
     from pdfexact.layout.vision import zones_texte_image
 
-    pages = [(page, zones_texte_image(page)) for page in document.pages]
+    pages = [(page, zones_texte_image(page)) for page in document.pages if pages is None or page.index in pages]
     if not any(zones for _, zones in pages):
         return 0
     added = 0
@@ -2390,6 +2402,26 @@ def lire_texte_des_images(document, source_pdf, polices, *, dpi=200, language="a
     return added
 
 
+# Margin kept around target zones so that text touching their edge is fully seen.
+MARGE_ZONES_OCR_PT = 8.0
+
+
+def _cadre_zones_cibles(page, zones: list[BBox]):
+    """(clip of the page to render, its origin in pt) around all target zones.
+
+    PyMuPDF clips in displayed (rotated) coordinates, the space of the zones.
+
+    None when that frame holds no pixel (zones off the page): the whole page is read then.
+    """
+    x0 = max(0.0, min(emu_vers_pt(z.x0) for z in zones) - MARGE_ZONES_OCR_PT)
+    y0 = max(0.0, min(emu_vers_pt(z.y0) for z in zones) - MARGE_ZONES_OCR_PT)
+    x1 = min(page.rect.width, max(emu_vers_pt(z.x1) for z in zones) + MARGE_ZONES_OCR_PT)
+    y1 = min(page.rect.height, max(emu_vers_pt(z.y1) for z in zones) + MARGE_ZONES_OCR_PT)
+    if x1 - x0 < 1 or y1 - y0 < 1:
+        return None
+    return pymupdf.Rect(x0, y0, x1, y1), (x0, y0)
+
+
 def extraire_rapidocr(
     page,
     polices: dict,
@@ -2410,23 +2442,31 @@ def extraire_rapidocr(
     zones_ignorees = zones_ignorees or []
     page_exact_native = layout in {"hybrid", "word-native"}
     besoin_boites_mots = granularite != "line" or (page_exact_native and layout_map is not None)
-    with TemporaryDirectory(prefix="pdfexact-rapidocr-") as dossier:
-        image = Path(dossier) / "page.png"
-        pixmap = page.get_pixmap(dpi=dpi, alpha=False)
-        pixmap.save(image)
-        facteur = 72.0 / dpi
-        def accept_box(points):
-            bbox = _boite_rapidocr(points, facteur)
-            return (not zones_cibles or _bbox_dans_zones(bbox, zones_cibles)) and not _touche_zone_ignoree(bbox, zones_ignorees)
-
-        result = _rapidocr(language=language, model_root=model_root)(
-            str(image),
-            return_word_box=besoin_boites_mots,
-            return_single_char_box=granularite == "char",
-            accept_box=accept_box,
-        )
-
     facteur = 72.0 / dpi
+    # Text inside a few images: render only around them (detection cost grows with the
+    # area), then move the boxes back onto the page. Word boxes keep the whole page.
+    cadre = _cadre_zones_cibles(page, zones_cibles) if zones_cibles and not besoin_boites_mots else None
+    clip, (origine_x, origine_y) = cadre or (None, (0.0, 0.0))
+    dx, dy = origine_x / facteur, origine_y / facteur
+
+    def sur_la_page(points):
+        return np.asarray(points, dtype=np.float32) + np.float32((dx, dy))
+
+    def accept_box(points):
+        bbox = _boite_rapidocr(sur_la_page(points), facteur)
+        return (not zones_cibles or _bbox_dans_zones(bbox, zones_cibles)) and not _touche_zone_ignoree(bbox, zones_ignorees)
+
+    pixmap = page.get_pixmap(dpi=dpi, alpha=False, clip=clip)
+    image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+    result = _rapidocr(language=language, model_root=model_root)(
+        image,
+        return_word_box=besoin_boites_mots,
+        return_single_char_box=granularite == "char",
+        accept_box=accept_box,
+    )
+    if cadre is not None and len(result.boxes):
+        result.boxes = np.asarray([sur_la_page(points) for points in result.boxes])
+
     facteur_emu = 12700.0
     blocs = []
     lignes_ocr = []

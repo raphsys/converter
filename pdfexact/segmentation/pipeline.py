@@ -24,7 +24,7 @@ from pdfexact.layout.text_comprehension_ai import creer_fournisseur_comprehensio
 from pdfexact.layout.vision import annoter_zones_visuelles
 from pdfexact.model_paths import resolve_ai_models_root
 from pdfexact.report import Rapport
-from pdfexact.segmentation.granularite import GRANULARITES, Boite, boites, regrouper_visuels_en_blocs
+from pdfexact.segmentation.granularite import GRANULARITES, Boite, boites, ligne_visible, regrouper_visuels_en_blocs
 
 
 @dataclass(frozen=True)
@@ -42,6 +42,9 @@ class OptionsSegmentation:
     text_understanding_timeout: float = 3.0
     # fine: lines and every visual part; blocs: paragraphs and whole images.
     granularite: str = "blocs"
+    # As in vysi (native text first, OCR only where text is missing): the text printed
+    # inside the images of a page that has native text is read only on request.
+    ocr_images: bool = False
 
     def __post_init__(self):
         if self.granularite not in GRANULARITES:
@@ -83,6 +86,7 @@ def segmenter(source_pdf: Path, options: OptionsSegmentation) -> ResultatSegment
             document, source_pdf, getattr(document, "polices", {}), dpi=options.dpi,
             language=options.ocr_language,
             model_root=resolve_ai_models_root(options.ai_models_root),
+            pages=None if options.ocr_images else pages_sans_texte_natif(document),
         )
         etape("ocr-images")
         if options.granularite == "blocs":
@@ -122,9 +126,22 @@ def _extraire_scene(source_pdf: Path, options: OptionsSegmentation) -> Document:
         layout_device=options.layout_device,
         ai_models_root=model_root,
         ocr_language=options.ocr_language,
+        ocr_images=options.ocr_images,
         rapport=Rapport(),
         verbose=True,
     )
+
+
+def pages_sans_texte_natif(document: Document) -> set[int]:
+    """Pages where no native (non-OCR) text shows a visible character: OCR is needed there."""
+    return {
+        page.index for page in document.pages
+        if not any(
+            isinstance(element, (TextBox, FlowParagraph)) and getattr(element, "source_kind", None) != "ocr"
+            and ligne_visible(*element.lignes)
+            for element in page.elements
+        )
+    }
 
 
 def _normaliser_texte(document: Document) -> None:
@@ -175,6 +192,12 @@ def _normaliser_texte(document: Document) -> None:
             if not isinstance(element, (TextBox, FlowParagraph))
         ] + textes
         segmenter_page_textes(page)
+        # Un texte sans aucun caractère visible (espaces du PDF) n'est pas un élément.
+        page.elements = [
+            element
+            for element in page.elements
+            if not isinstance(element, (TextBox, FlowParagraph)) or ligne_visible(*element.lignes)
+        ]
 
 
 def enregistrer_catalogue(resultat: ResultatSegmentation, source_pdf: Path, destination: Path) -> None:

@@ -1659,6 +1659,7 @@ def _remplir_page(
     verbose,
     ocr_language="auto",
     ocr_model_root=None,
+    ocr_images=True,
 ):
     """Construit les éléments d'une page, dans l'ordre de superposition."""
     geometrie = PageGeometry.depuis_page(page_pdf)
@@ -2141,7 +2142,7 @@ def _remplir_page(
             # lancé que sur les zones explicitement classées comme texte-image par
             # le plan, jamais sur toute la page graphique.
             zones_ocr_images = list(zones_images)
-            if zones_ocr_images:
+            if zones_ocr_images and ocr_images:
                 textes_images = extraire_rapidocr(
                     page_pdf,
                     polices,
@@ -2332,6 +2333,7 @@ def extraire(
     rapport: Rapport | None = None,
     ai_models_root=None,
     ocr_language: str = "auto",
+    ocr_images: bool = True,
 ) -> Document:
     """Construit l'IR complet à partir d'un PDF.
 
@@ -2466,6 +2468,7 @@ def extraire(
                     verbose,
                     ocr_language=ocr_language,
                     ocr_model_root=ai_models_root if ai_models_root is not None else layout_model_root,
+                    ocr_images=ocr_images,
                 )
             except Exception as erreur:  # noqa: BLE001 — une page ne fait jamais tout échouer
                 if strict:

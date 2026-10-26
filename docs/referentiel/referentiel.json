@@ -248,6 +248,46 @@
    "libelle": "Acronyme, abréviation"
   },
   {
+   "id": "personne",
+   "famille": "expression",
+   "libelle": "Nom de personne"
+  },
+  {
+   "id": "organisation",
+   "famille": "expression",
+   "libelle": "Organisation (institution, entreprise, agence)"
+  },
+  {
+   "id": "lieu",
+   "famille": "expression",
+   "libelle": "Lieu (pays, ville, région, adresse géographique)"
+  },
+  {
+   "id": "evenement",
+   "famille": "expression",
+   "libelle": "Événement nommé"
+  },
+  {
+   "id": "produit",
+   "famille": "expression",
+   "libelle": "Produit, logiciel, œuvre nommés"
+  },
+  {
+   "id": "montant",
+   "famille": "expression",
+   "libelle": "Montant monétaire"
+  },
+  {
+   "id": "telephone",
+   "famille": "expression",
+   "libelle": "Numéro de téléphone"
+  },
+  {
+   "id": "adresse_postale",
+   "famille": "expression",
+   "libelle": "Adresse postale"
+  },
+  {
    "id": "liste",
    "famille": "liste",
    "libelle": "Liste"

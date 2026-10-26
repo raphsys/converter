@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field, fields, is_dataclass
+from functools import lru_cache
 from enum import Enum
 from hashlib import sha256
 import json
@@ -230,21 +231,34 @@ def _legacy_text(element: object) -> str:
     return element_text(element)
 
 
-def _snapshot_value(value):
+@lru_cache(maxsize=None)
+def _noms_champs(classe) -> tuple[str, ...]:
+    """Field names of a dataclass: they depend on the class only."""
+    return tuple(item.name for item in fields(classe))
+
+
+def _snapshot_value(value, memo: dict | None = None):
+    """JSON-like snapshot. ``memo`` reuses the snapshot of an object already taken, while
+    nothing is mutated in between (one record build): its lines and spans recur."""
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, BBox):
         return [value.x0, value.y0, value.x1, value.y1]
     if is_dataclass(value):
-        names = {item.name for item in fields(value)}
+        if memo is not None and id(value) in memo:
+            return memo[id(value)]
+        names = set(_noms_champs(type(value)))
         names.update(name for name in vars(value) if not name.startswith("_"))
-        return {name: _snapshot_value(getattr(value, name)) for name in sorted(names)}
+        snapshot = {name: _snapshot_value(getattr(value, name), memo) for name in sorted(names)}
+        if memo is not None:
+            memo[id(value)] = snapshot
+        return snapshot
     if isinstance(value, dict):
-        return {str(key): _snapshot_value(item) for key, item in value.items()}
+        return {str(key): _snapshot_value(item, memo) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
-        return [_snapshot_value(item) for item in value]
+        return [_snapshot_value(item, memo) for item in value]
     if isinstance(value, (set, frozenset)):
-        return sorted((_snapshot_value(item) for item in value), key=repr)
+        return sorted((_snapshot_value(item, memo) for item in value), key=repr)
     if isinstance(value, bytes):
         return {"sha256": sha256(value).hexdigest(), "length": len(value)}
     if value is None or isinstance(value, (str, int, float, bool)):
@@ -370,6 +384,7 @@ def element_record_from_legacy(element, page_index, *, document=None):
     from pdfexact.ir import element_source_ids
 
     element_id = ensure_source_identity(element, page_index, source_pdf_id=getattr(document, "source_pdf_id", None) or "")
+    memo: dict = {}
     children = list(_descendants(element))
     lines = list(getattr(element, "lignes", ()) or ())
     spans = list(getattr(element, "spans", ()) or ())
@@ -397,10 +412,10 @@ def element_record_from_legacy(element, page_index, *, document=None):
         "geometry_locked": bool(getattr(element, "layout_frame_id", None) or getattr(element, "layout_frame_bbox", None)),
         "list_marker": getattr(element, "list_marker", None),
         "curved": bool(getattr(element, "curved", False)),
-        "line_geometries": [{**_snapshot_value(line), "bbox": _snapshot_value(line.bbox)} for line in lines],
-        "source_metadata": _snapshot_value(element),
+        "line_geometries": [{**_snapshot_value(line, memo), "bbox": _snapshot_value(line.bbox)} for line in lines],
+        "source_metadata": _snapshot_value(element, memo),
     })
-    runs = [_snapshot_value(span) for span in spans]
+    runs = [_snapshot_value(span, memo) for span in spans]
     style = deepcopy(getattr(element, "style", {}) or {})
     style.update({name: deepcopy(getattr(element, name)) for name in (
         "alignement", "vertical_alignement", "remplissage", "contour", "epaisseur_emu", "pointilles",

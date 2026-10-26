@@ -34,6 +34,11 @@ class Boite:
     ligne_index: int | None = None
 
 
+def ligne_visible(*lignes) -> bool:
+    """At least one visible character in these lines (spaces drawn by the PDF are not)."""
+    return any(span.texte.strip() for ligne in lignes for span in ligne.spans)
+
+
 def boites(document: Document, granularite: str) -> list[Boite]:
     """The segmentation bboxes: a text block per paragraph, or per line in ``fine``."""
     resultat = []
@@ -41,7 +46,8 @@ def boites(document: Document, granularite: str) -> list[Boite]:
         for element_index, element in enumerate(page.elements):
             kind = next((name for cls, name in _NATURES if isinstance(element, cls)), None)
             if kind == "text" and granularite == "fine" and getattr(element, "lignes", None):
-                cadres = [(ligne.bbox, ligne_index) for ligne_index, ligne in enumerate(element.lignes)]
+                cadres = [(ligne.bbox, ligne_index) for ligne_index, ligne in enumerate(element.lignes)
+                          if ligne_visible(ligne)]
             else:
                 cadres = [(getattr(element, "bbox", None), None)]
             for bbox, ligne_index in cadres:

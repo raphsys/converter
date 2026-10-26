@@ -140,6 +140,9 @@ def test_segmentation_provider_spans_its_stages_and_restores_caller(
     monkeypatch.setattr(reconstruct, "enregistrer_catalogue", lambda *_args: None)
     monkeypatch.setattr(reconstruct, "annotate_pdf_bboxes", lambda *_args: [])
     monkeypatch.setattr(reconstruct, "write_bbox_docx", fill)
+    monkeypatch.setattr(reconstruct, "identifier", lambda *args, **kwargs: None)
+    monkeypatch.setattr(reconstruct, "enregistrer_identification", lambda *args: None)
+    monkeypatch.setattr(reconstruct, "annoter_pdf_types", lambda *args: None)
 
     if fail_during_normalization:
         with pytest.raises(RuntimeError, match="normalization failed"):

@@ -21,6 +21,9 @@ dev = [
     "scikit-image>=0.22",
     "numpy>=1.26",
 ]
+banc = [
+    "gradio>=6.30",
+]
 layout-ai = [
     "paddlepaddle==3.2.0",
     "paddlex[ocr]==3.3.11",

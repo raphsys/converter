@@ -9,7 +9,7 @@ Rendu depuis `referentiel.json` (source unique) par `scripts/rendre_referentiel.
 - Portée : Les propriétés de bbox valent pour toute bbox ; un attribut vaut pour les familles de sa portée. Les lignes, runs et glyphes sont des bbox de granularité plus fine, pas des types. Le texte présent dans une image est porté par des bbox enfants d'origine ocr.
 - Priorité : Une visualisation (graphique, diagramme, carte) l'emporte sur image ou vectoriel ; image_generique quand seule la famille image est établie ; inconnu quand même la famille ne l'est pas ; page_numerisee si l'image porte le contenu de la page, arriere_plan sinon ; un objet de la couche d'annotation prend un type annotation, un objet imprimé un type image ; signature pour une marque de signature, ecriture_manuscrite pour tout autre texte manuscrit ; lien est la zone cliquable, url le texte écrit : les deux coexistent.
 
-**87 types, 32 propriétés de bbox, 62 attributs, 3 attributs de document, 3 attributs de page.**
+**95 types, 32 propriétés de bbox, 62 attributs, 3 attributs de document, 3 attributs de page.**
 
 ## 1. Types
 
@@ -81,6 +81,14 @@ Rendu depuis `referentiel.json` (source unique) par `scripts/rendre_referentiel.
 | `grandeur` | Grandeur avec unité, pourcentage, valeur scientifique |
 | `date` | Date |
 | `acronyme` | Acronyme, abréviation |
+| `personne` | Nom de personne |
+| `organisation` | Organisation (institution, entreprise, agence) |
+| `lieu` | Lieu (pays, ville, région, adresse géographique) |
+| `evenement` | Événement nommé |
+| `produit` | Produit, logiciel, œuvre nommés |
+| `montant` | Montant monétaire |
+| `telephone` | Numéro de téléphone |
+| `adresse_postale` | Adresse postale |
 
 ### Listes (`liste`)
 

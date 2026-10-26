@@ -11,6 +11,7 @@ from copy import deepcopy
 from statistics import median
 import warnings
 
+from pdfexact.analysis.paragraphes import fusionner_paragraphes
 from pdfexact.analysis.geometry import axis_overlap_ratio, intersection_area
 from pdfexact.analysis.provenance import observation_is_preserved
 from pdfexact.analysis.semantic import (
@@ -70,8 +71,23 @@ def _verified_line_ancestors(page, element, ligne):
     return tuple(ancestors)
 
 
+def _copie_sans_lignes(element):
+    """deepcopy of the element without its rows (and, for a flow paragraph, their spans):
+    each unit keeps one row, and a long block used to be copied whole once per row."""
+    lignes, element.lignes = element.lignes, []
+    spans = None
+    if isinstance(element, FlowParagraph):
+        spans, element.spans = element.spans, []
+    try:
+        return deepcopy(element)
+    finally:
+        element.lignes = lignes
+        if spans is not None:
+            element.spans = spans
+
+
 def _ligne_unit(element, ligne, ordinal: int, owner_key: str, *, page=None):
-    unit = deepcopy(element)
+    unit = _copie_sans_lignes(element)
     unit.lignes = [deepcopy(ligne)]
     unit.bbox = ligne.bbox
     inherit_direction = _default_line_direction(ligne) and (
@@ -503,6 +519,16 @@ def segmenter_page_textes(page) -> None:
             local = [unit for unit in units if unit.presentation["segmentation_owner"] == owner]
             groupes.extend(_segment_units(local, obstacles, protected=protected))
 
+    # Rows of one paragraph split across groups: geometry, then the layout zone or the meaning.
+    # Blank rows and validated paragraphs separate like drawings do.
+    separations = (*obstacles, *(element.bbox for element in protected),
+                   *(ligne.bbox for lignes, _ in blank_sources for ligne in lignes if not line_has_text(ligne)),
+                   *(ligne.bbox for element in text_elements if id(element) in retained_blocks
+                     for ligne in getattr(element, "lignes", ())))
+    # Groups decided by the comprehension AI are final.
+    decides = [g for g in groupes if any(u.presentation.get("comprehension_ia") == "compris" for u in g)]
+    groupes = [*decides, *fusionner_paragraphes([g for g in groupes if not any(g is d for d in decides)],
+                                                zones=getattr(page, "zones_layout", ()) or (), obstacles=separations)]
     groupes = _join_source_fragments([*groupes, *([element] for element in protected)], obstacles, protected)
     # Keep separators as exact source children, without making them AI units or
     # changing the already established visible groups and their geometry.

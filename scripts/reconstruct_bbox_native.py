@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lanceur du pipeline : SEGMENTATION, puis catalogue, PDF annoté et DOCX des bboxes."""
+"""Lanceur du pipeline : SEGMENTATION puis IDENTIFICATION, avec leurs catalogues et PDF annotés."""
 from __future__ import annotations
 
 import argparse
@@ -9,6 +9,7 @@ from time import perf_counter
 import pymupdf
 
 from pdfexact.bboxes import annotate_pdf_bboxes, write_bbox_docx
+from pdfexact.identification import annoter_pdf_types, enregistrer_identification, identifier
 from pdfexact.segmentation import OptionsSegmentation, enregistrer_catalogue, segmenter
 
 
@@ -54,10 +55,15 @@ def _options(args) -> OptionsSegmentation:
         text_understanding_url=args.text_understanding_url,
         text_understanding_timeout=args.text_understanding_timeout,
         granularite=args.granularite,
+        ocr_images=args.ocr_images,
     )
 
 
-def _rapporter(resultat, records, args) -> None:
+def _types_out(args) -> Path:
+    return args.types_out or args.pdf_out.with_name(f"{args.pdf_out.stem}_types.pdf")
+
+
+def _rapporter(resultat, records, args, identification=None) -> None:
     by_kind: dict[str, int] = {}
     for record in records:
         by_kind[record.kind] = by_kind.get(record.kind, 0) + 1
@@ -90,6 +96,17 @@ def _rapporter(resultat, records, args) -> None:
             non_compris[cle] = non_compris.get(cle, 0) + 1
     for (page, raison), nombre in non_compris.items():
         print(f"vision_ia: page={page} non-compris={nombre} reason={raison}")
+    if identification is not None:
+        statuts: dict[str, int] = {}
+        types: dict[str, int] = {}
+        for element in identification.elements:
+            statuts[element.statut] = statuts.get(element.statut, 0) + 1
+            types[element.type] = types.get(element.type, 0) + 1
+        print("identification: " + " ".join(f"{k}={v}" for k, v in sorted(statuts.items()))
+              + f" | expressions={len(identification.expressions)} | sources={','.join(identification.identificateurs)}")
+        print("types: " + " ".join(f"{k}={v}" for k, v in sorted(types.items(), key=lambda item: -item[1])))
+        print(f"identification_catalogue={args.docx_out.with_suffix('.identification.json')}")
+        print(f"types_pdf={_types_out(args)}")
     print("durees: " + " ".join(f"{nom}={valeur:.1f}s" for nom, valeur in resultat.durees.items())
           + f" total={sum(resultat.durees.values()):.1f}s")
 
@@ -130,6 +147,12 @@ def main() -> int:
         "--granularite", choices=("fine", "blocs"), default="blocs",
         help="fine : lignes et details des images ; blocs : paragraphes et images entieres",
     )
+    parser.add_argument("--types-out", type=Path, default=None,
+                        help="PDF annote par type (defaut : <pdf-out>_types.pdf)")
+    parser.add_argument("--ocr-images", action="store_true",
+                        help="lire aussi par OCR le texte des images des pages natives (lent ; defaut : seulement les pages sans texte natif)")
+    parser.add_argument("--sans-ia-identification", action="store_true",
+                        help="identification sans SmolVLM ni PP-FormulaNet (regles, PaddleX et OCR seulement)")
     args = parser.parse_args()
 
     resultat = segmenter(args.source_pdf, _options(args))
@@ -138,7 +161,14 @@ def main() -> int:
     records = annotate_pdf_bboxes(args.source_pdf, args.pdf_out, resultat.boites())
     write_bbox_docx(resultat.document, args.docx_out, records)
     resultat.durees["sorties"] = perf_counter() - debut
-    _rapporter(resultat, records, args)
+    debut = perf_counter()
+    ia = None if args.sans_ia_identification else "auto"
+    identification = identifier(resultat, args.source_pdf, vision=ia, formulenet=ia,
+                                model_root=args.ai_models_root or args.layout_model_root)
+    enregistrer_identification(identification, args.source_pdf, args.docx_out.with_suffix(".identification.json"))
+    annoter_pdf_types(args.source_pdf, _types_out(args), identification)
+    resultat.durees["identification"] = perf_counter() - debut
+    _rapporter(resultat, records, args, identification)
     return 0
 
 

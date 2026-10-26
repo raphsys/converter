@@ -227,7 +227,9 @@ def _classe_nom_police(nom: str) -> str:
     return "unknown"
 
 
-@lru_cache(maxsize=512)
+# Unbounded: one small tuple per indexed font, while the library holds more fonts than
+# a bounded LRU would keep (it then re-read every file on every substitution).
+@lru_cache(maxsize=None)
 def _signature_metrique(chemin: Path | str) -> tuple[float, ...] | None:
     try:
         police = TTFont(chemin, fontNumber=0, lazy=True)

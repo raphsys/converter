@@ -320,3 +320,11 @@ def test_le_dossier_dextension_du_projet_est_charge_par_defaut(tmp_path, monkeyp
     monkeypatch.chdir(tmp_path)
 
     assert extension in dossiers_par_defaut()
+
+
+def test_metric_signatures_are_kept_for_every_indexed_font():
+    # The library indexes ~730 candidates: a 512-entry LRU re-read every font file on
+    # every substitution (51 s on one page of a mathematics book).
+    from pdfexact.fontlib import _signature_metrique
+
+    assert _signature_metrique.cache_info().maxsize is None

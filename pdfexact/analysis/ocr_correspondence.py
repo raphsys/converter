@@ -5,6 +5,8 @@ from copy import copy, deepcopy
 from dataclasses import fields, is_dataclass
 from enum import Enum
 from hashlib import sha256
+from contextlib import contextmanager
+from contextvars import ContextVar
 import json
 from math import atan2, isfinite
 
@@ -80,10 +82,22 @@ def _snapshot(value):
     return _snapshot_value(value)
 
 
+# Digests taken during one proof: nothing is mutated while a proof is built, and a page
+# of formulas holds hundreds of fragments re-hashed for every row otherwise. The value is
+# kept with its digest so that its id cannot be reused by another object meanwhile.
+_DIGESTS: ContextVar[dict | None] = ContextVar("ocr_correspondence_digests", default=None)
+
+
 def _digest(value):
+    memo = _DIGESTS.get()
+    if memo is not None and id(value) in memo:
+        return memo[id(value)][1]
     encoded = json.dumps(_snapshot(value), sort_keys=True, separators=(",", ":"),
                          ensure_ascii=True, allow_nan=False).encode("utf-8")
-    return sha256(encoded).hexdigest()
+    digest = sha256(encoded).hexdigest()
+    if memo is not None:
+        memo[id(value)] = (value, digest)
+    return digest
 
 
 
@@ -350,12 +364,27 @@ def _build(observation_root, native_line, inventory, binding):
 
 def build_ocr_native_correspondence(observation_root, native_line, inventory, *, page_binding):
     """Return acquisition proof plus errors; never record an event or choose output."""
+    with memoire_empreintes():
+        try:
+            return _build(observation_root, native_line, inventory, page_binding), []
+        except _Invalid as error:
+            return None, [str(error)]
+        except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+            return None, ["invalid-correspondence-source"]
+
+
+@contextmanager
+def memoire_empreintes():
+    """Share digests across the proofs of one page: its inventory holds immutable
+    acquisition copies. Inside an open memory, a nested one reuses it."""
+    if _DIGESTS.get() is not None:
+        yield
+        return
+    jeton = _DIGESTS.set({})
     try:
-        return _build(observation_root, native_line, inventory, page_binding), []
-    except _Invalid as error:
-        return None, [str(error)]
-    except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
-        return None, ["invalid-correspondence-source"]
+        yield
+    finally:
+        _DIGESTS.reset(jeton)
 
 
 def selection_event_details(proof):

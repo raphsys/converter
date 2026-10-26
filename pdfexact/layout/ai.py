@@ -22,6 +22,8 @@ from pdfexact.layout.model import LayoutPage
 
 DEFAULT_LAYOUT_PROVIDER = "paddlex"
 DEFAULT_LAYOUT_MODEL = "ppstructurev3/PP-DocLayout_plus-L"
+# As in vysi (VYSI_PDF_LAYOUT_MIN_CONFIDENCE): a zone the model is less sure of is dropped.
+CONFIANCE_MIN_ZONE = float(os.environ.get("PDFEXACT_LAYOUT_MIN_CONFIDENCE", "0.20"))
 _MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
 
 
@@ -200,6 +202,7 @@ def detecter_layout_ia(
             required,
         )
 
+    zones = filtrer_confiance(zones)
     if not zones:
         return _failure_or_fallback(
             analyse, provider, model_id, model_path, "layout_ai_empty", required
@@ -577,6 +580,11 @@ def _aire(bbox: BBox) -> int:
 
 def _intersection(a: BBox, b: BBox) -> int:
     return intersection_area(a, b)
+
+
+def filtrer_confiance(zones: list[LayoutAIZone], seuil: float = CONFIANCE_MIN_ZONE) -> list[LayoutAIZone]:
+    """Zones at or above the confidence floor (an unknown confidence is kept)."""
+    return [zone for zone in zones if zone.confidence is None or zone.confidence >= seuil]
 
 
 def _dedoublonner(zones: list[LayoutAIZone]) -> list[LayoutAIZone]:

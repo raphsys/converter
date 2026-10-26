@@ -201,3 +201,45 @@ def test_spatial_policy_thresholds_are_fixed_not_proof_controlled(acquired, gate
         observation, None, records(doc.pages[0]), page_binding=doc.pages[0].ocr_correspondence_page_binding,
     )
     assert (proof is not None and errors == []) is accepted
+
+
+def test_each_source_node_is_snapshotted_once_per_proof(acquired, monkeypatch):
+    # A math page holds hundreds of fragments: re-hashing every tree for every row exploded.
+    module = helper()
+    vus = []
+    original = module._snapshot
+
+    def compte(value):
+        if isinstance(value, (TextBox, Line, Span)):  # the costly trees (geometry fields are tiny)
+            vus.append(id(value))
+        return original(value)
+
+    monkeypatch.setattr(module, "_snapshot", compte)
+    doc, native, observation = acquired
+    page = doc.pages[0]
+    proof, errors = module.build_ocr_native_correspondence(
+        observation, native.lignes[0], records(page), page_binding=page.ocr_correspondence_page_binding)
+    assert errors == [] and proof is not None
+    assert len(vus) == len(set(vus))
+
+
+def test_a_page_loop_snapshots_its_immutable_inventory_only_once(acquired, monkeypatch):
+    module = helper()
+    vus = []
+    original = module._snapshot
+
+    def compte(value):
+        if isinstance(value, (TextBox, Line, Span)):
+            vus.append(id(value))
+        return original(value)
+
+    monkeypatch.setattr(module, "_snapshot", compte)
+    doc, native, observation = acquired
+    page = doc.pages[0]
+    inventaire = records(page)
+    with module.memoire_empreintes():
+        for _ in range(3):
+            proof, errors = module.build_ocr_native_correspondence(
+                observation, native.lignes[0], inventaire, page_binding=page.ocr_correspondence_page_binding)
+            assert errors == [] and proof is not None
+    assert len(vus) == len(set(vus))

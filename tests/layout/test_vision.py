@@ -82,6 +82,10 @@ def test_ocr_reads_only_the_selected_zones_and_marks_text_in_image(monkeypatch, 
     assert calls["zones_cibles"] == [zone.bbox] and calls["zones_ignorees"] == [native_box]
     assert read.attributes["text_in_image"] is True
 
+    calls.clear()
+    assert ocr.lire_texte_des_images(Document([page]), source, {}, dpi=100, pages={5}) == 0
+    assert calls == {}  # page 0 is not among the pages to read
+
 
 
 

@@ -1,8 +1,8 @@
 {
- "pages_sha256": "bd7db250812c93736709e642d967b2786a437f7db064c1984afaee0e79ce73b7",
+ "pages_sha256": "80483e10d8d2edad2b2141be4cff6b31508ba5a6b1da2e74696f6a3f44caf49f",
  "totals": {
   "pages": 3,
-  "text_elements": 43,
+  "text_elements": 41,
   "lines": 157,
   "runs": 167,
   "visual_elements": 8
@@ -95,26 +95,8 @@
    5065200,
    3909600,
    6051600,
-   8164800,
-   "highest \nmixing\nsalt wedge\nslightly stratified\nvertically-mixed \nstorms\npeat\nred mangrove\nflooded\nsalinity\nwrack\nconversion\npollution\nbiomagnification\nsediments\neutrophication\nnutrient\npathogens\ncombined sewage \t\n   overflows \ninvasives\nNERRS\nincreases\ndissolved oxygen"
-  ],
-  [
-   0,
-   "TextBox",
-   5065200,
-   8179200,
-   5839200,
-   8341200,
-   "photosynthesis"
-  ],
-  [
-   0,
-   "TextBox",
-   5065200,
-   8355600,
-   5824800,
    9054000,
-   "organic matter\nturbidity\npH\nchlorophyll "
+   "highest \nmixing\nsalt wedge\nslightly stratified\nvertically-mixed \nstorms\npeat\nred mangrove\nflooded\nsalinity\nwrack\nconversion\npollution\nbiomagnification\nsediments\neutrophication\nnutrient\npathogens\ncombined sewage \t\n   overflows \ninvasives\nNERRS\nincreases\ndissolved oxygen\nphotosynthesis\norganic matter\nturbidity\npH\nchlorophyll "
   ],
   [
    0,

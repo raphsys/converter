@@ -37,6 +37,9 @@ def pipeline(monkeypatch, tmp_path):
     monkeypatch.setattr(reconstruct, "enregistrer_catalogue", lambda *args: None)
     monkeypatch.setattr(reconstruct, "annotate_pdf_bboxes", lambda *args: [])
     monkeypatch.setattr(reconstruct, "write_bbox_docx", lambda *args: [])
+    monkeypatch.setattr(reconstruct, "identifier", lambda *args, **kwargs: None)
+    monkeypatch.setattr(reconstruct, "enregistrer_identification", lambda *args: None)
+    monkeypatch.setattr(reconstruct, "annoter_pdf_types", lambda *args: None)
     calls["argv"] = ["reconstruct_bbox_native.py", "unused.pdf", "--pdf-out", str(tmp_path / "bbox.pdf"),
                      "--docx-out", str(tmp_path / "out.docx")]
     with comprehension.contexte_comprehension_texte():
@@ -153,3 +156,14 @@ def test_font_library_metadata_warnings_are_silenced():
     import pdfexact.fontlib  # noqa: F401
 
     assert logging.getLogger("fontTools.ttLib").getEffectiveLevel() >= logging.ERROR
+
+
+
+def test_text_in_images_is_read_only_on_request_as_in_vysi(monkeypatch, tmp_path, pipeline):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", pipeline["argv"])
+    assert reconstruct.main() == 0
+    assert pipeline["extract"]["ocr_images"] is False
+    monkeypatch.setattr(sys, "argv", pipeline["argv"] + ["--ocr-images"])
+    assert reconstruct.main() == 0
+    assert pipeline["extract"]["ocr_images"] is True

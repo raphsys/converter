@@ -5,14 +5,19 @@ Ajouter une identité : déclarer le type dans le référentiel, puis enregistre
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from pdfexact.identification.referentiel import famille
 
+logger = logging.getLogger(__name__)
+
 # Status thresholds of a decision.
 SEUIL_IDENTIFIE = 0.6
 ECART_IDENTIFIE = 0.15
+# Candidates below this score are noise: they never impose a type.
+SCORE_MIN = 0.15
 ALTERNATIVES_MAX = 3
 
 
@@ -35,14 +40,10 @@ class Decision:
 
 @dataclass(frozen=True)
 class ContextePage:
-    """What rules may know about the page of an element."""
+    """The page of an element, and what the pipeline lends the sources (renderers…)."""
 
     page: object
-    premiere_page: bool
-    corps_pt: float
-    taille_max_pt: float
-    boites_texte: tuple = ()
-    boites_ocr: tuple = ()
+    premiere_page: bool = False
     extra: dict = field(default_factory=dict)
 
 
@@ -51,6 +52,9 @@ class Identificateur(Protocol):
     """A source of identification: proposes candidate types for some natures of objects.
 
     ``natures``: the object natures it handles ("text", "image", "shape", "table", "link").
+    Sources complement each other in a cascade: an identificateur may define
+    ``pertinent(element, contexte, candidats) -> bool``; it is then consulted only when
+    the candidates already proposed by the sources before it leave it work to do.
     """
 
     nom: str
@@ -82,10 +86,31 @@ class Registre:
         return tuple(i.nom for i in self._identificateurs)
 
 
+def consulter(identificateurs, element, contexte: ContextePage, echecs: list[str] | None = None) -> list[Candidat]:
+    """Run the identificateurs in order; each sees what the previous ones proposed.
+
+    A source failing on an element is logged and noted in ``echecs``; the others go on.
+    """
+    candidats: list[Candidat] = []
+    for identificateur in identificateurs:
+        try:
+            pertinent = getattr(identificateur, "pertinent", None)
+            if pertinent is not None and not pertinent(element, contexte, tuple(candidats)):
+                continue
+            candidats.extend(identificateur.candidats(element, contexte))
+        except Exception as erreur:
+            logger.warning("identification : source %s en échec sur %s (page %s) : %s", identificateur.nom,
+                           type(element).__name__, getattr(contexte.page, "index", "?"), erreur, exc_info=True)
+            if echecs is not None:
+                echecs.append(f"{identificateur.nom} en échec : {erreur}")
+    return candidats
+
+
 def decider(candidats: list[Candidat], repli: str = "inconnu") -> Decision:
     """Combine the scores of each type (1 - Π(1 - s)) and settle the status."""
     for candidat in candidats:
         famille(candidat.type)
+    candidats = [c for c in candidats if c.score >= SCORE_MIN]
     if not candidats:
         return Decision(repli, famille(repli), "non_identifie", 0.0, (), ())
     restes: dict[str, float] = {}

@@ -77,3 +77,25 @@ def test_pages_keep_their_layout_zones():
     from pdfexact.ir import Page
 
     assert Page(0, 1, 1).zones_layout == []
+
+
+def _ligne(texte, y):
+    return Line(_box(72, y, 300, y + 10), [Span(texte, FontRef("f", "Arial", False, False), 10, "000000")], u(10), u(228))
+
+
+def test_a_text_without_any_visible_character_is_not_segmented():
+    from pdfexact.segmentation.pipeline import _normaliser_texte
+
+    vide = TextBox(_box(540, 173, 545, 189), [_ligne("  ", 175)])
+    plein = TextBox(_box(72, 100, 300, 110), [_ligne("Final report", 100)])
+    document = Document([Page(0, u(612), u(792), [vide, plein])], media={})
+    _normaliser_texte(document)
+    textes = [e for e in document.pages[0].elements if isinstance(e, TextBox)]
+    assert ["".join(s.texte for l in e.lignes for s in l.spans) for e in textes] == ["Final report"]
+
+
+def test_fine_skips_the_empty_lines_of_a_text_block():
+    bloc = TextBox(_box(72, 100, 300, 134), [_ligne("first", 100), _ligne("  ", 112), _ligne("third", 124)])
+    document = Document([Page(0, u(612), u(792), [bloc])], media={})
+    assert [b.ligne_index for b in boites(document, "fine")] == [0, 2]
+    assert len(boites(document, "blocs")) == 1
